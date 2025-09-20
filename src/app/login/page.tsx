@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
-import { Eye, EyeOff, Power, Zap, Lock, Mail, User, ArrowRight } from 'lucide-react'
+import { Eye, EyeOff, Power, Zap, Lock, Mail, ArrowRight } from 'lucide-react'
 
 interface FormData {
   email: string
@@ -109,7 +110,8 @@ export default function AuthPage() {
           })
         }
       }
-    } catch (error) {
+    } catch (err) {
+      console.error('Auth error:', err)
       setErrors({ general: 'An unexpected error occurred. Please try again.' })
     } finally {
       setIsLoading(false)
@@ -330,12 +332,12 @@ export default function AuthPage() {
             >
               Test API
             </a>
-            <a 
+            <Link 
               href="/" 
               className="text-gray-400 hover:text-gray-300 text-sm transition-colors"
             >
               Home
-            </a>
+            </Link>
           </div>
         </div>
       </div>

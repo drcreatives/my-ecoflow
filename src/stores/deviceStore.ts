@@ -38,7 +38,7 @@ interface DeviceActions {
   controlDevice: (deviceId: string, command: {
     cmdSet: number
     cmdId: number
-    param: any
+    param: Record<string, unknown>
   }) => Promise<boolean>
   
   // Utility actions
