@@ -59,6 +59,7 @@ const navigationItems = [
 const SidebarContent = ({ onClose }: SidebarProps) => {
   const pathname = usePathname()
   const { user, logout } = useAuthStore()
+  const isMobile = useIsMobile()
   
   const handleLogout = async () => {
     try {
@@ -70,24 +71,9 @@ const SidebarContent = ({ onClose }: SidebarProps) => {
   }
 
   return (
-    <div className="h-full bg-primary-dark border-r border-gray-700 w-70 flex flex-col">
-      {/* Header */}
-      <div className="h-16 flex items-center mx-4 justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-accent-green rounded-md flex items-center justify-center">
-            <Zap size={20} className="text-white" />
-          </div>
-          <span className="text-lg font-bold text-accent-gray">
-            EcoFlow
-          </span>
-        </div>
-      </div>
-
-      {/* Divider */}
-      <div className="h-px bg-gray-700 mx-4" />
-
+    <div className="h-full bg-primary-dark border-r border-gray-700 w-full flex flex-col">
       {/* Navigation */}
-      <nav className="flex-1 mt-4 px-3 space-y-1">
+      <nav className="flex-1 mt-4 px-3 space-y-1 overflow-y-auto">
         {navigationItems.map((item) => {
           const isActive = pathname === item.href
           const Icon = item.icon
@@ -96,16 +82,27 @@ const SidebarContent = ({ onClose }: SidebarProps) => {
             <Link key={item.href} href={item.href} onClick={onClose}>
               <button
                 className={cn(
-                  'w-full flex items-start gap-3 p-3 rounded-md text-left transition-colors h-12',
+                  'w-full flex items-start gap-3 p-4 rounded-md text-left transition-colors touch-manipulation',
+                  'min-h-[60px]', // Better touch target size
                   isActive 
                     ? 'bg-accent-green text-white' 
-                    : 'text-accent-gray hover:bg-gray-700'
+                    : 'text-accent-gray hover:bg-gray-700 active:bg-gray-600'
                 )}
               >
-                <Icon size={20} className="flex-shrink-0 mt-0.5" />
+                <Icon size={isMobile ? 22 : 20} className="flex-shrink-0 mt-1" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium">{item.label}</div>
-                  <div className="text-xs opacity-70">{item.description}</div>
+                  <div className={cn(
+                    "font-medium",
+                    isMobile ? "text-base" : "text-sm"
+                  )}>
+                    {item.label}
+                  </div>
+                  <div className={cn(
+                    "opacity-70",
+                    isMobile ? "text-sm" : "text-xs"
+                  )}>
+                    {item.description}
+                  </div>
                 </div>
               </button>
             </Link>
@@ -116,15 +113,24 @@ const SidebarContent = ({ onClose }: SidebarProps) => {
       {/* User Profile & Logout */}
       <div className="p-4 border-t border-gray-700">
         {user && (
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 bg-accent-green rounded-full flex items-center justify-center text-sm font-bold text-white">
+          <div className="flex items-center gap-3 mb-4">
+            <div className={cn(
+              "bg-accent-green rounded-full flex items-center justify-center font-bold text-white",
+              isMobile ? "w-10 h-10 text-base" : "w-8 h-8 text-sm"
+            )}>
               {user.email?.[0]?.toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-accent-gray truncate">
+              <div className={cn(
+                "font-medium text-accent-gray truncate",
+                isMobile ? "text-base" : "text-sm"
+              )}>
                 {user.email}
               </div>
-              <div className="text-xs text-gray-400">
+              <div className={cn(
+                "text-gray-400",
+                isMobile ? "text-sm" : "text-xs"
+              )}>
                 Online
               </div>
             </div>
@@ -133,9 +139,12 @@ const SidebarContent = ({ onClose }: SidebarProps) => {
 
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 p-2 text-gray-400 hover:text-accent-gray hover:bg-gray-700 rounded-md transition-colors"
+          className={cn(
+            'w-full flex items-center gap-3 text-gray-400 hover:text-accent-gray hover:bg-gray-700 active:bg-gray-600 rounded-md transition-colors touch-manipulation',
+            isMobile ? 'p-4 text-base' : 'p-2'
+          )}
         >
-          <LogOut size={20} />
+          <LogOut size={isMobile ? 22 : 20} />
           <span>Sign Out</span>
         </button>
       </div>
@@ -150,29 +159,44 @@ export const Sidebar = () => {
 
   if (isMobile) {
     return (
-      <div>
-        <button
-          onClick={toggleSidebar}
-          className="fixed top-4 left-4 z-50 bg-primary-dark border border-gray-700 text-accent-gray hover:text-white p-2 rounded-md flex items-center gap-2 transition-colors"
-        >
-          <Menu size={20} />
-          <span>Menu</span>
-        </button>
-        
+      <>
+        {/* Mobile Sidebar Overlay */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 bg-black/60 z-40"
+            className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
             onClick={toggleSidebar}
-          >
-            <div
-              className="w-70 h-full bg-primary-dark"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <SidebarContent onClose={toggleSidebar} />
-            </div>
-          </div>
+          />
         )}
-      </div>
+        
+        {/* Mobile Sidebar */}
+        <div
+          className={cn(
+            "fixed top-0 left-0 h-full w-80 bg-primary-dark z-50 transition-transform duration-300 ease-out",
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+        >
+          {/* Mobile Header */}
+          <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-accent-green rounded-md flex items-center justify-center">
+                <Zap size={20} className="text-white" />
+              </div>
+              <span className="text-lg font-bold text-accent-gray">
+                EcoFlow
+              </span>
+            </div>
+            <button
+              onClick={toggleSidebar}
+              className="p-2 text-accent-gray hover:bg-gray-700 rounded-md transition-colors touch-manipulation"
+              aria-label="Close navigation menu"
+            >
+              <Menu size={20} />
+            </button>
+          </div>
+          
+          <SidebarContent onClose={toggleSidebar} />
+        </div>
+      </>
     )
   }
 

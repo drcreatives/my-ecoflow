@@ -140,25 +140,25 @@ export default function AuthPage() {
 
       <div className="relative w-full max-w-md">
         {/* Logo/Brand Section */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-green-500 to-green-400 rounded-xl mb-4">
-            <Power className="w-8 h-8 text-black" />
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-r from-green-500 to-green-400 rounded-xl mb-3 sm:mb-4">
+            <Power className="w-7 h-7 sm:w-8 sm:h-8 text-black" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
             EcoFlow Dashboard
           </h1>
-          <p className="text-gray-400">
+          <p className="text-gray-400 text-sm sm:text-base">
             Monitor and control your EcoFlow devices
           </p>
         </div>
 
         {/* Auth Form */}
-        <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800/50 rounded-2xl p-8 shadow-2xl">
+        <div className="bg-gray-900/60 backdrop-blur-lg border border-gray-700/50 rounded-2xl p-6 sm:p-8 shadow-2xl">
           {/* Mode Toggle */}
-          <div className="flex bg-gray-800/50 rounded-lg p-1 mb-8">
+          <div className="flex bg-gray-800/50 rounded-lg p-1 mb-6 sm:mb-8">
             <button
               onClick={() => setIsLogin(true)}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all touch-manipulation ${
                 isLogin 
                   ? 'bg-green-500 text-black shadow-lg' 
                   : 'text-gray-400 hover:text-white'
@@ -168,7 +168,7 @@ export default function AuthPage() {
             </button>
             <button
               onClick={() => setIsLogin(false)}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all touch-manipulation ${
                 !isLogin 
                   ? 'bg-green-500 text-black shadow-lg' 
                   : 'text-gray-400 hover:text-white'
@@ -179,7 +179,7 @@ export default function AuthPage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
             {/* Email Field */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -191,12 +191,14 @@ export default function AuthPage() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  className={`w-full h-12 pl-12 pr-4 py-3 bg-gray-800/50 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-all ${
+                  className={`w-full h-12 sm:h-14 pl-12 pr-4 py-3 bg-gray-800/50 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-all text-base ${
                     errors.email 
                       ? 'border-red-500 focus:ring-red-500/20' 
                       : 'border-gray-700 focus:border-green-500 focus:ring-green-500/20'
                   }`}
                   placeholder="Enter your email"
+                  autoComplete="email"
+                  inputMode="email"
                 />
               </div>
               {errors.email && (
@@ -215,17 +217,19 @@ export default function AuthPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
-                  className={`w-full h-12 pl-12 pr-12 py-3 bg-gray-800/50 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-all ${
+                  className={`w-full h-12 sm:h-14 pl-12 pr-12 py-3 bg-gray-800/50 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-all text-base ${
                     errors.password 
                       ? 'border-red-500 focus:ring-red-500/20' 
                       : 'border-gray-700 focus:border-green-500 focus:ring-green-500/20'
                   }`}
                   placeholder="Enter your password"
+                  autoComplete={isLogin ? "current-password" : "new-password"}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors z-10"
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors z-10 touch-manipulation p-1"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -247,17 +251,19 @@ export default function AuthPage() {
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={formData.confirmPassword || ''}
                     onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                    className={`w-full h-12 pl-12 pr-12 py-3 bg-gray-800/50 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-all ${
+                    className={`w-full h-12 sm:h-14 pl-12 pr-12 py-3 bg-gray-800/50 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-all text-base ${
                       errors.confirmPassword 
                         ? 'border-red-500 focus:ring-red-500/20' 
                         : 'border-gray-700 focus:border-green-500 focus:ring-green-500/20'
                     }`}
                     placeholder="Confirm your password"
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors z-10"
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors z-10 touch-manipulation p-1"
+                    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
                   >
                     {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -270,7 +276,7 @@ export default function AuthPage() {
 
             {/* General Error */}
             {errors.general && (
-              <div className={`p-4 rounded-lg ${
+              <div className={`p-3 sm:p-4 rounded-lg ${
                 errors.general.includes('Check your email') 
                   ? 'bg-green-500/10 border border-green-500/20 text-green-400'
                   : 'bg-red-500/10 border border-red-500/20 text-red-400'
@@ -283,7 +289,7 @@ export default function AuthPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full h-12 bg-gradient-to-r from-green-500 to-green-400 hover:from-green-600 hover:to-green-500 text-black font-medium px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center group"
+              className="w-full h-12 sm:h-14 bg-gradient-to-r from-green-500 to-green-400 hover:from-green-600 hover:to-green-500 text-black font-medium px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center group touch-manipulation text-base"
             >
               {isLoading ? (
                 <div className="flex items-center">

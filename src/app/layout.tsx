@@ -12,7 +12,15 @@ export const metadata: Metadata = {
   description: 'Monitor and manage your EcoFlow Delta 2 power station',
   keywords: ['EcoFlow', 'Delta 2', 'Power Station', 'Battery Monitor', 'Energy Management'],
   authors: [{ name: 'EcoFlow Dashboard' }],
-  viewport: 'width=device-width, initial-scale=1',
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: 'cover'
+  },
+  themeColor: '#44af21',
+  manifest: '/manifest.json',
 }
 
 export default function RootLayout({
