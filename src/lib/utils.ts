@@ -5,6 +5,79 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// EcoFlow design system utilities
+export const ecoflowStyles = {
+  // Backgrounds
+  bg: {
+    primary: 'bg-primary-black',
+    primaryDark: 'bg-primary-dark',
+    card: 'bg-gray-900/50 backdrop-blur-sm',
+    input: 'bg-gray-800/50',
+  },
+  
+  // Text colors
+  text: {
+    primary: 'text-accent-gray',
+    secondary: 'text-gray-400',
+    accent: 'text-accent-green',
+    error: 'text-red-400',
+    warning: 'text-status-warning',
+  },
+  
+  // Borders
+  border: {
+    default: 'border border-gray-700',
+    accent: 'border border-accent-green',
+    error: 'border border-red-500',
+    success: 'border border-accent-green',
+  },
+  
+  // Buttons
+  button: {
+    primary: 'bg-accent-green hover:bg-accent-green-secondary text-black font-medium py-2 px-4 rounded-lg transition-colors',
+    secondary: 'bg-gray-800 hover:bg-gray-700 text-accent-gray border border-gray-600 py-2 px-4 rounded-lg transition-colors',
+    ghost: 'hover:bg-gray-800/50 text-accent-gray py-2 px-4 rounded-lg transition-colors',
+  },
+  
+  // Inputs
+  input: {
+    default: cn(
+      'w-full h-12 px-4 py-3 bg-gray-800/50 border border-gray-700',
+      'text-white placeholder-gray-500 rounded-lg',
+      'focus:outline-none focus:ring-2 focus:ring-accent-green/20 focus:border-accent-green',
+      'transition-all'
+    ),
+    error: cn(
+      'w-full h-12 px-4 py-3 bg-gray-800/50 border border-red-500',
+      'text-white placeholder-gray-500 rounded-lg',
+      'focus:outline-none focus:ring-2 focus:ring-red-500/20',
+      'transition-all'
+    ),
+  },
+  
+  // Cards
+  card: {
+    default: 'bg-gray-900/50 backdrop-blur-sm border border-gray-800/50 rounded-2xl p-6 shadow-2xl',
+    accent: 'bg-gray-900/50 backdrop-blur-sm border border-accent-green/30 rounded-2xl p-6 shadow-2xl',
+  },
+  
+  // Layout
+  layout: {
+    container: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8',
+    page: 'min-h-screen bg-primary-black text-accent-gray',
+    section: 'py-8 md:py-12',
+  },
+  
+  // Status indicators
+  status: {
+    online: 'text-status-online',
+    offline: 'text-status-offline',
+    charging: 'text-status-charging',
+    error: 'text-status-error',
+    warning: 'text-status-warning',
+  },
+}
+
 /**
  * Format power value with appropriate units
  */
