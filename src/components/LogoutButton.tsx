@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { LogOut } from 'lucide-react'
-import { Button } from '@chakra-ui/react'
+import { LogOut, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default function LogoutButton() {
   const [isLoading, setIsLoading] = useState(false)
@@ -24,16 +24,22 @@ export default function LogoutButton() {
   }
 
   return (
-    <Button
+    <button
       onClick={handleLogout}
-      isLoading={isLoading}
-      loadingText="Signing out..."
-      colorScheme="red"
-      variant="ghost"
-      size="sm"
-      leftIcon={<LogOut size={16} />}
+      disabled={isLoading}
+      className={cn(
+        'inline-flex items-center gap-2 px-3 py-2 text-sm font-medium',
+        'text-red-400 hover:text-red-300 hover:bg-red-500/10',
+        'rounded-md transition-colors duration-200',
+        'disabled:opacity-50 disabled:cursor-not-allowed'
+      )}
     >
-      Sign Out
-    </Button>
+      {isLoading ? (
+        <Loader2 size={16} className="animate-spin" />
+      ) : (
+        <LogOut size={16} />
+      )}
+      {isLoading ? 'Signing out...' : 'Sign Out'}
+    </button>
   )
 }

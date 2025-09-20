@@ -1,14 +1,6 @@
 'use client'
 
 import {
-  Box,
-  Stack,
-  Text,
-  Button,
-  useBreakpointValue,
-  Flex,
-} from '@chakra-ui/react'
-import {
   Home,
   Battery,
   BarChart3,
@@ -24,6 +16,8 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
+import { useIsMobile } from '@/hooks/useBreakpoint'
+import { cn } from '@/lib/utils'
 
 interface SidebarProps {
   onClose?: () => void
@@ -76,205 +70,152 @@ const SidebarContent = ({ onClose }: SidebarProps) => {
   }
 
   return (
-    <Box h="full" bg="primary.dark" borderRight="1px" borderColor="gray.700" w="280px">
+    <div className="h-full bg-primary-dark border-r border-gray-700 w-70 flex flex-col">
       {/* Header */}
-      <Flex h="16" alignItems="center" mx="4" justify="space-between">
-        <Flex alignItems="center" gap={3}>
-          <Box
-            w={8}
-            h={8}
-            bg="accent.green"
-            borderRadius="md"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Zap size={20} color="white" />
-          </Box>
-          <Text fontSize="lg" fontWeight="bold" color="accent.gray">
+      <div className="h-16 flex items-center mx-4 justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-accent-green rounded-md flex items-center justify-center">
+            <Zap size={20} className="text-white" />
+          </div>
+          <span className="text-lg font-bold text-accent-gray">
             EcoFlow
-          </Text>
-        </Flex>
-      </Flex>
+          </span>
+        </div>
+      </div>
 
       {/* Divider */}
-      <Box h="1px" bg="gray.700" mx={4} />
+      <div className="h-px bg-gray-700 mx-4" />
 
       {/* Navigation */}
-      <Stack gap={1} mt={4} px={3}>
+      <nav className="flex-1 mt-4 px-3 space-y-1">
         {navigationItems.map((item) => {
           const isActive = pathname === item.href
           const Icon = item.icon
 
           return (
             <Link key={item.href} href={item.href} onClick={onClose}>
-              <Button
-                variant="ghost"
-                justifyContent="flex-start"
-                bg={isActive ? 'accent.green' : 'transparent'}
-                color={isActive ? 'white' : 'accent.gray'}
-                _hover={{
-                  bg: isActive ? 'accent.greenSecondary' : 'gray.700',
-                }}
-                borderRadius="md"
-                h={12}
-                fontWeight="medium"
-                w="full"
-                gap={3}
+              <button
+                className={cn(
+                  'w-full flex items-start gap-3 p-3 rounded-md text-left transition-colors h-12',
+                  isActive 
+                    ? 'bg-accent-green text-white' 
+                    : 'text-accent-gray hover:bg-gray-700'
+                )}
               >
-                <Icon size={20} />
-                <Stack gap={0} flex={1} alignItems="flex-start">
-                  <Text fontSize="sm">{item.label}</Text>
-                  <Text fontSize="xs" opacity={0.7}>
-                    {item.description}
-                  </Text>
-                </Stack>
-              </Button>
+                <Icon size={20} className="flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">{item.label}</div>
+                  <div className="text-xs opacity-70">{item.description}</div>
+                </div>
+              </button>
             </Link>
           )
         })}
-      </Stack>
+      </nav>
 
       {/* User Profile & Logout */}
-      <Box position="absolute" bottom={0} left={0} right={0} p={4}>
-        <Box h="1px" bg="gray.700" mb={4} />
-        
+      <div className="p-4 border-t border-gray-700">
         {user && (
-          <Flex gap={3} mb={3} alignItems="center">
-            <Box
-              w={8}
-              h={8}
-              bg="accent.green"
-              borderRadius="full"
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-              fontSize="sm"
-              fontWeight="bold"
-              color="white"
-            >
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 bg-accent-green rounded-full flex items-center justify-center text-sm font-bold text-white">
               {user.email?.[0]?.toUpperCase()}
-            </Box>
-            <Stack gap={0} flex={1}>
-              <Text fontSize="sm" fontWeight="medium" color="accent.gray">
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-accent-gray truncate">
                 {user.email}
-              </Text>
-              <Text fontSize="xs" color="gray.400">
+              </div>
+              <div className="text-xs text-gray-400">
                 Online
-              </Text>
-            </Stack>
-          </Flex>
+              </div>
+            </div>
+          </div>
         )}
 
-        <Button
-          variant="ghost"
+        <button
           onClick={handleLogout}
-          w="full"
-          justifyContent="flex-start"
-          color="gray.400"
-          _hover={{ color: 'accent.gray', bg: 'gray.700' }}
-          gap={3}
+          className="w-full flex items-center gap-3 p-2 text-gray-400 hover:text-accent-gray hover:bg-gray-700 rounded-md transition-colors"
         >
           <LogOut size={20} />
-          Sign Out
-        </Button>
-      </Box>
-    </Box>
+          <span>Sign Out</span>
+        </button>
+      </div>
+    </div>
   )
 }
 
 export const Sidebar = () => {
   const pathname = usePathname()
   const { sidebarOpen, toggleSidebar } = useUIStore()
-  const isMobile = useBreakpointValue({ base: true, lg: false })
+  const isMobile = useIsMobile()
 
   if (isMobile) {
     return (
-      <Box>
-        <Button
+      <div>
+        <button
           onClick={toggleSidebar}
-          variant="ghost"
-          size="sm"
-          position="fixed"
-          top={4}
-          left={4}
-          zIndex={1001}
-          bg="primary.dark"
-          border="1px"
-          borderColor="gray.700"
-          gap={2}
+          className="fixed top-4 left-4 z-50 bg-primary-dark border border-gray-700 text-accent-gray hover:text-white p-2 rounded-md flex items-center gap-2 transition-colors"
         >
           <Menu size={20} />
-          Menu
-        </Button>
+          <span>Menu</span>
+        </button>
         
         {sidebarOpen && (
-          <Box
-            position="fixed"
-            top={0}
-            left={0}
-            w="full"
-            h="full"
-            bg="blackAlpha.600"
-            zIndex={1000}
+          <div
+            className="fixed inset-0 bg-black/60 z-40"
             onClick={toggleSidebar}
           >
-            <Box
-              w="280px"
-              h="full"
-              bg="primary.dark"
+            <div
+              className="w-70 h-full bg-primary-dark"
               onClick={(e) => e.stopPropagation()}
             >
               <SidebarContent onClose={toggleSidebar} />
-            </Box>
-          </Box>
+            </div>
+          </div>
         )}
-      </Box>
+      </div>
     )
   }
 
   return (
-    <Box
-      w={sidebarOpen ? "280px" : "80px"}
-      transition="width 0.3s ease"
-      position="relative"
+    <div
+      className={cn(
+        "transition-all duration-300 ease-in-out relative",
+        sidebarOpen ? "w-70" : "w-20"
+      )}
     >
       {sidebarOpen ? (
         <SidebarContent />
       ) : (
-        <Box w="80px" h="full" bg="primary.dark" borderRight="1px" borderColor="gray.700">
-          <Stack gap={4} pt={4} alignItems="center">
-            <Button
-              variant="ghost"
+        <div className="w-20 h-full bg-primary-dark border-r border-gray-700">
+          <div className="flex flex-col items-center gap-4 pt-4">
+            <button
               onClick={toggleSidebar}
-              size="sm"
-              color="accent.gray"
+              className="p-2 text-accent-gray hover:text-white transition-colors"
             >
               <Menu size={20} />
-            </Button>
+            </button>
             {navigationItems.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href
               
               return (
                 <Link key={item.href} href={item.href}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    bg={isActive ? 'accent.green' : 'transparent'}
-                    color={isActive ? 'white' : 'accent.gray'}
-                    _hover={{
-                      bg: isActive ? 'accent.greenSecondary' : 'gray.700',
-                    }}
+                  <button
+                    className={cn(
+                      'p-2 rounded-md transition-colors',
+                      isActive 
+                        ? 'bg-accent-green text-white' 
+                        : 'text-accent-gray hover:bg-gray-700'
+                    )}
                   >
                     <Icon size={20} />
-                  </Button>
+                  </button>
                 </Link>
               )
             })}
-          </Stack>
-        </Box>
+          </div>
+        </div>
       )}
-    </Box>
+    </div>
   )
 }

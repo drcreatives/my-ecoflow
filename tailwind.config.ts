@@ -8,6 +8,9 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      width: {
+        '70': '280px', // Custom width for sidebar
+      },
       colors: {
         // EcoFlow Brand Colors
         primary: {

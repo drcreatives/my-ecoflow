@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import { Providers } from '@/providers/Providers'
 import './globals.css'
 
 const inter = Inter({
@@ -27,10 +26,10 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" />
       </head>
       <body 
-        className={`${inter.variable} font-sans antialiased`}
+        className={`${inter.variable} font-sans antialiased bg-primary-black text-accent-gray min-h-screen`}
         suppressHydrationWarning={true}
       >
-        <Providers>{children}</Providers>
+        {children}
       </body>
     </html>
   )
