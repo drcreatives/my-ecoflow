@@ -1,21 +1,13 @@
 'use client';
 
 import { useEffect } from 'react';
-import {
-  Box,
-  VStack,
-  HStack,
-  Text,
-  SimpleGrid,
-  Button,
-  Spinner,
-} from '@chakra-ui/react';
-import { Plus, Zap, Battery, TrendingUp } from 'lucide-react';
+import { Plus, Zap, Battery, TrendingUp, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useDeviceStore } from '@/stores/deviceStore';
 import { DeviceStatusCard } from '@/components/controls';
 import { AppLayout } from '@/components/layout';
 import AuthWrapper from '@/components/AuthWrapper';
+import { cn } from '@/lib/utils';
 
 // Mock stats for demo purposes
 const stats = [
@@ -23,67 +15,61 @@ const stats = [
     label: 'Total Devices',
     value: '3',
     change: '+1',
-    changeType: 'positive',
+    changeType: 'positive' as const,
     icon: <Zap size={24} />,
   },
   {
     label: 'Total Energy Stored',
     value: '2.4 kWh',
     change: '+0.3 kWh',
-    changeType: 'positive',
+    changeType: 'positive' as const,
     icon: <Battery size={24} />,
   },
   {
     label: 'Current Output',
     value: '450W',
     change: '-50W',
-    changeType: 'negative',
+    changeType: 'negative' as const,
     icon: <TrendingUp size={24} />,
   },
   {
     label: 'Efficiency',
     value: '94%',
     change: '+2%',
-    changeType: 'positive',
+    changeType: 'positive' as const,
     icon: <TrendingUp size={24} />,
   },
 ];
 
 const StatCard = ({ stat }: { stat: typeof stats[0] }) => (
-  <Box p={6} bg="primary.dark" borderRadius="lg" border="1px solid" borderColor="accent.green">
-    <VStack gap={4} align="stretch">
-      <HStack justify="space-between">
-        <Box color="accent.green">
+  <div className="p-4 sm:p-6 bg-primary-dark rounded-lg border border-accent-green touch-manipulation">
+    <div className="flex flex-col gap-3 sm:gap-4">
+      <div className="flex justify-between items-start">
+        <div className="text-accent-green">
           {stat.icon}
-        </Box>
-        <Box
-          px={2}
-          py={1}
-          borderRadius="md"
-          bg={stat.changeType === 'positive' ? 'green.900' : 'red.900'}
-          border="1px solid"
-          borderColor={stat.changeType === 'positive' ? 'green.600' : 'red.600'}
+        </div>
+        <div
+          className={cn(
+            "px-2 py-1 rounded-md border text-xs font-medium shrink-0",
+            stat.changeType === 'positive' 
+              ? "bg-green-900 border-green-600 text-green-400" 
+              : "bg-red-900 border-red-600 text-red-400"
+          )}
         >
-          <Text
-            fontSize="xs"
-            color={stat.changeType === 'positive' ? 'green.400' : 'red.400'}
-            fontWeight="medium"
-          >
-            {stat.change}
-          </Text>
-        </Box>
-      </HStack>
+          {stat.change}
+        </div>
+      </div>
       
-      <VStack align="start" gap={1}>
-        <Text fontSize="2xl" fontWeight="bold" color="accent.gray">
+      <div className="flex flex-col gap-1">
+        <div className="text-xl sm:text-2xl font-bold text-accent-gray">
           {stat.value}
-        </Text>
-        <Text fontSize="sm" color="accent.gray" opacity={0.7}>
+        </div>
+        <div className="text-sm text-accent-gray opacity-70">
           {stat.label}
-        </Text>
-      </VStack>
-    </VStack>
-  </Box>
+        </div>
+      </div>
+    </div>
+  </div>
 );
 
 function Dashboard() {
@@ -95,114 +81,101 @@ function Dashboard() {
 
   return (
     <AppLayout>
-      <Box p={6}>
-        <VStack gap={8} align="stretch">
+      <div className="p-4 sm:p-6">
+        <div className="flex flex-col gap-6 sm:gap-8">
           {/* Header */}
-          <HStack justify="space-between">
-            <VStack align="start" gap={1}>
-              <Text fontSize="3xl" fontWeight="bold" color="accent.gray">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+            <div className="flex flex-col gap-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-accent-gray">
                 Dashboard
-              </Text>
-              <Text color="accent.gray" opacity={0.7}>
+              </h1>
+              <p className="text-accent-gray opacity-70">
                 Monitor and control your EcoFlow devices
-              </Text>
-            </VStack>
+              </p>
+            </div>
             
-            <Button
-              colorScheme="green"
-              size="lg"
-            >
+            <button className="bg-accent-green hover:bg-accent-green-secondary text-black font-medium px-4 sm:px-6 py-3 rounded-lg flex items-center justify-center gap-2 transition-colors touch-manipulation">
               <Plus size={16} />
-              Add Device
-            </Button>
-          </HStack>
+              <span className="sm:inline">Add Device</span>
+            </button>
+          </div>
 
           {/* Stats Grid */}
-          <Box>
-            <Text fontSize="xl" fontWeight="bold" mb={4} color="accent.green">
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-accent-green">
               Overview
-            </Text>
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} gap={4}>
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {stats.map((stat, index) => (
                 <StatCard key={index} stat={stat} />
               ))}
-            </SimpleGrid>
-          </Box>
+            </div>
+          </div>
 
           {/* Devices Section */}
-          <Box>
-            <HStack justify="space-between" mb={4}>
-              <Text fontSize="xl" fontWeight="bold" color="accent.green">
+          <div>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 sm:mb-4 gap-2">
+              <h2 className="text-lg sm:text-xl font-bold text-accent-green">
                 Your Devices
-              </Text>
+              </h2>
               {devices.length > 0 && (
-                <Text fontSize="sm" color="accent.gray" opacity={0.7}>
+                <p className="text-sm text-accent-gray opacity-70">
                   {devices.length} device{devices.length !== 1 ? 's' : ''} connected
-                </Text>
+                </p>
               )}
-            </HStack>
+            </div>
 
             {isLoading ? (
-              <Box display="flex" justifyContent="center" alignItems="center" minHeight="40vh">
-                <VStack gap={4}>
-                  <Spinner size="xl" color="accent.green" />
-                  <Text color="accent.gray">Loading devices...</Text>
-                </VStack>
-              </Box>
+              <div className="flex flex-col justify-center items-center min-h-[30vh] sm:min-h-[40vh] gap-4">
+                <Loader2 size={48} className="text-accent-green animate-spin" />
+                <p className="text-accent-gray">Loading devices...</p>
+              </div>
             ) : error ? (
-              <Box p={8} bg="red.900" borderRadius="lg" border="1px solid" borderColor="red.600">
-                <VStack gap={4} align="center">
-                  <Text color="red.400" fontSize="lg">
+              <div className="p-6 sm:p-8 bg-red-900 rounded-lg border border-red-600">
+                <div className="flex flex-col gap-4 items-center text-center">
+                  <p className="text-red-400 text-base sm:text-lg">
                     Error loading devices: {error}
-                  </Text>
-                  <Button onClick={() => fetchDevices()} colorScheme="red" variant="outline">
+                  </p>
+                  <button 
+                    onClick={() => fetchDevices()} 
+                    className="border border-red-400 text-red-400 hover:bg-red-400 hover:text-white px-4 py-2 rounded-md transition-colors touch-manipulation"
+                  >
                     Try Again
-                  </Button>
-                </VStack>
-              </Box>
+                  </button>
+                </div>
+              </div>
             ) : devices.length === 0 ? (
-              <Box 
-                p={12} 
-                bg="primary.dark" 
-                borderRadius="lg" 
-                border="2px dashed" 
-                borderColor="accent.green"
-                opacity={0.6}
-              >
-                <VStack gap={4} align="center">
-                  <Zap size={48} color="currentColor" />
-                  <VStack gap={2} align="center">
-                    <Text fontSize="lg" fontWeight="bold" color="accent.gray">
+              <div className="p-8 sm:p-12 bg-primary-dark rounded-lg border-2 border-dashed border-accent-green opacity-60">
+                <div className="flex flex-col gap-4 items-center text-center">
+                  <Zap size={40} className="sm:size-12 text-current" />
+                  <div className="flex flex-col gap-2 items-center">
+                    <h3 className="text-lg font-bold text-accent-gray">
                       No devices found
-                    </Text>
-                    <Text color="accent.gray" opacity={0.7} textAlign="center">
+                    </h3>
+                    <p className="text-accent-gray opacity-70 text-sm sm:text-base">
                       Connect your first EcoFlow device to start monitoring
-                    </Text>
-                  </VStack>
-                  <Button colorScheme="green" size="lg">
+                    </p>
+                  </div>
+                  <button className="bg-accent-green hover:bg-accent-green-secondary text-black font-medium px-4 sm:px-6 py-3 rounded-lg flex items-center gap-2 transition-colors touch-manipulation">
                     <Plus size={16} />
                     Add Your First Device
-                  </Button>
-                </VStack>
-              </Box>
+                  </button>
+                </div>
+              </div>
             ) : (
-              <SimpleGrid columns={{ base: 1, lg: 2, xl: 3 }} gap={6}>
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
                 {devices.map((device) => (
                   <Link key={device.id} href={`/device/${device.id}`}>
-                    <Box
-                      cursor="pointer"
-                      transition="transform 0.2s"
-                      _hover={{ transform: 'translateY(-4px)' }}
-                    >
+                    <div className="cursor-pointer transition-transform duration-200 hover:-translate-y-1 touch-manipulation">
                       <DeviceStatusCard device={device} isCompact />
-                    </Box>
+                    </div>
                   </Link>
                 ))}
-              </SimpleGrid>
+              </div>
             )}
-          </Box>
-        </VStack>
-      </Box>
+          </div>
+        </div>
+      </div>
     </AppLayout>
   );
 }

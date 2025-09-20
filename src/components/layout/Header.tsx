@@ -1,15 +1,6 @@
 'use client'
 
 import {
-  Box,
-  Flex,
-  Text,
-  Button,
-  Stack,
-  Badge,
-  useBreakpointValue,
-} from '@chakra-ui/react'
-import {
   Bell,
   Menu,
   Power,
@@ -21,7 +12,9 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useDeviceStore } from '@/stores/deviceStore'
+import { useIsMobile } from '@/hooks/useBreakpoint'
 import LogoutButton from '@/components/LogoutButton'
+import { cn } from '@/lib/utils'
 
 interface HeaderProps {
   title?: string
@@ -31,7 +24,7 @@ export const Header = ({ title }: HeaderProps) => {
   const { user } = useAuthStore()
   const { notifications, toggleSidebar } = useUIStore()
   const { devices } = useDeviceStore()
-  const isMobile = useBreakpointValue({ base: true, lg: false })
+  const isMobile = useIsMobile()
 
   const unreadNotifications = notifications.filter(n => !n.isRead).length
   const activeDevices = devices.filter(d => d.isActive).length
@@ -41,114 +34,91 @@ export const Header = ({ title }: HeaderProps) => {
   const isOnline = true
 
   return (
-    <Box
-      bg="primary.dark"
-      borderBottom="1px"
-      borderColor="gray.700"
-      px={6}
-      py={4}
-      position="sticky"
-      top={0}
-      zIndex={100}
-    >
-      <Flex alignItems="center" justify="space-between">
+    <header className="bg-primary-dark border-b border-gray-700 px-4 sm:px-6 py-4 sticky top-0 z-50">
+      <div className="flex items-center justify-between">
         {/* Left side */}
-        <Flex alignItems="center" gap={4}>
+        <div className="flex items-center gap-2 sm:gap-4">
           {isMobile && (
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={toggleSidebar}
-              color="accent.gray"
+              className="p-2 text-accent-gray hover:bg-gray-700 rounded-md transition-colors touch-manipulation"
+              aria-label="Toggle navigation menu"
             >
               <Menu size={20} />
-            </Button>
+            </button>
           )}
           
-          <Stack gap={1}>
-            <Text
-              fontSize="xl"
-              fontWeight="bold"
-              color="accent.gray"
-            >
+          <div className="flex flex-col gap-1">
+            <h1 className="text-lg sm:text-xl font-bold text-accent-gray">
               {title || 'Dashboard'}
-            </Text>
-            <Text fontSize="sm" color="gray.400">
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-400 hidden sm:block">
               Welcome back, {user?.email?.split('@')[0]}
-            </Text>
-          </Stack>
-        </Flex>
+            </p>
+          </div>
+        </div>
 
         {/* Right side */}
-        <Flex alignItems="center" gap={4}>
-          {/* Device Status */}
-          <Flex alignItems="center" gap={2}>
-            <Box
-              w={2}
-              h={2}
-              borderRadius="full"
-              bg={isOnline ? 'accent.green' : 'red.400'}
-            />
-            <Text fontSize="sm" color="accent.gray">
-              {activeDevices}/{totalDevices} devices active
-            </Text>
-          </Flex>
+        <div className="flex items-center gap-2 sm:gap-4">
+          {/* Device Status - Hidden on mobile */}
+          {!isMobile && (
+            <div className="flex items-center gap-2">
+              <div 
+                className={cn(
+                  "w-2 h-2 rounded-full",
+                  isOnline ? "bg-accent-green" : "bg-red-400"
+                )}
+              />
+              <span className="text-sm text-accent-gray">
+                {activeDevices}/{totalDevices} devices active
+              </span>
+            </div>
+          )}
 
-          {/* Connection Status */}
-          <Flex alignItems="center" gap={2}>
+          {/* Connection Status - Simplified on mobile */}
+          <div className="flex items-center gap-2">
             {isOnline ? (
-              <Wifi size={16} color="var(--chakra-colors-accent-green)" />
+              <Wifi size={isMobile ? 18 : 16} className="text-accent-green" />
             ) : (
-              <WifiOff size={16} color="var(--chakra-colors-red-400)" />
+              <WifiOff size={isMobile ? 18 : 16} className="text-red-400" />
             )}
-            <Text fontSize="sm" color={isOnline ? 'accent.green' : 'red.400'}>
-              {isOnline ? 'Connected' : 'Offline'}
-            </Text>
-          </Flex>
+            {!isMobile && (
+              <span className={cn(
+                "text-sm",
+                isOnline ? "text-accent-green" : "text-red-400"
+              )}>
+                {isOnline ? 'Connected' : 'Offline'}
+              </span>
+            )}
+          </div>
 
           {/* Notifications */}
-          <Button
-            variant="ghost"
-            size="sm"
-            position="relative"
-            color="accent.gray"
-            _hover={{ bg: 'gray.700' }}
+          <button 
+            className="relative p-2 text-accent-gray hover:bg-gray-700 rounded-md transition-colors touch-manipulation"
+            aria-label={`Notifications ${unreadNotifications > 0 ? `(${unreadNotifications} unread)` : ''}`}
           >
-            <Bell size={20} />
+            <Bell size={isMobile ? 18 : 20} />
             {unreadNotifications > 0 && (
-              <Badge
-                position="absolute"
-                top="-1"
-                right="-1"
-                bg="accent.green"
-                color="white"
-                borderRadius="full"
-                fontSize="xs"
-                minW={5}
-                h={5}
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-              >
+              <span className="absolute -top-1 -right-1 bg-accent-green text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center">
                 {unreadNotifications > 9 ? '9+' : unreadNotifications}
-              </Badge>
+              </span>
             )}
-          </Button>
+          </button>
 
-          {/* Settings */}
-          <Button
-            variant="ghost"
-            size="sm"
-            color="accent.gray"
-            _hover={{ bg: 'gray.700' }}
-          >
-            <Settings size={20} />
-          </Button>
+          {/* Settings - Hidden on mobile */}
+          {!isMobile && (
+            <button 
+              className="p-2 text-accent-gray hover:bg-gray-700 rounded-md transition-colors"
+              aria-label="Settings"
+            >
+              <Settings size={20} />
+            </button>
+          )}
 
           {/* Logout Button */}
-          <LogoutButton />
-        </Flex>
-      </Flex>
-    </Box>
+          <LogoutButton isMobile={isMobile} />
+        </div>
+      </div>
+    </header>
   )
 }

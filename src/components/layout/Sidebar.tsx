@@ -1,14 +1,6 @@
 'use client'
 
 import {
-  Box,
-  Stack,
-  Text,
-  Button,
-  useBreakpointValue,
-  Flex,
-} from '@chakra-ui/react'
-import {
   Home,
   Battery,
   BarChart3,
@@ -24,6 +16,8 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
+import { useIsMobile } from '@/hooks/useBreakpoint'
+import { cn } from '@/lib/utils'
 
 interface SidebarProps {
   onClose?: () => void
@@ -65,6 +59,7 @@ const navigationItems = [
 const SidebarContent = ({ onClose }: SidebarProps) => {
   const pathname = usePathname()
   const { user, logout } = useAuthStore()
+  const isMobile = useIsMobile()
   
   const handleLogout = async () => {
     try {
@@ -76,205 +71,175 @@ const SidebarContent = ({ onClose }: SidebarProps) => {
   }
 
   return (
-    <Box h="full" bg="primary.dark" borderRight="1px" borderColor="gray.700" w="280px">
-      {/* Header */}
-      <Flex h="16" alignItems="center" mx="4" justify="space-between">
-        <Flex alignItems="center" gap={3}>
-          <Box
-            w={8}
-            h={8}
-            bg="accent.green"
-            borderRadius="md"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Zap size={20} color="white" />
-          </Box>
-          <Text fontSize="lg" fontWeight="bold" color="accent.gray">
-            EcoFlow
-          </Text>
-        </Flex>
-      </Flex>
-
-      {/* Divider */}
-      <Box h="1px" bg="gray.700" mx={4} />
-
+    <div className="h-full bg-primary-dark border-r border-gray-700 w-full flex flex-col">
       {/* Navigation */}
-      <Stack gap={1} mt={4} px={3}>
+      <nav className="flex-1 mt-4 px-3 space-y-1 overflow-y-auto">
         {navigationItems.map((item) => {
           const isActive = pathname === item.href
           const Icon = item.icon
 
           return (
             <Link key={item.href} href={item.href} onClick={onClose}>
-              <Button
-                variant="ghost"
-                justifyContent="flex-start"
-                bg={isActive ? 'accent.green' : 'transparent'}
-                color={isActive ? 'white' : 'accent.gray'}
-                _hover={{
-                  bg: isActive ? 'accent.greenSecondary' : 'gray.700',
-                }}
-                borderRadius="md"
-                h={12}
-                fontWeight="medium"
-                w="full"
-                gap={3}
+              <button
+                className={cn(
+                  'w-full flex items-start gap-3 p-4 rounded-md text-left transition-colors touch-manipulation',
+                  'min-h-[60px]', // Better touch target size
+                  isActive 
+                    ? 'bg-accent-green text-white' 
+                    : 'text-accent-gray hover:bg-gray-700 active:bg-gray-600'
+                )}
               >
-                <Icon size={20} />
-                <Stack gap={0} flex={1} alignItems="flex-start">
-                  <Text fontSize="sm">{item.label}</Text>
-                  <Text fontSize="xs" opacity={0.7}>
+                <Icon size={isMobile ? 22 : 20} className="flex-shrink-0 mt-1" />
+                <div className="flex-1 min-w-0">
+                  <div className={cn(
+                    "font-medium",
+                    isMobile ? "text-base" : "text-sm"
+                  )}>
+                    {item.label}
+                  </div>
+                  <div className={cn(
+                    "opacity-70",
+                    isMobile ? "text-sm" : "text-xs"
+                  )}>
                     {item.description}
-                  </Text>
-                </Stack>
-              </Button>
+                  </div>
+                </div>
+              </button>
             </Link>
           )
         })}
-      </Stack>
+      </nav>
 
       {/* User Profile & Logout */}
-      <Box position="absolute" bottom={0} left={0} right={0} p={4}>
-        <Box h="1px" bg="gray.700" mb={4} />
-        
+      <div className="p-4 border-t border-gray-700">
         {user && (
-          <Flex gap={3} mb={3} alignItems="center">
-            <Box
-              w={8}
-              h={8}
-              bg="accent.green"
-              borderRadius="full"
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-              fontSize="sm"
-              fontWeight="bold"
-              color="white"
-            >
+          <div className="flex items-center gap-3 mb-4">
+            <div className={cn(
+              "bg-accent-green rounded-full flex items-center justify-center font-bold text-white",
+              isMobile ? "w-10 h-10 text-base" : "w-8 h-8 text-sm"
+            )}>
               {user.email?.[0]?.toUpperCase()}
-            </Box>
-            <Stack gap={0} flex={1}>
-              <Text fontSize="sm" fontWeight="medium" color="accent.gray">
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className={cn(
+                "font-medium text-accent-gray truncate",
+                isMobile ? "text-base" : "text-sm"
+              )}>
                 {user.email}
-              </Text>
-              <Text fontSize="xs" color="gray.400">
+              </div>
+              <div className={cn(
+                "text-gray-400",
+                isMobile ? "text-sm" : "text-xs"
+              )}>
                 Online
-              </Text>
-            </Stack>
-          </Flex>
+              </div>
+            </div>
+          </div>
         )}
 
-        <Button
-          variant="ghost"
+        <button
           onClick={handleLogout}
-          w="full"
-          justifyContent="flex-start"
-          color="gray.400"
-          _hover={{ color: 'accent.gray', bg: 'gray.700' }}
-          gap={3}
+          className={cn(
+            'w-full flex items-center gap-3 text-gray-400 hover:text-accent-gray hover:bg-gray-700 active:bg-gray-600 rounded-md transition-colors touch-manipulation',
+            isMobile ? 'p-4 text-base' : 'p-2'
+          )}
         >
-          <LogOut size={20} />
-          Sign Out
-        </Button>
-      </Box>
-    </Box>
+          <LogOut size={isMobile ? 22 : 20} />
+          <span>Sign Out</span>
+        </button>
+      </div>
+    </div>
   )
 }
 
 export const Sidebar = () => {
   const pathname = usePathname()
   const { sidebarOpen, toggleSidebar } = useUIStore()
-  const isMobile = useBreakpointValue({ base: true, lg: false })
+  const isMobile = useIsMobile()
 
   if (isMobile) {
     return (
-      <Box>
-        <Button
-          onClick={toggleSidebar}
-          variant="ghost"
-          size="sm"
-          position="fixed"
-          top={4}
-          left={4}
-          zIndex={1001}
-          bg="primary.dark"
-          border="1px"
-          borderColor="gray.700"
-          gap={2}
-        >
-          <Menu size={20} />
-          Menu
-        </Button>
-        
+      <>
+        {/* Mobile Sidebar Overlay */}
         {sidebarOpen && (
-          <Box
-            position="fixed"
-            top={0}
-            left={0}
-            w="full"
-            h="full"
-            bg="blackAlpha.600"
-            zIndex={1000}
+          <div
+            className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
             onClick={toggleSidebar}
-          >
-            <Box
-              w="280px"
-              h="full"
-              bg="primary.dark"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <SidebarContent onClose={toggleSidebar} />
-            </Box>
-          </Box>
+          />
         )}
-      </Box>
+        
+        {/* Mobile Sidebar */}
+        <div
+          className={cn(
+            "fixed top-0 left-0 h-full w-80 bg-primary-dark z-50 transition-transform duration-300 ease-out",
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+        >
+          {/* Mobile Header */}
+          <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-accent-green rounded-md flex items-center justify-center">
+                <Zap size={20} className="text-white" />
+              </div>
+              <span className="text-lg font-bold text-accent-gray">
+                EcoFlow
+              </span>
+            </div>
+            <button
+              onClick={toggleSidebar}
+              className="p-2 text-accent-gray hover:bg-gray-700 rounded-md transition-colors touch-manipulation"
+              aria-label="Close navigation menu"
+            >
+              <Menu size={20} />
+            </button>
+          </div>
+          
+          <SidebarContent onClose={toggleSidebar} />
+        </div>
+      </>
     )
   }
 
   return (
-    <Box
-      w={sidebarOpen ? "280px" : "80px"}
-      transition="width 0.3s ease"
-      position="relative"
+    <div
+      className={cn(
+        "transition-all duration-300 ease-in-out relative",
+        sidebarOpen ? "w-70" : "w-20"
+      )}
     >
       {sidebarOpen ? (
         <SidebarContent />
       ) : (
-        <Box w="80px" h="full" bg="primary.dark" borderRight="1px" borderColor="gray.700">
-          <Stack gap={4} pt={4} alignItems="center">
-            <Button
-              variant="ghost"
+        <div className="w-20 h-full bg-primary-dark border-r border-gray-700">
+          <div className="flex flex-col items-center gap-4 pt-4">
+            <button
               onClick={toggleSidebar}
-              size="sm"
-              color="accent.gray"
+              className="p-2 text-accent-gray hover:text-white transition-colors"
             >
               <Menu size={20} />
-            </Button>
+            </button>
             {navigationItems.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href
               
               return (
                 <Link key={item.href} href={item.href}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    bg={isActive ? 'accent.green' : 'transparent'}
-                    color={isActive ? 'white' : 'accent.gray'}
-                    _hover={{
-                      bg: isActive ? 'accent.greenSecondary' : 'gray.700',
-                    }}
+                  <button
+                    className={cn(
+                      'p-2 rounded-md transition-colors',
+                      isActive 
+                        ? 'bg-accent-green text-white' 
+                        : 'text-accent-gray hover:bg-gray-700'
+                    )}
                   >
                     <Icon size={20} />
-                  </Button>
+                  </button>
                 </Link>
               )
             })}
-          </Stack>
-        </Box>
+          </div>
+        </div>
       )}
-    </Box>
+    </div>
   )
 }
