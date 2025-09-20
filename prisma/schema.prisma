@@ -1,0 +1,136 @@
+// EcoFlow Delta 2 Dashboard Database Schema
+// Comprehensive schema for monitoring and managing EcoFlow devices
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Users table (for authentication and user management)
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  devices Device[]
+  
+  @@map("users")
+}
+
+// Device registrations
+model Device {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  deviceSn   String   @map("device_sn")
+  deviceName String?  @map("device_name")
+  deviceType String   @default("DELTA_2") @map("device_type")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readings       DeviceReading[]
+  settings       DeviceSetting[]
+  dailySummaries DailySummary[]
+  
+  @@map("devices")
+}
+
+// Device data readings (real-time and historical data)
+model DeviceReading {
+  id            String   @id @default(uuid())
+  deviceId      String   @map("device_id")
+  batteryLevel  Int?     @map("battery_level")
+  inputWatts    Decimal? @map("input_watts") @db.Decimal(10, 2)
+  outputWatts   Decimal? @map("output_watts") @db.Decimal(10, 2)
+  remainingTime Int?     @map("remaining_time") // in minutes
+  temperature   Decimal? @db.Decimal(5, 2)
+  status        String?
+  rawData       Json?    @map("raw_data") // store full API response
+  recordedAt    DateTime @default(now()) @map("recorded_at")
+  
+  // Relations
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  
+  @@index([deviceId, recordedAt(sort: Desc)])
+  @@map("device_readings")
+}
+
+// Device settings/configuration
+model DeviceSetting {
+  id           String   @id @default(uuid())
+  deviceId     String   @map("device_id")
+  settingKey   String   @map("setting_key")
+  settingValue String?  @map("setting_value")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  
+  @@unique([deviceId, settingKey])
+  @@map("device_settings")
+}
+
+// Data aggregations for performance (daily summaries)
+model DailySummary {
+  id               String   @id @default(uuid())
+  deviceId         String   @map("device_id")
+  date             DateTime @db.Date
+  avgBatteryLevel  Decimal? @map("avg_battery_level") @db.Decimal(5, 2)
+  totalEnergyIn    Decimal? @map("total_energy_in") @db.Decimal(10, 2)
+  totalEnergyOut   Decimal? @map("total_energy_out") @db.Decimal(10, 2)
+  maxTemperature   Decimal? @map("max_temperature") @db.Decimal(5, 2)
+  minTemperature   Decimal? @map("min_temperature") @db.Decimal(5, 2)
+  totalRuntime     Int?     @map("total_runtime") // in minutes
+  
+  // Relations
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  
+  @@unique([deviceId, date])
+  @@index([deviceId, date(sort: Desc)])
+  @@map("daily_summaries")
+}
+
+// Alert/notification logs
+model Alert {
+  id        String      @id @default(uuid())
+  deviceId  String      @map("device_id")
+  type      AlertType
+  title     String
+  message   String
+  severity  AlertSeverity
+  isRead    Boolean     @default(false) @map("is_read")
+  createdAt DateTime    @default(now()) @map("created_at")
+  
+  @@index([deviceId, createdAt(sort: Desc)])
+  @@map("alerts")
+}
+
+// Enums
+enum AlertType {
+  BATTERY_LOW
+  TEMPERATURE_HIGH
+  DEVICE_OFFLINE
+  POWER_OVERLOAD
+  CHARGING_ERROR
+  SYSTEM_ERROR
+  
+  @@map("alert_type")
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+  
+  @@map("alert_severity")
+}
