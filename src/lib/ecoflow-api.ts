@@ -22,10 +22,10 @@ export interface DeviceQuotaData {
 export interface SetCommandParams {
   cmdSet: number
   cmdId: number
-  param: any
+  param: Record<string, unknown>
 }
 
-export interface APIResponse<T = any> {
+export interface APIResponse<T = Record<string, unknown>> {
   code: string
   message: string
   data: T
@@ -42,7 +42,7 @@ export class EcoFlowAPIError extends Error {
     message: string, 
     public code?: string, 
     public statusCode?: number,
-    public response?: any
+    public response?: unknown
   ) {
     super(message)
     this.name = 'EcoFlowAPIError'
@@ -75,12 +75,12 @@ export class EcoFlowAPI {
   private generateSignature(
     method: string,
     endpoint: string,
-    params: Record<string, any> = {},
+    params: Record<string, string | number> = {},
     timestamp: number,
     nonce: string
   ): string {
     // Add authentication parameters to the params object
-    const allParams: Record<string, any> = {
+    const allParams: Record<string, string | number> = {
       ...params,
       accessKey: this.credentials.accessKey,
       nonce: nonce,
@@ -105,11 +105,11 @@ export class EcoFlowAPI {
   /**
    * Make authenticated request to EcoFlow API
    */
-  private async makeRequest<T = any>(
+  private async makeRequest<T = Record<string, unknown>>(
     endpoint: string,
     method: 'GET' | 'POST' | 'PUT' = 'GET',
-    params: Record<string, any> = {},
-    body?: any
+    params: Record<string, string | number> = {},
+    body?: unknown
   ): Promise<APIResponse<T>> {
     const timestamp = Date.now()
     const nonce = Math.floor(100000 + Math.random() * 900000).toString() // 6-digit random number
@@ -276,7 +276,7 @@ export class EcoFlowAPI {
   /**
    * Extract and scale quota values
    */
-  private getQuotaValue(quotaMap: any, key: string): number | null {
+  private getQuotaValue(quotaMap: Record<string, { val: number; scale?: number }>, key: string): number | null {
     const value = quotaMap[key]
     if (!value || typeof value.val !== 'number') {
       return null
@@ -290,7 +290,7 @@ export class EcoFlowAPI {
   /**
    * Determine device status based on quota data
    */
-  private determineDeviceStatus(quotaMap: any): string {
+  private determineDeviceStatus(quotaMap: Record<string, { val: number; scale?: number }>): string {
     const inputWatts = this.getQuotaValue(quotaMap, 'inv.inputWatts') || 0
     const outputWatts = this.getQuotaValue(quotaMap, 'inv.outputWatts') || 0
     const batteryLevel = this.getQuotaValue(quotaMap, 'bms_bmsStatus.soc') || 0

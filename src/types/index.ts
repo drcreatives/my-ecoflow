@@ -27,7 +27,7 @@ export interface DeviceReading {
   remainingTime?: number // in minutes
   temperature?: number
   status?: string
-  rawData?: any
+  rawData?: Record<string, unknown>
   recordedAt: Date
 }
 
@@ -97,7 +97,7 @@ export interface EcoFlowDeviceStatus {
   timestamp: Date
 }
 
-export interface EcoFlowAPIResponse<T = any> {
+export interface EcoFlowAPIResponse<T = Record<string, unknown>> {
   code: string
   message: string
   data: T
@@ -181,5 +181,5 @@ export interface APIError {
   message: string
   code?: string
   statusCode?: number
-  details?: any
+  details?: Record<string, unknown>
 }

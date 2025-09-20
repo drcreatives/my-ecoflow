@@ -48,12 +48,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         isLoading: false,
         error: null,
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Login failed'
       set({
         user: null,
         isAuthenticated: false,
         isLoading: false,
-        error: error.message || 'Login failed',
+        error: errorMessage,
       })
       throw error
     }
@@ -79,12 +80,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         isLoading: false,
         error: null,
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Registration failed'
       set({
         user: null,
         isAuthenticated: false,
         isLoading: false,
-        error: error.message || 'Registration failed',
+        error: errorMessage,
       })
       throw error
     }
@@ -107,10 +109,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         isLoading: false,
         error: null,
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Logout failed'
       set({
         isLoading: false,
-        error: error.message || 'Logout failed',
+        error: errorMessage,
       })
       throw error
     }
@@ -133,12 +136,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         isLoading: false,
         error: null,
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Auth check failed'
       set({
         user: null,
         isAuthenticated: false,
         isLoading: false,
-        error: error.message || 'Auth check failed',
+        error: errorMessage,
       })
     }
   },

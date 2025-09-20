@@ -164,7 +164,7 @@ export function isValidDeviceSN(deviceSN: string): boolean {
 /**
  * Debounce function for API calls
  */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
