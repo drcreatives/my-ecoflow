@@ -1,23 +1,54 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
-import type { Device, DeviceReading } from '@/types'
+import { 
+  DeviceData, 
+  DeviceReading, 
+  fetchDevices, 
+  fetchDeviceDetails, 
+  fetchDeviceReadings,
+  controlDevice,
+  handleAPIError 
+} from '@/lib/data-utils'
 
 interface DeviceState {
-  devices: Device[]
-  currentDevice: Device | null
+  devices: DeviceData[]
+  currentDevice: DeviceData | null
   readings: DeviceReading[]
   isLoading: boolean
+  isControlling: boolean
   error: string | null
+  lastUpdated: Date | null
 }
 
 interface DeviceActions {
+  // Device management
   fetchDevices: () => Promise<void>
+  refreshDevice: (deviceId: string) => Promise<void>
   selectDevice: (deviceId: string) => void
-  updateDeviceStatus: (deviceId: string, status: Partial<Device>) => void
-  addReading: (reading: DeviceReading) => void
-  setDevices: (devices: Device[]) => void
-  setReadings: (readings: DeviceReading[]) => void
+  clearCurrentDevice: () => void
+  
+  // Readings management
+  fetchReadings: (deviceId: string, options?: {
+    limit?: number
+    offset?: number
+    timeRange?: '1h' | '6h' | '24h' | '7d' | '30d'
+  }) => Promise<void>
+  
+  // Device control
+  controlDevice: (deviceId: string, command: {
+    cmdSet: number
+    cmdId: number
+    param: any
+  }) => Promise<boolean>
+  
+  // Utility actions
   clearError: () => void
+  setError: (error: string) => void
+  
+  // Computed getters
+  getDeviceById: (id: string) => DeviceData | undefined
+  getOnlineDevices: () => DeviceData[]
+  getActiveDevices: () => DeviceData[]
 }
 
 type DeviceStore = DeviceState & DeviceActions
@@ -30,82 +61,142 @@ export const useDeviceStore = create<DeviceStore>()(
       currentDevice: null,
       readings: [],
       isLoading: false,
+      isControlling: false,
       error: null,
+      lastUpdated: null,
 
-      // Actions
+      // Device management actions
       fetchDevices: async () => {
         try {
           set({ isLoading: true, error: null })
           
-          // This will be implemented when we connect to the actual API
-          const response = await fetch('/api/devices')
-          
-          if (!response.ok) {
-            throw new Error('Failed to fetch devices')
-          }
-          
-          const devices = await response.json()
+          const response = await fetchDevices()
           
           set({
-            devices,
+            devices: response.devices,
             isLoading: false,
-            error: null,
+            lastUpdated: new Date(),
           })
-        } catch (error: any) {
+        } catch (error) {
+          const errorMessage = handleAPIError(error)
           set({
+            error: errorMessage,
             isLoading: false,
-            error: error.message || 'Failed to fetch devices',
           })
+          console.error('Failed to fetch devices:', error)
+        }
+      },
+
+      refreshDevice: async (deviceId: string) => {
+        try {
+          set({ isLoading: true, error: null })
+          
+          const response = await fetchDeviceDetails(deviceId)
+          const { devices } = get()
+          
+          // Update the device in the devices array
+          const updatedDevices = devices.map(device => 
+            device.id === deviceId ? response.device : device
+          )
+          
+          set({
+            devices: updatedDevices,
+            currentDevice: get().currentDevice?.id === deviceId 
+              ? response.device 
+              : get().currentDevice,
+            isLoading: false,
+            lastUpdated: new Date(),
+          })
+          
+        } catch (error) {
+          const errorMessage = handleAPIError(error)
+          set({
+            error: errorMessage,
+            isLoading: false,
+          })
+          console.error('Failed to refresh device:', error)
         }
       },
 
       selectDevice: (deviceId: string) => {
-        const { devices } = get()
-        const device = devices.find(d => d.id === deviceId)
-        
-        if (device) {
-          set({ currentDevice: device })
+        const device = get().getDeviceById(deviceId)
+        set({ currentDevice: device || null })
+      },
+
+      clearCurrentDevice: () => {
+        set({ currentDevice: null, readings: [] })
+      },
+
+      // Readings management
+      fetchReadings: async (deviceId: string, options = {}) => {
+        try {
+          set({ isLoading: true, error: null })
+          
+          const response = await fetchDeviceReadings(deviceId, options)
+          
+          set({
+            readings: response.readings,
+            isLoading: false,
+            lastUpdated: new Date(),
+          })
+          
+        } catch (error) {
+          const errorMessage = handleAPIError(error)
+          set({
+            error: errorMessage,
+            isLoading: false,
+          })
+          console.error('Failed to fetch readings:', error)
         }
       },
 
-      updateDeviceStatus: (deviceId: string, status: Partial<Device>) => {
-        const { devices } = get()
-        const updatedDevices = devices.map(device =>
-          device.id === deviceId ? { ...device, ...status } : device
-        )
-        
-        set({ devices: updatedDevices })
-        
-        // Update current device if it's the one being updated
-        const { currentDevice } = get()
-        if (currentDevice?.id === deviceId) {
-          set({ currentDevice: { ...currentDevice, ...status } })
+      // Device control
+      controlDevice: async (deviceId: string, command) => {
+        try {
+          set({ isControlling: true, error: null })
+          
+          const response = await controlDevice(deviceId, command)
+          
+          set({ isControlling: false })
+          
+          // Refresh device data after control action
+          setTimeout(() => {
+            get().refreshDevice(deviceId)
+          }, 2000) // Wait 2 seconds for device to update
+          
+          return response.success
+          
+        } catch (error) {
+          const errorMessage = handleAPIError(error)
+          set({
+            error: errorMessage,
+            isControlling: false,
+          })
+          console.error('Failed to control device:', error)
+          return false
         }
       },
 
-      addReading: (reading: DeviceReading) => {
-        const { readings } = get()
-        const updatedReadings = [reading, ...readings].slice(0, 1000) // Keep last 1000 readings
-        
-        set({ readings: updatedReadings })
-      },
-
-      setDevices: (devices: Device[]) => {
-        set({ devices })
-      },
-
-      setReadings: (readings: DeviceReading[]) => {
-        set({ readings })
-      },
-
+      // Utility actions
       clearError: () => {
         set({ error: null })
       },
 
-      // Computed values
-      getDeviceById: (id: string): Device | undefined => {
-        const { devices } = get()
-        return devices.find(device => device.id === id)
+      setError: (error: string) => {
+        set({ error })
+      },
+
+      // Computed getters
+      getDeviceById: (id: string) => {
+        return get().devices.find(device => device.id === id)
+      },
+
+      getOnlineDevices: () => {
+        return get().devices.filter(device => device.online)
+      },
+
+      getActiveDevices: () => {
+        return get().devices.filter(device => device.isActive)
       },
     }),
     {
