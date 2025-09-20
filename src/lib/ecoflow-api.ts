@@ -54,7 +54,7 @@ export class EcoFlowAPIError extends Error {
  * Handles authentication, requests, and data transformation for EcoFlow devices
  */
 export class EcoFlowAPI {
-  private readonly baseURL = 'https://api.ecoflow.com'
+  private readonly baseURL = 'https://api-e.ecoflow.com'
   private readonly credentials: EcoFlowCredentials
 
   constructor(credentials?: EcoFlowCredentials) {
@@ -70,26 +70,33 @@ export class EcoFlowAPI {
 
   /**
    * Generate authentication signature for EcoFlow API
+   * Based on official documentation: https://developer-eu.ecoflow.com/
    */
   private generateSignature(
     method: string,
-    url: string,
+    endpoint: string,
     params: Record<string, any> = {},
-    timestamp: number
+    timestamp: number,
+    nonce: string
   ): string {
-    // Sort parameters
-    const sortedParams = Object.keys(params)
+    // Add authentication parameters to the params object
+    const allParams: Record<string, any> = {
+      ...params,
+      accessKey: this.credentials.accessKey,
+      nonce: nonce,
+      timestamp: timestamp
+    }
+
+    // Sort parameters by ASCII value and concatenate with = and &
+    const sortedParams = Object.keys(allParams)
       .sort()
-      .map(key => `${key}=${params[key]}`)
+      .map(key => `${key}=${allParams[key]}`)
       .join('&')
 
-    // Create string to sign
-    const stringToSign = `${method}\n${url}\n${sortedParams}\n${this.credentials.accessKey}\n${timestamp}`
-
-    // Generate HMAC-SHA256 signature
+    // Generate HMAC-SHA256 signature using the sorted parameter string
     const signature = crypto
       .createHmac('sha256', this.credentials.secretKey)
-      .update(stringToSign)
+      .update(sortedParams)
       .digest('hex')
 
     return signature
@@ -105,15 +112,17 @@ export class EcoFlowAPI {
     body?: any
   ): Promise<APIResponse<T>> {
     const timestamp = Date.now()
+    const nonce = Math.floor(100000 + Math.random() * 900000).toString() // 6-digit random number
     const url = `${this.baseURL}${endpoint}`
     
     // Generate signature
-    const signature = this.generateSignature(method, endpoint, params, timestamp)
+    const signature = this.generateSignature(method, endpoint, params, timestamp, nonce)
 
     // Prepare headers
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'accessKey': this.credentials.accessKey,
+      'nonce': nonce,
       'timestamp': timestamp.toString(),
       'sign': signature,
     }

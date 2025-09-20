@@ -26,7 +26,10 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/favicon.ico" />
       </head>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body 
+        className={`${inter.variable} font-sans antialiased`}
+        suppressHydrationWarning={true}
+      >
         <Providers>{children}</Providers>
       </body>
     </html>
