@@ -21,6 +21,7 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useDeviceStore } from '@/stores/deviceStore'
+import LogoutButton from '@/components/LogoutButton'
 
 interface HeaderProps {
   title?: string
@@ -143,6 +144,9 @@ export const Header = ({ title }: HeaderProps) => {
           >
             <Settings size={20} />
           </Button>
+
+          {/* Logout Button */}
+          <LogoutButton />
         </Flex>
       </Flex>
     </Box>

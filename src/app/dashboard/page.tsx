@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { useDeviceStore } from '@/stores/deviceStore';
 import { DeviceStatusCard } from '@/components/controls';
 import { AppLayout } from '@/components/layout';
+import AuthWrapper from '@/components/AuthWrapper';
 
 // Mock stats for demo purposes
 const stats = [
@@ -85,7 +86,7 @@ const StatCard = ({ stat }: { stat: typeof stats[0] }) => (
   </Box>
 );
 
-export default function DashboardPage() {
+function Dashboard() {
   const { devices, fetchDevices, isLoading, error } = useDeviceStore();
 
   useEffect(() => {
@@ -203,5 +204,14 @@ export default function DashboardPage() {
         </VStack>
       </Box>
     </AppLayout>
+  );
+}
+
+// Wrap the dashboard with authentication
+export default function DashboardPage() {
+  return (
+    <AuthWrapper>
+      <Dashboard />
+    </AuthWrapper>
   );
 }
