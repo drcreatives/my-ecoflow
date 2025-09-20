@@ -1,197 +1,324 @@
-import axios, { AxiosInstance } from 'axios'
+import crypto from 'crypto'
 
-export interface DeviceStatus {
-  deviceSn: string
-  batteryLevel: number
-  inputWatts: number
-  outputWatts: number
-  remainingTime: number
-  temperature: number
+// Types for EcoFlow API responses
+export interface EcoFlowDevice {
+  sn: string
+  productType: string
+  productName: string
+  online: number
   status: string
-  timestamp: Date
 }
 
-export interface Device {
-  deviceSn: string
-  deviceName: string
-  deviceType: string
-  onlineStatus: boolean
-}
-
-export interface DeviceQuota {
-  deviceSn: string
-  quota: {
-    requestCount: number
-    remainingCount: number
-    resetTime: Date
+export interface DeviceQuotaData {
+  sn: string
+  quotaMap: {
+    [key: string]: {
+      val: number
+      scale: number
+    }
   }
 }
 
+export interface SetCommandParams {
+  cmdSet: number
+  cmdId: number
+  param: any
+}
+
+export interface APIResponse<T = any> {
+  code: string
+  message: string
+  data: T
+  tid?: string
+}
+
+export interface EcoFlowCredentials {
+  accessKey: string
+  secretKey: string
+}
+
+export class EcoFlowAPIError extends Error {
+  constructor(
+    message: string, 
+    public code?: string, 
+    public statusCode?: number,
+    public response?: any
+  ) {
+    super(message)
+    this.name = 'EcoFlowAPIError'
+  }
+}
+
+/**
+ * EcoFlow API Wrapper Class
+ * Handles authentication, requests, and data transformation for EcoFlow devices
+ */
 export class EcoFlowAPI {
-  private client: AxiosInstance
-  private accessKey: string
-  private secretKey: string
-  private baseURL: string
+  private readonly baseURL = 'https://api-e.ecoflow.com'
+  private readonly credentials: EcoFlowCredentials
 
-  constructor() {
-    this.accessKey = process.env.ECOFLOW_ACCESS_KEY!
-    this.secretKey = process.env.ECOFLOW_SECRET_KEY!
-    this.baseURL = 'https://api.ecoflow.com'
-
-    if (!this.accessKey || !this.secretKey) {
-      throw new Error('EcoFlow API credentials are not configured')
+  constructor(credentials?: EcoFlowCredentials) {
+    this.credentials = credentials || {
+      accessKey: process.env.ECOFLOW_ACCESS_KEY!,
+      secretKey: process.env.ECOFLOW_SECRET_KEY!
     }
 
-    this.client = axios.create({
-      baseURL: this.baseURL,
-      timeout: 30000,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
+    if (!this.credentials.accessKey || !this.credentials.secretKey) {
+      throw new EcoFlowAPIError('EcoFlow API credentials are required')
+    }
+  }
 
-    // Add request interceptor for authentication
-    this.client.interceptors.request.use((config) => {
-      const timestamp = Date.now().toString()
-      // Note: You'll need to implement the proper EcoFlow authentication signature
-      // This is a placeholder for the authentication logic
-      config.headers['Authorization'] = `Bearer ${this.accessKey}`
-      config.headers['Timestamp'] = timestamp
-      return config
-    })
+  /**
+   * Generate authentication signature for EcoFlow API
+   * Based on official documentation: https://developer-eu.ecoflow.com/
+   */
+  private generateSignature(
+    method: string,
+    endpoint: string,
+    params: Record<string, any> = {},
+    timestamp: number,
+    nonce: string
+  ): string {
+    // Add authentication parameters to the params object
+    const allParams: Record<string, any> = {
+      ...params,
+      accessKey: this.credentials.accessKey,
+      nonce: nonce,
+      timestamp: timestamp
+    }
 
-    // Add response interceptor for error handling
-    this.client.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        console.error('EcoFlow API Error:', error.response?.data || error.message)
-        throw new APIError(
-          error.response?.data?.message || 'EcoFlow API request failed',
-          error.response?.status || 500
+    // Sort parameters by ASCII value and concatenate with = and &
+    const sortedParams = Object.keys(allParams)
+      .sort()
+      .map(key => `${key}=${allParams[key]}`)
+      .join('&')
+
+    // Generate HMAC-SHA256 signature using the sorted parameter string
+    const signature = crypto
+      .createHmac('sha256', this.credentials.secretKey)
+      .update(sortedParams)
+      .digest('hex')
+
+    return signature
+  }
+
+  /**
+   * Make authenticated request to EcoFlow API
+   */
+  private async makeRequest<T = any>(
+    endpoint: string,
+    method: 'GET' | 'POST' | 'PUT' = 'GET',
+    params: Record<string, any> = {},
+    body?: any
+  ): Promise<APIResponse<T>> {
+    const timestamp = Date.now()
+    const nonce = Math.floor(100000 + Math.random() * 900000).toString() // 6-digit random number
+    const url = `${this.baseURL}${endpoint}`
+    
+    // Generate signature
+    const signature = this.generateSignature(method, endpoint, params, timestamp, nonce)
+
+    // Prepare headers
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'accessKey': this.credentials.accessKey,
+      'nonce': nonce,
+      'timestamp': timestamp.toString(),
+      'sign': signature,
+    }
+
+    // Build URL with query parameters for GET requests
+    const searchParams = new URLSearchParams()
+    if (method === 'GET' && Object.keys(params).length > 0) {
+      Object.entries(params).forEach(([key, value]) => {
+        searchParams.append(key, String(value))
+      })
+    }
+
+    const requestUrl = searchParams.toString() 
+      ? `${url}?${searchParams.toString()}` 
+      : url
+
+    try {
+      const response = await fetch(requestUrl, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+      })
+
+      if (!response.ok) {
+        throw new EcoFlowAPIError(
+          `HTTP ${response.status}: ${response.statusText}`,
+          response.status.toString(),
+          response.status
         )
       }
-    )
-  }
 
-  /**
-   * Get list of all devices
-   */
-  async getDeviceList(): Promise<Device[]> {
-    try {
-      const response = await this.client.get('/iot-open/sign/device/list')
-      return this.transformDeviceList(response.data)
-    } catch (error) {
-      throw new APIError('Failed to fetch device list', 500)
-    }
-  }
+      const data: APIResponse<T> = await response.json()
 
-  /**
-   * Get device status and current readings
-   */
-  async getDeviceStatus(deviceSN: string): Promise<DeviceStatus> {
-    try {
-      const response = await this.client.get(`/iot-open/sign/device/quota`, {
-        params: { deviceSn: deviceSN }
-      })
-      return this.transformDeviceStatus(response.data)
-    } catch (error) {
-      throw new APIError(`Failed to fetch device status for ${deviceSN}`, 500)
-    }
-  }
-
-  /**
-   * Get device quota information
-   */
-  async getDeviceQuota(deviceSN: string): Promise<DeviceQuota> {
-    try {
-      const response = await this.client.get(`/iot-open/sign/device/quota`, {
-        params: { deviceSn: deviceSN }
-      })
-      return this.transformDeviceQuota(response.data)
-    } catch (error) {
-      throw new APIError(`Failed to fetch device quota for ${deviceSN}`, 500)
-    }
-  }
-
-  /**
-   * Set device function/control
-   */
-  async setDeviceFunction(deviceSN: string, params: any): Promise<any> {
-    try {
-      const response = await this.client.post('/iot-open/sign/device/control', {
-        deviceSn: deviceSN,
-        ...params
-      })
-      return response.data
-    } catch (error) {
-      throw new APIError(`Failed to control device ${deviceSN}`, 500)
-    }
-  }
-
-  /**
-   * Get historical data for a device
-   */
-  async getHistoricalData(
-    deviceSN: string, 
-    timeRange: { start: Date; end: Date }
-  ): Promise<any> {
-    try {
-      const response = await this.client.get('/iot-open/sign/device/history', {
-        params: {
-          deviceSn: deviceSN,
-          startTime: timeRange.start.getTime(),
-          endTime: timeRange.end.getTime()
-        }
-      })
-      return response.data
-    } catch (error) {
-      throw new APIError(`Failed to fetch historical data for ${deviceSN}`, 500)
-    }
-  }
-
-  // Transform methods to normalize API responses
-  private transformDeviceList(data: any): Device[] {
-    // Transform the API response to our Device interface
-    // This will need to be adjusted based on actual EcoFlow API response structure
-    return data.data?.map((device: any) => ({
-      deviceSn: device.deviceSn,
-      deviceName: device.deviceName,
-      deviceType: device.deviceType,
-      onlineStatus: device.onlineStatus === 1
-    })) || []
-  }
-
-  private transformDeviceStatus(data: any): DeviceStatus {
-    // Transform the API response to our DeviceStatus interface
-    // This will need to be adjusted based on actual EcoFlow API response structure
-    return {
-      deviceSn: data.deviceSn,
-      batteryLevel: data.batteryLevel || 0,
-      inputWatts: data.inputWatts || 0,
-      outputWatts: data.outputWatts || 0,
-      remainingTime: data.remainingTime || 0,
-      temperature: data.temperature || 0,
-      status: data.status || 'unknown',
-      timestamp: new Date()
-    }
-  }
-
-  private transformDeviceQuota(data: any): DeviceQuota {
-    return {
-      deviceSn: data.deviceSn,
-      quota: {
-        requestCount: data.quota?.requestCount || 0,
-        remainingCount: data.quota?.remainingCount || 0,
-        resetTime: new Date(data.quota?.resetTime || Date.now())
+      // Check API response code
+      if (data.code !== '0') {
+        throw new EcoFlowAPIError(
+          data.message || 'API request failed',
+          data.code,
+          response.status,
+          data
+        )
       }
+
+      return data
+    } catch (error) {
+      if (error instanceof EcoFlowAPIError) {
+        throw error
+      }
+
+      throw new EcoFlowAPIError(
+        `Network error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'NETWORK_ERROR'
+      )
     }
   }
-}
 
-export class APIError extends Error {
-  constructor(message: string, public statusCode: number = 500) {
-    super(message)
-    this.name = 'APIError'
+  /**
+   * Get list of devices associated with the account
+   */
+  async getDeviceList(): Promise<EcoFlowDevice[]> {
+    try {
+      const response = await this.makeRequest<EcoFlowDevice[]>('/iot-open/sign/device/list')
+      return response.data || []
+    } catch (error) {
+      throw new EcoFlowAPIError(
+        'Failed to fetch device list',
+        'DEVICE_LIST_ERROR',
+        undefined,
+        error
+      )
+    }
+  }
+
+  /**
+   * Get device quota data (real-time status information)
+   */
+  async getDeviceQuota(deviceSN: string): Promise<DeviceQuotaData | null> {
+    if (!deviceSN) {
+      throw new EcoFlowAPIError('Device serial number is required', 'INVALID_PARAMS')
+    }
+
+    try {
+      const response = await this.makeRequest<DeviceQuotaData>(
+        '/iot-open/sign/device/quota',
+        'GET',
+        { sn: deviceSN }
+      )
+      return response.data || null
+    } catch (error) {
+      throw new EcoFlowAPIError(
+        `Failed to fetch device quota for ${deviceSN}`,
+        'DEVICE_QUOTA_ERROR',
+        undefined,
+        error
+      )
+    }
+  }
+
+  /**
+   * Send command to device (control device functions)
+   */
+  async setDeviceFunction(
+    deviceSN: string, 
+    params: SetCommandParams
+  ): Promise<boolean> {
+    if (!deviceSN || !params) {
+      throw new EcoFlowAPIError('Device SN and command parameters are required', 'INVALID_PARAMS')
+    }
+
+    try {
+      const response = await this.makeRequest(
+        '/iot-open/sign/device/quota',
+        'POST',
+        { sn: deviceSN },
+        params
+      )
+      return response.code === '0'
+    } catch (error) {
+      throw new EcoFlowAPIError(
+        `Failed to control device ${deviceSN}`,
+        'DEVICE_CONTROL_ERROR',
+        undefined,
+        error
+      )
+    }
+  }
+
+  /**
+   * Transform quota data to our internal device reading format
+   */
+  transformQuotaToReading(quotaData: DeviceQuotaData, deviceId: string) {
+    if (!quotaData?.quotaMap) {
+      return null
+    }
+
+    const quota = quotaData.quotaMap
+    
+    return {
+      deviceId,
+      batteryLevel: this.getQuotaValue(quota, 'bms_bmsStatus.soc'),
+      inputWatts: this.getQuotaValue(quota, 'inv.inputWatts'),
+      outputWatts: this.getQuotaValue(quota, 'inv.outputWatts'),
+      remainingTime: this.getQuotaValue(quota, 'bms_bmsStatus.remainTime'),
+      temperature: this.getQuotaValue(quota, 'bms_bmsStatus.temp'),
+      status: this.determineDeviceStatus(quota),
+      rawData: quotaData,
+      recordedAt: new Date(),
+    }
+  }
+
+  /**
+   * Extract and scale quota values
+   */
+  private getQuotaValue(quotaMap: any, key: string): number | null {
+    const value = quotaMap[key]
+    if (!value || typeof value.val !== 'number') {
+      return null
+    }
+    
+    // Apply scaling if present
+    const scale = value.scale || 0
+    return scale > 0 ? value.val / scale : value.val
+  }
+
+  /**
+   * Determine device status based on quota data
+   */
+  private determineDeviceStatus(quotaMap: any): string {
+    const inputWatts = this.getQuotaValue(quotaMap, 'inv.inputWatts') || 0
+    const outputWatts = this.getQuotaValue(quotaMap, 'inv.outputWatts') || 0
+    const batteryLevel = this.getQuotaValue(quotaMap, 'bms_bmsStatus.soc') || 0
+
+    if (inputWatts > 10) {
+      return 'charging'
+    } else if (outputWatts > 10) {
+      return 'discharging'
+    } else if (batteryLevel > 95) {
+      return 'full'
+    } else if (batteryLevel < 10) {
+      return 'low'
+    }
+    
+    return 'standby'
+  }
+
+  /**
+   * Health check - verify API connectivity and credentials
+   */
+  async healthCheck(): Promise<boolean> {
+    try {
+      await this.getDeviceList()
+      return true
+    } catch (error) {
+      console.error('EcoFlow API health check failed:', error)
+      return false
+    }
   }
 }
 
