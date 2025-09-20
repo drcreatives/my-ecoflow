@@ -15,11 +15,6 @@ body {
   min-height: 100vh;
 }
 
-* {
-  margin: initial!important;
-  padding: initial!important;
-}
-
 /* Scrollbar styling for dark theme */
 ::-webkit-scrollbar {
   width: 8px;
