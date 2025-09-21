@@ -176,8 +176,8 @@ export async function POST(request: NextRequest) {
       createdAt: Date
       updatedAt: Date
     }>(`
-      INSERT INTO devices (user_id, device_sn, device_name, device_type, is_active, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, true, NOW(), NOW())
+      INSERT INTO devices (id, user_id, device_sn, device_name, device_type, is_active, created_at, updated_at)
+      VALUES (gen_random_uuid(), $1, $2, $3, $4, true, NOW(), NOW())
       RETURNING id, user_id as "userId", device_sn as "deviceSn", device_name as "deviceName", device_type as "deviceType", is_active as "isActive", created_at as "createdAt", updated_at as "updatedAt"
     `, [user.id, deviceSn, deviceName, deviceType || 'DELTA_2'])
 

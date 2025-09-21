@@ -70,6 +70,7 @@ export async function POST(_request: NextRequest) {
           id: string
         }>(`
           INSERT INTO device_readings (
+            id,
             device_id, 
             battery_level, 
             input_watts, 
@@ -81,6 +82,7 @@ export async function POST(_request: NextRequest) {
             recorded_at
           )
           VALUES (
+            gen_random_uuid(),
             $1,
             $2,
             $3,
