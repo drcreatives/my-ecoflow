@@ -122,8 +122,6 @@ export async function PATCH(
          device_name as "deviceName",
          device_type as "deviceType",
          is_active as "isActive",
-         online,
-         status,
          user_id as "userId",
          created_at as "createdAt",
          updated_at as "updatedAt"`,
