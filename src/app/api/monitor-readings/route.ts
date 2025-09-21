@@ -17,16 +17,16 @@ export async function GET() {
       }>>`
         SELECT 
           dr.id,
-          dr."deviceId",
-          dr."batteryLevel",
-          dr."inputWatts", 
-          dr."outputWatts",
-          dr."recordedAt",
-          d."deviceSn",
-          d."deviceName"
-        FROM "DeviceReading" dr
-        LEFT JOIN "Device" d ON dr."deviceId" = d.id
-        ORDER BY dr."recordedAt" DESC
+          dr.device_id as "deviceId",
+          dr.battery_level as "batteryLevel",
+          dr.input_watts as "inputWatts", 
+          dr.output_watts as "outputWatts",
+          dr.recorded_at as "recordedAt",
+          d.device_sn as "deviceSn",
+          d.device_name as "deviceName"
+        FROM device_readings dr
+        LEFT JOIN devices d ON dr.device_id = d.id
+        ORDER BY dr.recorded_at DESC
         LIMIT 10
       `
 
@@ -38,13 +38,13 @@ export async function GET() {
         readingCount: number
       }>>`
         SELECT 
-          dr."deviceId",
-          d."deviceSn",
-          d."deviceName",
+          dr.device_id as "deviceId",
+          d.device_sn as "deviceSn",
+          d.device_name as "deviceName",
           COUNT(dr.id)::int as "readingCount"
-        FROM "DeviceReading" dr
-        LEFT JOIN "Device" d ON dr."deviceId" = d.id
-        GROUP BY dr."deviceId", d."deviceSn", d."deviceName"
+        FROM device_readings dr
+        LEFT JOIN devices d ON dr.device_id = d.id
+        GROUP BY dr.device_id, d.device_sn, d.device_name
         ORDER BY COUNT(dr.id) DESC
       `
 

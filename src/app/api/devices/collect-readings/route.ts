@@ -28,9 +28,9 @@ export async function POST(_request: NextRequest) {
       deviceName: string
       userId: string
     }>>`
-      SELECT id, "deviceSn", "deviceName", "userId"
-      FROM "Device"
-      WHERE "userId" = ${user.id}
+      SELECT id, device_sn as "deviceSn", device_name as "deviceName", user_id as "userId"
+      FROM devices
+      WHERE user_id = ${user.id}
     `
 
     if (devices.length === 0) {
@@ -71,16 +71,16 @@ export async function POST(_request: NextRequest) {
         const savedReading = await prisma.$queryRaw<Array<{
           id: string
         }>>`
-          INSERT INTO "DeviceReading" (
-            "deviceId", 
-            "batteryLevel", 
-            "inputWatts", 
-            "outputWatts", 
-            "remainingTime", 
-            "temperature", 
-            "status", 
-            "rawData",
-            "recordedAt"
+          INSERT INTO device_readings (
+            device_id, 
+            battery_level, 
+            input_watts, 
+            output_watts, 
+            remaining_time, 
+            temperature, 
+            status, 
+            raw_data,
+            recorded_at
           )
           VALUES (
             ${device.id},
