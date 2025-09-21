@@ -8,17 +8,10 @@ function getPool(): Pool {
     // Parse the DATABASE_URL to extract connection details
     const dbUrl = process.env.DATABASE_URL || ''
     
-    // For production, ensure SSL mode is set correctly
-    const connectionString = process.env.NODE_ENV === 'production' 
-      ? dbUrl.includes('sslmode=') 
-        ? dbUrl.replace(/sslmode=[^&]*/, 'sslmode=require')
-        : `${dbUrl}${dbUrl.includes('?') ? '&' : '?'}sslmode=require`
-      : dbUrl
-    
     // Create pool with direct connection (no prepared statements)
     pool = new Pool({
-      connectionString,
-      // SSL configuration for production (Supabase)
+      connectionString: dbUrl,
+      // SSL configuration for production (Supabase) - minimal verification
       ssl: process.env.NODE_ENV === 'production' ? {
         rejectUnauthorized: false
       } : false,

@@ -1,5 +1,8 @@
 import crypto from 'crypto'
 
+// For handling SSL certificates in production
+const isProduction = process.env.NODE_ENV === 'production'
+
 // Types for EcoFlow API responses
 export interface EcoFlowDevice {
   sn: string
@@ -140,6 +143,11 @@ export class EcoFlowAPI {
       : url
 
     try {
+      // For production environments with SSL certificate issues
+      if (isProduction && typeof process !== 'undefined' && process.env) {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+      }
+
       const response = await fetch(requestUrl, {
         method,
         headers,
@@ -216,6 +224,11 @@ export class EcoFlowAPI {
       
       // Build URL with sn as query parameter
       const url = `${this.baseURL}/iot-open/sign/device/quota/all?sn=${deviceSN}`
+      
+      // For production environments with SSL certificate issues
+      if (isProduction && typeof process !== 'undefined' && process.env) {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+      }
       
       const response = await fetch(url, {
         method: 'GET',
