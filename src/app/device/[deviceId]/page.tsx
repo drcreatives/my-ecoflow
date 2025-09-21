@@ -16,9 +16,12 @@ import {
   Power,
   TrendingUp,
   TrendingDown,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react'
 import { DeviceData } from '@/lib/data-utils'
+import { AppLayout } from '@/components/layout'
+import AuthWrapper from '@/components/AuthWrapper'
 
 interface DevicePageProps {
   params: { deviceId: string }
@@ -33,6 +36,16 @@ export default function DevicePage({ params }: DevicePageProps) {
   useEffect(() => {
     fetchDeviceDetails()
   }, [params.deviceId])
+
+  const handleBack = () => {
+    // Check if there's navigation history
+    if (window.history.length > 1) {
+      router.back()
+    } else {
+      // Fallback to devices page if no history
+      router.push('/devices')
+    }
+  }
 
   const fetchDeviceDetails = async () => {
     try {
@@ -82,72 +95,127 @@ export default function DevicePage({ params }: DevicePageProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-primary-black text-accent-gray">
-        <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
-          <div className="animate-pulse">
-            <div className="h-8 bg-primary-dark rounded w-48 mb-8"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-32 bg-primary-dark rounded-lg"></div>
-              ))}
+      <AuthWrapper>
+        <AppLayout>
+          <div className="min-h-screen bg-primary-black text-accent-gray">
+            <div className="container mx-auto px-4 py-8">
+              {/* Back button skeleton */}
+              <div className="flex items-center space-x-4 mb-8">
+                <div className="w-9 h-9 bg-primary-dark rounded-lg animate-pulse"></div>
+                <div>
+                  <div className="h-8 w-48 bg-primary-dark rounded animate-pulse mb-2"></div>
+                  <div className="h-4 w-32 bg-primary-dark rounded animate-pulse"></div>
+                </div>
+              </div>
+
+              {/* Center loading spinner */}
+              {/* <div className="flex flex-col items-center justify-center py-16">
+                <Loader2 size={48} className="animate-spin text-accent-green mb-4" />
+                <h3 className="text-lg font-medium text-white mb-2">Loading Device Details</h3>
+                <p className="text-gray-400">Fetching device information...</p>
+              </div> */}
+
+              {/* Content skeleton */}
+              <div className="space-y-6">
+                {/* Analytics card skeleton */}
+                <div className="bg-primary-dark rounded-lg p-6 animate-pulse">
+                  <div className="h-6 w-40 bg-gray-800 rounded mb-2"></div>
+                  <div className="h-4 w-64 bg-gray-800 rounded"></div>
+                </div>
+
+                {/* Metrics grid skeleton */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="bg-primary-dark rounded-lg p-6 animate-pulse">
+                      <div className="h-6 w-24 bg-gray-800 rounded mb-2"></div>
+                      <div className="h-8 w-16 bg-gray-800 rounded"></div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Large cards skeleton */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {[...Array(2)].map((_, i) => (
+                    <div key={i} className="bg-primary-dark rounded-lg p-6 animate-pulse">
+                      <div className="h-6 w-32 bg-gray-800 rounded mb-4"></div>
+                      <div className="space-y-2">
+                        <div className="h-4 w-full bg-gray-800 rounded"></div>
+                        <div className="h-4 w-3/4 bg-gray-800 rounded"></div>
+                        <div className="h-4 w-1/2 bg-gray-800 rounded"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </AppLayout>
+      </AuthWrapper>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-primary-black text-accent-gray flex items-center justify-center">
-        <div className="text-center">
-          <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Error Loading Device</h1>
-          <p className="text-accent-gray mb-6">{error}</p>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="bg-accent-green hover:bg-accent-green/80 text-primary-black px-6 py-3 rounded-lg font-medium transition-colors"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
+      <AuthWrapper>
+        <AppLayout>
+          <div className="min-h-screen bg-primary-black text-accent-gray flex items-center justify-center">
+            <div className="text-center">
+              <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+              <h1 className="text-2xl font-bold text-white mb-2">Error Loading Device</h1>
+              <p className="text-accent-gray mb-6">{error}</p>
+              <button
+                onClick={handleBack}
+                className="bg-accent-green hover:bg-accent-green/80 text-primary-black px-6 py-3 rounded-lg font-medium transition-colors"
+              >
+                Go Back
+              </button>
+            </div>
+          </div>
+        </AppLayout>
+      </AuthWrapper>
     )
   }
 
   if (!device) {
     return (
-      <div className="min-h-screen bg-primary-black text-accent-gray flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-white mb-2">Device Not Found</h1>
-          <p className="text-accent-gray mb-6">The device you&apos;re looking for doesn&apos;t exist.</p>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="bg-accent-green hover:bg-accent-green/80 text-primary-black px-6 py-3 rounded-lg font-medium transition-colors"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
+      <AuthWrapper>
+        <AppLayout>
+          <div className="min-h-screen bg-primary-black text-accent-gray flex items-center justify-center">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-white mb-2">Device Not Found</h1>
+              <p className="text-accent-gray mb-6">The device you&apos;re looking for doesn&apos;t exist.</p>
+              <button
+                onClick={handleBack}
+                className="bg-accent-green hover:bg-accent-green/80 text-primary-black px-6 py-3 rounded-lg font-medium transition-colors"
+              >
+                Go Back
+              </button>
+            </div>
+          </div>
+        </AppLayout>
+      </AuthWrapper>
     )
   }
 
   const reading = device.currentReading
 
   return (
-    <div className="min-h-screen bg-primary-black text-accent-gray">
-      <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="p-2 hover:bg-primary-dark rounded-lg transition-colors group"
-            >
-              <ArrowLeft className="w-5 h-5 group-hover:text-accent-green transition-colors" />
-            </button>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">{device.deviceName}</h1>
+    <AuthWrapper>
+      <AppLayout>
+        <div className="min-h-screen bg-primary-black text-accent-gray">
+          <div className="container mx-auto px-4 py-8">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={handleBack}
+                  className="p-2 hover:bg-primary-dark rounded-lg transition-colors group"
+                  title="Go back"
+                >
+                  <ArrowLeft className="w-5 h-5 group-hover:text-accent-green transition-colors" />
+                </button>
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-white">{device.deviceName}</h1>
               <div className="flex items-center space-x-3 mt-1">
                 <span className="text-accent-gray text-sm">SN: {device.deviceSn}</span>
                 <div className="flex items-center space-x-1">
@@ -405,7 +473,9 @@ export default function DevicePage({ params }: DevicePageProps) {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+          </div>
+        </div>
+      </AppLayout>
+    </AuthWrapper>
   )
 }
