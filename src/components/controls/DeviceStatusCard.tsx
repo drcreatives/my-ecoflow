@@ -8,10 +8,15 @@ import {
   Power,
   Wifi,
   WifiOff,
-  ArrowRight
+  ArrowRight,
+  Database,
+  DatabaseZap,
+  Plus,
+  X
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatRemainingTime } from '@/lib/data-utils'
+import { useState } from 'react'
 
 interface DeviceData {
   id: string
@@ -38,11 +43,17 @@ interface DeviceStatusCardProps {
 }
 
 export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCardProps) => {
+  const [isRegistering, setIsRegistering] = useState(false)
+  const [isUnregistering, setIsUnregistering] = useState(false)
+  
   const batteryLevel = device.currentReading?.batteryLevel ?? 0
   const inputWatts = device.currentReading?.inputWatts ?? 0
   const outputWatts = device.currentReading?.outputWatts ?? 0
   const temperature = device.currentReading?.temperature ?? 20
   const remainingTime = device.currentReading?.remainingTime
+
+  // Check if device is registered (has real UUID vs temp ID)
+  const isRegistered = !device.id.startsWith('temp-')
 
   // Determine status color and text
   const getStatusInfo = () => {
@@ -58,11 +69,67 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
     return { color: 'text-accent-green', bg: 'bg-accent-green/10', text: 'Standby' }
   }
 
+  const handleRegisterDevice = async () => {
+    setIsRegistering(true)
+    try {
+      const response = await fetch('/api/register-device', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          deviceSn: device.deviceSn,
+          userId: device.userId
+        })
+      })
+
+      if (response.ok) {
+        // Refresh the page or update state to show the device as registered
+        window.location.reload()
+      } else {
+        throw new Error('Failed to register device')
+      }
+    } catch (error) {
+      console.error('Registration error:', error)
+      alert('Failed to register device for analytics. Please try again.')
+    } finally {
+      setIsRegistering(false)
+    }
+  }
+
+  const handleUnregisterDevice = async () => {
+    setIsUnregistering(true)
+    try {
+      const response = await fetch('/api/unregister-device', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          deviceSn: device.deviceSn,
+          userId: device.userId
+        })
+      })
+
+      if (response.ok) {
+        // Refresh the page or update state to show the device as unregistered
+        window.location.reload()
+      } else {
+        throw new Error('Failed to unregister device')
+      }
+    } catch (error) {
+      console.error('Unregistration error:', error)
+      alert('Failed to unregister device. Please try again.')
+    } finally {
+      setIsUnregistering(false)
+    }
+  }
+
   const statusInfo = getStatusInfo()
 
   return (
     <div className={cn(
-      "bg-primary-dark rounded-lg border border-gray-700 hover:border-accent-green transition-all duration-200 group",
+      "bg-primary-dark rounded-lg border border-gray-700 hover:border-accent-green transition-all duration-200 group relative",
       isCompact ? "p-4" : "p-6"
     )}>
       {/* Header */}
@@ -108,6 +175,74 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
         {device.isActive && (
           <div className="w-2 h-2 bg-accent-green rounded-full animate-pulse" />
         )}
+      </div>
+
+      {/* Analytics Registration Status */}
+      <div className="mb-4 p-3 rounded-lg border border-gray-600 bg-gray-800/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {isRegistered ? (
+              <DatabaseZap size={16} className="text-accent-green" />
+            ) : (
+              <Database size={16} className="text-gray-400" />
+            )}
+            <div className="flex flex-col">
+              <span className={cn(
+                "text-sm font-medium",
+                isRegistered ? "text-accent-green" : "text-gray-400"
+              )}>
+                {isRegistered ? "Analytics Enabled" : "Analytics Disabled"}
+              </span>
+              <span className="text-xs text-gray-500">
+                {isRegistered 
+                  ? "Device data is being collected for history and analytics" 
+                  : "Register device to enable data collection and analytics"
+                }
+              </span>
+            </div>
+          </div>
+          
+          {/* Registration Controls */}
+          <div className="ml-2">
+            {isRegistered ? (
+              <button
+                onClick={handleUnregisterDevice}
+                disabled={isUnregistering}
+                className="flex items-center gap-1 px-2 py-1 text-xs border border-red-400 text-red-400 hover:bg-red-400 hover:text-white rounded transition-colors disabled:opacity-50"
+              >
+                {isUnregistering ? (
+                  <>
+                    <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                    <span>Removing...</span>
+                  </>
+                ) : (
+                  <>
+                    <X size={12} />
+                    <span>Disable</span>
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={handleRegisterDevice}
+                disabled={isRegistering}
+                className="flex items-center gap-1 px-2 py-1 text-xs border border-accent-green text-accent-green hover:bg-accent-green hover:text-black rounded transition-colors disabled:opacity-50"
+              >
+                {isRegistering ? (
+                  <>
+                    <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                    <span>Enabling...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus size={12} />
+                    <span>Enable</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Main Stats Grid */}
