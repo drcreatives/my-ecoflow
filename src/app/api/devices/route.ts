@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ecoflowAPI, EcoFlowAPIError } from '@/lib/ecoflow-api'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { withPrisma } from '@/lib/prisma'
+import { executeQuery } from '@/lib/database'
 
 export async function GET(_request: NextRequest) {
   try {
@@ -19,22 +19,20 @@ export async function GET(_request: NextRequest) {
     // Fetch devices from EcoFlow API
     const devices = await ecoflowAPI.getDeviceList()
 
-    const userDevices = await withPrisma(async (prisma) => {
-      // Get user's registered devices from database using raw SQL
-      return await prisma.$queryRaw<Array<{
-        id: string
-        deviceSn: string
-        deviceName: string
-        userId: string
-        isActive: boolean | null
-        createdAt: Date | null
-        updatedAt: Date | null
-      }>>`
-        SELECT id, device_sn as "deviceSn", device_name as "deviceName", user_id as "userId", is_active as "isActive", created_at as "createdAt", updated_at as "updatedAt"
-        FROM devices 
-        WHERE user_id = ${user.id}
-      `
-    })
+    // Get user's registered devices from database using direct PostgreSQL
+    const userDevices = await executeQuery<{
+      id: string
+      deviceSn: string
+      deviceName: string
+      userId: string
+      isActive: boolean | null
+      createdAt: Date | null
+      updatedAt: Date | null
+    }>(`
+      SELECT id, device_sn as "deviceSn", device_name as "deviceName", user_id as "userId", is_active as "isActive", created_at as "createdAt", updated_at as "updatedAt"
+      FROM devices 
+      WHERE user_id = $1
+    `, [user.id])
 
     console.log(`Found ${userDevices.length} registered devices for user ${user.id}`)
 
@@ -167,25 +165,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const result = await withPrisma(async (prisma) => {
-      // Register device in our database using raw SQL
-      const device = await prisma.$queryRaw<Array<{
-        id: string
-        userId: string
-        deviceSn: string
-        deviceName: string
-        deviceType: string
-        isActive: boolean
-        createdAt: Date
-        updatedAt: Date
-      }>>`
-        INSERT INTO devices (user_id, device_sn, device_name, device_type, is_active, created_at, updated_at)
-        VALUES (${user.id}, ${deviceSn}, ${deviceName}, ${deviceType || 'DELTA_2'}, true, NOW(), NOW())
-        RETURNING id, user_id as "userId", device_sn as "deviceSn", device_name as "deviceName", device_type as "deviceType", is_active as "isActive", created_at as "createdAt", updated_at as "updatedAt"
-      `
+    // Register device in our database using direct PostgreSQL
+    const deviceResult = await executeQuery<{
+      id: string
+      userId: string
+      deviceSn: string
+      deviceName: string
+      deviceType: string
+      isActive: boolean
+      createdAt: Date
+      updatedAt: Date
+    }>(`
+      INSERT INTO devices (user_id, device_sn, device_name, device_type, is_active, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, true, NOW(), NOW())
+      RETURNING id, user_id as "userId", device_sn as "deviceSn", device_name as "deviceName", device_type as "deviceType", is_active as "isActive", created_at as "createdAt", updated_at as "updatedAt"
+    `, [user.id, deviceSn, deviceName, deviceType || 'DELTA_2'])
 
-      return device[0]
-    })
+    const result = deviceResult[0]
 
     console.log('Device registered successfully:', result.id)
 
