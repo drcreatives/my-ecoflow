@@ -2,14 +2,27 @@ import { PrismaClient } from '@prisma/client'
 
 // Create a function that returns a completely isolated Prisma client
 export function createIsolatedPrismaClient() {
+  // Build URL with parameters to disable prepared statements
+  let dbUrl = process.env.DATABASE_URL || ''
+  
+  // Remove pgbouncer if present and add prepared statement disabling parameters
+  if (dbUrl.includes('pgbouncer')) {
+    dbUrl = dbUrl.replace('pgbouncer=true', 'pgbouncer=false').replace(/aws-.*pooler/, 'db')
+  }
+  
+  // Add parameters to disable prepared statements and avoid naming conflicts
+  const urlObj = new URL(dbUrl)
+  urlObj.searchParams.set('prepared_statement_cache_queries', 'false')
+  urlObj.searchParams.set('statement_cache_size', '0')
+  urlObj.searchParams.set('connection_limit', '1')
+  // Add unique session identifier to prevent statement name conflicts
+  urlObj.searchParams.set('application_name', `prisma_${Date.now()}_${Math.random().toString(36).substring(7)}`)
+  
   return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
     datasources: {
       db: {
-        // Force direct connection with unique connection parameters to avoid conflicts
-        url: process.env.DATABASE_URL?.includes('pgbouncer') 
-          ? process.env.DATABASE_URL.replace('pgbouncer=true', 'pgbouncer=false').replace(/aws-.*pooler/, 'db') 
-          : process.env.DATABASE_URL
+        url: urlObj.toString()
       }
     }
   })
