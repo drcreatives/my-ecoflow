@@ -11,6 +11,10 @@ function getPool(): Pool {
     // Create pool with direct connection (no prepared statements)
     pool = new Pool({
       connectionString: dbUrl,
+      // SSL configuration for production (Supabase)
+      ssl: process.env.NODE_ENV === 'production' ? {
+        rejectUnauthorized: false // Accept self-signed certificates
+      } : false,
       // Disable prepared statements completely
       statement_timeout: 30000,
       query_timeout: 30000,
