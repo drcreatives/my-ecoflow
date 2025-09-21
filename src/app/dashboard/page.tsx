@@ -7,6 +7,7 @@ import { useDeviceStore } from '@/stores/deviceStore';
 import { DeviceStatusCard } from '@/components/controls';
 import { AppLayout } from '@/components/layout';
 import AuthWrapper from '@/components/AuthWrapper';
+import CronStatusWidget from '@/components/CronStatusWidget';
 import { cn } from '@/lib/utils';
 
 // Mock stats for demo purposes
@@ -109,6 +110,7 @@ function Dashboard() {
               {stats.map((stat, index) => (
                 <StatCard key={index} stat={stat} />
               ))}
+              <CronStatusWidget />
             </div>
           </div>
 
