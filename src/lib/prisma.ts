@@ -1,36 +1,49 @@
 import { PrismaClient } from '@prisma/client'
 
-// Create a function that returns a new Prisma client for each request
-export function createPrismaClient() {
+// Create a function that returns a completely isolated Prisma client
+export function createIsolatedPrismaClient() {
   return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
     datasources: {
       db: {
-        // Use direct connection for serverless to avoid prepared statement conflicts
-        url: process.env.DATABASE_URL?.replace('pgbouncer=true', 'pgbouncer=false')
+        // Force direct connection with unique connection parameters to avoid conflicts
+        url: process.env.DATABASE_URL?.includes('pgbouncer') 
+          ? process.env.DATABASE_URL.replace('pgbouncer=true', 'pgbouncer=false').replace(/aws-.*pooler/, 'db') 
+          : process.env.DATABASE_URL
       }
     }
   })
 }
 
-// For backward compatibility, export a singleton for non-critical operations
+// For backward compatibility in development
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient()
+export const prisma = globalForPrisma.prisma ?? createIsolatedPrismaClient()
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma
 }
 
-// Helper function to get a fresh Prisma client for serverless functions
-export function getPrismaClient(): PrismaClient {
-  // In production, always create new instance to avoid connection conflicts
-  if (process.env.NODE_ENV === 'production') {
-    return createPrismaClient()
+// Helper function to execute a query with complete isolation
+export async function withPrisma<T>(
+  operation: (prisma: PrismaClient) => Promise<T>
+): Promise<T> {
+  const client = createIsolatedPrismaClient()
+  try {
+    const result = await operation(client)
+    return result
+  } finally {
+    await client.$disconnect()
   }
-  // In development, use singleton
+}
+
+// Legacy function for backward compatibility
+export function getPrismaClient(): PrismaClient {
+  if (process.env.NODE_ENV === 'production') {
+    return createIsolatedPrismaClient()
+  }
   return prisma
 }
 

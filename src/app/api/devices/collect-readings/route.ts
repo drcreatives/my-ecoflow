@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ecoflowAPI } from '@/lib/ecoflow-api'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { getPrismaClient, disconnectPrisma } from '@/lib/prisma'
+import { withPrisma } from '@/lib/prisma'
 
 /**
  * Background job endpoint to collect and store device readings
  * This can be called periodically by a cron job or monitoring system
  */
 export async function POST(_request: NextRequest) {
-  const prisma = getPrismaClient()
-  
   try {
     console.log('📊 Starting background reading collection...')
     
@@ -20,6 +18,8 @@ export async function POST(_request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    
+    const result = await withPrisma(async (prisma) => {
 
     // Get all devices for this user
     const devices = await prisma.device.findMany({
@@ -30,10 +30,10 @@ export async function POST(_request: NextRequest) {
 
     if (devices.length === 0) {
       console.log('ℹ️ No devices found for user')
-      return NextResponse.json({ 
+      return {
         message: 'No devices found',
         collected: 0 
-      })
+      }
     }
 
     let successCount = 0
@@ -101,7 +101,7 @@ export async function POST(_request: NextRequest) {
 
     console.log(`📊 Collection complete: ${successCount} success, ${errorCount} errors`)
 
-    return NextResponse.json({
+    return {
       message: 'Reading collection completed',
       timestamp: new Date().toISOString(),
       summary: {
@@ -110,7 +110,10 @@ export async function POST(_request: NextRequest) {
         failed: errorCount
       },
       results
-    })
+    }
+  })
+
+  return NextResponse.json(result)
 
   } catch (error) {
     console.error('❌ Error in reading collection:', error)
@@ -119,8 +122,5 @@ export async function POST(_request: NextRequest) {
       error: 'Failed to collect readings',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
-  } finally {
-    // Always disconnect in serverless
-    await disconnectPrisma(prisma)
   }
 }
