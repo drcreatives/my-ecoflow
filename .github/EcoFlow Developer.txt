@@ -1,0 +1,3238 @@
+Host
+Key	Value
+host
+
+https://api-e.ecoflow.com
+HTTP access steps
+Create a signature with accesskey and secretkey for authentication when HTTP requesting.
+
+How to implement signature:
+
+Step 1: request parameters must be sorted by ASCII value and concatenated with characters =, &
+
+E.g. str=param1=value1&param2=value2
+
+Step 2: if the type is nested, expand and splice according to the method of step 1.
+
+E.g. deviceInfo.id=1&deviceList[0].id=1&deviceList[1].id=2&ids[0]=1&ids[1]=2&ids[2]=3&name=demo1
+
+{
+    // General Parameter, expand to: name=demo1
+    "name" : "demo1" ,
+    // Array, expand to: ids[0]=1&ids[1]=2&ids[2]=3
+    "ids" :[1, 2, 3],
+    // Object, expand to: deviceInfo.id=1
+    "deviceInfo" :{
+        "id" :1
+    },
+    // Object Array, expand to: deviceList[0].id=1&deviceList[1].id=2
+    "deviceList" :[
+        {
+            "id" :1
+        },
+        {
+            "id" :2
+        }
+    ]
+}
+Step 3: concatenate accessKey, nonce, timestamp
+
+E.g. str=param1=value1&param2=value2&accessKey=***&nonce=...&timestamp=...
+
+Step 4: encrypt
+
+E.g. byte[] signBytes = HMAC-SHA256(str, secretKey)
+
+Step 5: convert byte[] to hexadecimal string. String sign = bytesToHexString(signBytes)
+
+E.g. sign=85776ede686fe4783eac48135b0b1748ba2d7e9bb7791b826dc942fc29d4ada8
+
+Step 6: add accessKey, nonce, timestamp, sign to HTTP header
+
+E.g.
+
+// HTTP Header
+accessKey:ba2d7e9...
+nonce:123456
+timestamp:1671171709428
+sign:85776ede686fe...
+Step 7: get request data according to Content-Type header
+
+If Content-Type is "application/json;charset=UTF-8", get request data from request body, else get from request query string.
+
+E.g.
+
+// HTTP header content-type=application/json;charset=UTF-8
+// HTTP body
+{
+ "name": "...",   
+ "begin_time": 123456789
+}
+
+// HTTP header content-type is none or other
+// HTTP query string
+https://${host}//iot-open/sign/device/quota/all?sn=123
+Step8: verify that the steps to generate the signature are correct
+
+accessKey=Fp4SvIprYSDPXtYJidEtUAd1o
+secretKey=WIbFEKre0s6sLnh4ei7SPUeYnptHG6V
+nonce=345164
+timestamp=1671171709428
+
+// HTTP json Body
+{
+    "sn" : "123456789" ,
+    "params" :{
+        "cmdSet" :11,
+        "id" :24,
+        "eps" :0
+    }
+}
+
+// key-value string
+params.cmdSet=11&params.eps=0&params.id=24&sn=123456789&accessKey=Fp4SvIprYSDPXtYJidEtUAd1o&nonce=345164&timestamp=1671171709428
+
+// sign. If the signature you generated is this value, than is correct
+07c13b65e037faf3b153d51613638fa80003c4c38d2407379a7f52851af1473e
+General HTTP Header
+Field	Field's Type	Required	Description
+accessKey
+
+string
+
+Yes
+
+Get from IoT platform
+
+nonce
+
+int
+
+Yes
+
+Random number, 6 digits. Such as 537642
+
+timestamp
+
+long
+
+Yes
+
+UTC timestamp. Such as 1672382607378
+
+sign
+
+string
+
+Yes
+
+Creating by the signature rule
+
+Query the user's bound device list
+Only returns the device bound to itself, not by share.
+
+Key	Value
+Method
+
+GET
+
+URL
+
+https://${host}/iot-open/sign/device/list
+Content-Type
+
+none
+
+Request Body
+
+None
+
+Response Body
+
+Field	Field's Type	Required	Description
+code
+
+string
+
+Yes
+
+0: success
+
+message
+
+string
+
+data
+
+List
+
+Device's info list
+
+DeviceInfo
+
+Field	Field's Type	Required	Description
+sn
+
+string
+
+Yes
+
+Device's sequence number
+
+deviceName
+
+string
+
+Yes
+
+Device's name
+
+online
+
+int
+
+Yes
+
+Device online or not0: No, 1: Yes
+
+Example
+
+// request
+curl -X GET https://api-e.ecoflow.com/iot-open/sign/device/list \
+-H 'accessKey:OCHzRuj6NLF7o43***' \
+-H 'timestamp:1681796503289' \
+-H 'nonce:234762' \
+-H 'sign:f560c3e31d96ad31e4567939f9b3dca7b2c454ca7003f60***'
+
+// response
+{
+    "code":"0",
+    "message":"Success",
+    "data":[
+        {
+            "sn":"DCABZ****",
+            "online":1
+        }
+    ]
+}
+Setting device's function
+Key	Value
+Method
+
+PUT
+
+URL
+
+https://${host}/iot-open/sign/device/quota
+Content-Type
+
+application/json;charset=UTF-8
+
+Request Body
+
+Field	Field's Type	Required	Description
+sn
+
+string
+
+Yes
+
+Device's sequence number
+
+params
+
+SetCmdRequest
+
+Yes
+
+Response Body
+
+Field	Field's Type	Required	Description
+code
+
+string
+
+Yes
+
+0: success
+
+message
+
+string
+
+Example
+
+// Delta Pro: Setting the X-Boost switch
+// Request
+curl -X PUT https://api-e.ecoflow.com/iot-open/sign/device/quota \
+-H 'Content-Type:application/json;charset=UTF-8' \
+-H 'accessKey:OCHzRuj6NLF7o43***' \
+-H 'timestamp:1681872798000' \
+-H 'nonce:238752' \
+-H 'sign:0f3a1b102cd9a306307b7a9a0f0a9add7b8bfc93cf11***' \
+-d '{"sn":"DCABZ***","params":{"cmdSet":32,"id":66,"enabled":1}}'
+
+// Response
+{
+    "code":"0",
+    "message":"Success"
+}
+Query the device's quota infomation
+Key	Value
+Method
+
+POST
+
+URL
+
+https://${host}/iot-open/sign/device/quota
+Content-Type
+
+application/json;charset=UTF-8
+
+Request Body
+
+Field	Field's Type	Required	Description
+sn
+
+string
+
+Yes
+
+Device's sequence number
+
+params
+
+GetCmdRequest
+
+Yes
+
+Response Body
+
+Field	Field's Type	Required	Description
+code
+
+string
+
+Yes
+
+0: success
+
+message
+
+string
+
+data
+
+GetCmdResponse
+
+Example
+
+// Delta Pro: Get the X-Boost switch value
+// Request
+curl -X POST https://api-e.ecoflow.com/iot-open/sign/device/quota \
+-H 'Content-Type:application/json;charset=UTF-8' \
+-H 'accessKey:OCHzRuj6NLF7o43***' \
+-H 'timestamp:1681872798000' \
+-H 'nonce:238752' \
+-H 'sign:1e48307441d06a6b31d4c0d66be1580c7748fd0***' \
+-d '{"sn":"DCABZ***","params":{"cmdSet":32,"id":66,"quotas":["inv.cfgAcEnabled"]}}'
+
+// Response
+{
+    "code":"0",
+    "message":"Success",
+    "data":{
+        "inv.cfgAcEnabled":1
+    }
+}
+Query device's all quota infomation
+Key	Value
+Method
+
+GET
+
+URL
+
+https://${host}/iot-open/sign/device/quota/all
+Content-Type
+
+none
+
+Request Query String
+
+Field	Field's Type	Required	Description
+sn
+
+string
+
+Yes
+
+Device's sequence number
+
+Response Body
+
+Field	Field's Type	Required	Description
+code
+
+string
+
+Yes
+
+0: success
+
+message
+
+string
+
+data
+
+GetAllQuotaResponse
+
+Example
+
+// Get Delta Pro all quota values
+// Request
+curl -X GET https://api-e.ecoflow.com/iot-open/sign/device/quota/all?sn=DCABZ*** \
+-H 'accessKey:OCHzRuj6NLF7o43***' \
+-H 'timestamp:1681872798000' \
+-H 'nonce:238752' \
+-H 'sign:534215ccfe93979588975630ea0ad7091c7e250ae5***'
+
+// Response
+{
+    "code":"0",
+    "message":"Success",
+    "data":{
+        "bmsMaster.soc":"100",
+        "bmsMaster.temp":"34",
+        "bmsMaster.inputWatts":"0",
+        "bmsMaster.outputWatts":"0",
+        "pd.remainTime":"14781",
+        "inv.cfgAcEnabled":"0",
+        "mppt.carState":"0",
+        "pd.usb1Watts":"0",
+        "pd.usb2Watts":"0",
+        "pd.qcUsb1Watts":"0",
+        ...
+    }
+}
+MQTT certificate acquisition
+Get the MQTT certification, using it for MQTT communication.
+
+Key	Value
+Method
+
+GET
+
+URL
+
+https://${host}/iot-open/sign/certification
+Content-Type
+
+none
+
+Request Body
+
+None
+
+Response Body
+
+Field	Field's Type	Required	Description
+code
+
+string
+
+Yes
+
+0: success
+
+message
+
+string
+
+data
+
+AppCertification
+
+AppCertification
+
+Field	Field's Type	Required	Description
+certificateAccount
+
+string
+
+Yes
+
+MQTT certification account
+
+certificatePassword
+
+string
+
+Yes
+
+MQTT certification password
+
+url
+
+string
+
+Yes
+
+MQTT host
+
+port
+
+string
+
+Yes
+
+MQTT port
+
+protocol
+
+string
+
+Yes
+
+MQTT communication protocol: mqtt、mqtts
+
+Example
+
+// Request
+curl -X GET https://api-e.ecoflow.com/iot-open/sign/certification \
+-H 'accessKey:OCHzRuj6NLF7o43***' \
+-H 'timestamp:1681872798000' \
+-H 'nonce:238752' \
+-H 'sign:0396ef9748bf273ecf6ad7ded6333f343d778945f7***'
+
+// Response
+{
+    "code":"0",
+    "message":"Success",
+    "data":{
+        "certificateAccount":"open-57c134518b5***",
+        "certificatePassword":"959253cc103a4008***",
+        "url":"mqtt.ecoflow.com",
+        "port":"8883",
+        "protocol":"mqtts"
+    }
+}
+MQTT Topic
+Usage of Topic	Topic	From	To
+Report device quota
+
+/open/${certificateAccount}/${sn}/quota
+
+device
+
+app
+
+Set device function
+
+/open/${certificateAccount}/${sn}/set
+
+app
+
+device
+
+Reply to the set result
+
+/open/${certificateAccount}/${sn}/set_reply
+
+device
+
+app
+
+Get some quota
+
+/open/${certificateAccount}/${sn/get
+
+app
+
+device
+
+Reply to the get result
+
+/open/${certificateAccount}/${sn}/get_reply
+
+device
+
+app
+
+Report Device status
+
+/open/${certificateAccount}/${sn}/status
+
+device
+
+app
+
+Description
+
+Field	Get from the HTTP** **API
+certificateAccount
+
+GET: /iot-open/sign/certification
+sn
+
+GET: /iot-open/sign/device/list
+Request Topic's Common Field
+Field	Field Type	Description
+id
+
+string
+
+Message ID, unique per request.Such as UTC timestamp: 1672389360845Response will return the same id
+
+version
+
+string
+
+Protocol version. Input 1.0 at this moment
+
+operateType
+
+string
+
+Device's operator typeDelta Pro, Smart Home Panel device input TCP
+
+from
+
+string
+
+Request from source. Such as iOS, Android, Web
+
+params
+
+ParamInfo
+
+Example
+
+{
+  "id":"123456789",
+  "version":"1.0",
+  "operateType":"TCP",
+  "from":"iOS",
+  "params": {
+    "cmdSet": 32,
+    "id": 33,
+    "standByMode": 0
+  }
+}
+3.Reply Topic's Common Field
+
+Field	Field Type	Description
+id
+
+string
+
+Message ID, unique per request.Such as UTC timestamp: 1672389360845Response will return the same id
+
+version
+
+string
+
+Protocol version. Input 1.0 at this moment
+
+operateType
+
+string
+
+Device's operator typeDelta Pro, Smart Home Panel device input TCP
+
+code
+
+string
+
+Response result0: success-1: this device don't belong to user-2: device offline
+
+message
+
+string
+
+Error information
+
+data
+
+DataInfo
+
+Response data
+
+Example
+
+{
+    "id":123456789,
+    "version":"1.0",
+    "operateType": "TCP",
+    "code": "0",
+    "data": {
+        "cmdSet": 32,
+        "id": 33,
+        "ack": 0
+    }
+}
+Report Device status
+Usage of Topic	Topic	From	To
+Report Device status
+
+/open/${certificateAccount}/${sn}/status
+
+device
+
+app
+
+Message Format
+
+{
+  "id":"123456789",
+  "version":"1.0",
+  "timestamp": 1634841971000,
+  "params": {
+    "status": 0
+  }
+}
+Field
+
+Field	Field Type	Description
+status
+
+int
+
+Device online or not0: No, 1: Yes
+
+Was this page helpful?
+
+
+
+
+ModuleType definition
+
+Field	Field's Type	Description
+moduleType
+
+int
+
+1: PD
+2: BMS
+3: INV
+4: BMS_SLAVE
+5: MPPT
+
+HTTP communication mode
+
+Set & Get Quota
+
+How to transfer request parameters by these two HTTP API.
+
+PUT: /iot-open/sign/device/quota: SetCmdRequest
+
+GET: /iot-open/sign/device/quota: GetCmdRequest, GetCmdResponse
+
+MPPT
+
+Set Command	SetCmdRequest	GetCmdRequest	GetCmdResponse
+Set buzzer silent mode(0: disables the silent mode, 1: enables the silent mode)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 5,
+    "operateType": "quietMode",
+    "params": {
+        "enabled": 1
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "mppt.beepState"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "mppt.beepState": 1
+    },
+    "tid": ""
+}
+            
+        
+Set car charger switch (1: On; 0: Off)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 5,
+    "operateType": "mpptCar",
+    "params": {
+        "enabled": 1
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "mppt.carState"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "mppt.carState": 1
+    },
+    "tid": ""
+}
+            
+        
+Set AC discharge ("enabled" and X-Boost switch settings)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 5,
+    "operateType": "acOutCfg",
+    "params": {
+        "enabled": 0,
+        "xboost": 0,
+        "out_voltage": 30,
+        "out_freq": 1
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "mppt.cfgAcEnabled",
+            "mppt.cfgAcXboost",
+            "mppt.cfgAcOutVol",
+            "mppt.cfgAcOutFreq"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "mppt.cfgAcOutVol": 40,
+        "mppt.cfgAcXboost": 1,
+        "mppt.cfgAcEnabled": 0,
+        "mppt.cfgAcOutFreq": 50
+    },
+    "tid": ""
+}
+            
+        
+AC charging settings(chgPauseFlag: 0: AC charging in normal operation, 1: AC charging paused (not saved, restored by plugging))
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 5,
+    "operateType": "acChgCfg",
+    "params": {
+        "chgWatts": 100,
+        "chgPauseFlag": 0
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "mppt.cfgChgWatts",
+            "mqtt.chgPauseFlag"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "mppt.cfgChgWatts": 100
+    },
+    "tid": ""
+}
+            
+        
+AC standby time when there is no load(0: never shuts down, default value: 12 x 60 mins, unit: minute)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 5,
+    "operateType": "standbyTime",
+    "params": {
+        "standbyMins": 180
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "mppt.acStandbyMins"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "mppt.acStandbyMins": 180
+    },
+    "tid": ""
+}
+            
+        
+CAR standby duration settings(Auto shutdown when there is no load, unit: minute)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 5,
+    "operateType": "carStandby",
+    "params": {
+        "standbyMins": 240
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "mppt.carStandbyMin"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "mppt.carStandbyMin": 240
+    },
+    "tid": ""
+}
+            
+        
+Set 12 V DC (car charger) charging current(Maximum DC charging current (mA), range: 4000 mA–10000 mA, default value: 8000 mA)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 5,
+    "operateType": "dcChgCfg",
+    "params": {
+        "dcChgCfg": 5000
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "mppt.dcChgCurrent"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "mppt.dcChgCurrent": 5000
+    },
+    "tid": ""
+}
+            
+        
+PD
+
+Set Command	SetCmdRequest	GetCmdRequest	GetCmdResponse
+Set standby time(0 for never standby; other values indicate the standby time; in minutes)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 1,
+    "operateType": "standbyTime",
+    "params": {
+        "standbyMin": 0
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "pd.standbyMin"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "pd.standbyMin": 60
+    },
+    "tid": ""
+}
+            
+        
+Set DC(USB) switch(0: off, 1: on)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 1,
+    "operateType": "dcOutCfg",
+    "params": {
+        "enabled": 0
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "pd.dcOutState"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "pd.dcOutState": 1
+    },
+    "tid": ""
+}
+            
+        
+LCD screen settings(delayOff: screen timeout, unit: seconds;brightLevel: must be set to 3; other values are invalid.)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 1,
+    "operateType": "lcdCfg",
+    "params": {
+        "delayOff": 60,
+        "brighLevel": 3
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "pd.lcdOffSec",
+            "pd.brightLevel"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "pd.brightLevel": 3,
+        "pd.lcdOffSec": 60
+    },
+    "tid": ""
+}
+            
+        
+Prioritize solar charging
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 1,
+    "operateType": "pvChangePrio",
+    "params": {
+        "pvChangeSet": 0
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZCB4ZE86056P",
+    "params": {
+        "quotas": [
+            "pd.pvChgPrioSet"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "pd.pvChgPrioSet": 0
+    },
+    "tid": ""
+}
+            
+        
+Set energy management(isConfig: energy management, 0: disabled, 1: enabled; bpPowerSoc: backup reserve level; minDsgSoc: discharge limit (not in use);minChgSoc: charge limit (not in use))
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 1,
+    "operateType": "watthConfig",
+    "params": {
+        "isConfig": 1,
+        "bpPowerSoc": 95,
+        "minDsgSoc": 40,
+        "minChgSoc": 95
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "pd.watchIsConfig",
+            "pd.bpPowerSoc",
+            "pd.minDsgSoc",
+            "pd.minChgSoc"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "pd.watchIsConfig": 1,
+        "pd.bpPowerSoc": 77
+    }
+}
+            
+        
+Set AC always on (acAutoOutConfig: 0: disabled; 1: enabled;minAcOutSoc: minimum SoC for turning on "AC always on" )
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 1,
+    "operateType": "acAutoOutConfig",
+    "params": {
+        "acAutoOutConfig": 0,
+        "minAcOutSoc": 20
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "pd.acAutoOutConfig",
+            "pd.minAcoutSoc"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "pd.acAutoOutConfig": 0,
+        "pd.minAcoutSoc": 20
+    }
+}
+            
+        
+BMS
+
+Set Command	SetCmdRequest	GetCmdRequest	GetCmdResponse
+UPS settings(UPS, upper SoC limit when charging)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 2,
+    "operateType": "upsConfig",
+    "params": {
+        "maxChgSoc": 50
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "bms_emsStatus.maxChargeSoc"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "bms_emsStatus.maxChargeSoc": 50
+    },
+    "tid": ""
+}
+            
+        
+SOC lower limit when discharging
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 2,
+    "operateType": "dsgCfg",
+    "params": {
+        "minDsgSoc": 19
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "bms_emsStatus.minDsgSoc"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "bms_emsStatus.minDsgSoc": 19
+    },
+    "tid": ""
+}
+            
+        
+SoC that triggers EMS to turn on Smart Generator
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 2,
+    "operateType": "openOilSoc",
+    "params": {
+        "openOilSoc": 40
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "bms_emsStatus.minOpenOilEb"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "bms_emsStatus.minOpenOilEb": 40
+    },
+    "tid": ""
+}
+            
+        
+SOC that triggers EMS to turn off Smart Generator
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 2,
+    "operateType": "closeOilSoc",
+    "params": {
+        "closeOilSoc": 80
+    }
+}
+            
+        
+            
+{
+    "sn": "R331ZEB4ZEAL0528",
+    "params": {
+        "quotas": [
+            "bms_emsStatus.maxCloseOilEb"
+        ]
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "bms_emsStatus.maxCloseOilEb": 80
+    },
+    "tid": ""
+}
+            
+        
+GetAllQuotaResponse
+
+How to transfer request parameters by this HTTP API.
+
+GET: /iot-open/sign/device/quota/all: GetAllQuotaResponse
+
+Field	Field's Type	Description
+mppt.faultCode
+
+int
+
+Error code: byte0: mppt_fault; byte1: car_fault; byte2: dc24v_fault "swVer":"uint32", //mppt version number
+
+mppt.dc24vState
+
+int
+
+DCDC 24 V switch status: 0: off; 1: on
+
+pd.wattsInSum
+
+int
+
+Total input power (W) [key indicator]
+
+bms_emsStatus.maxChargeSoc
+
+int
+
+Maximum charging SOC
+
+pd.wifiVer
+
+int
+
+Wi-Fi version: 0x00000405 = V0.4.5
+
+inv.cfgAcWorkMode
+
+int
+
+AC charging mode: 0: full power; 1: mute
+
+bms_bmsStatus.designCap
+
+int
+
+Design capacity (mAh)
+
+bms_bmsStatus.temp
+
+int
+
+Temperature (℃)
+
+bms_bmsStatus.f32ShowSoc
+
+float
+
+Battery level SOC_float
+
+pd.beepMode
+
+int
+
+BEEP mode: 0: Normal; 1: Silent
+
+bms_bmsStatus.outputWatts
+
+int
+
+Output power
+
+pd.typec2Watts
+
+int
+
+Type-C 2 output power (W)
+
+inv.outputWatts
+
+int
+
+Discharging power (W)
+
+bms_bmsStatus.vol
+
+int
+
+Voltage (mV)
+
+inv.invOutFreq
+
+int
+
+Inverter output frequency (Hz): 50 or 60;
+
+mppt.inAmp
+
+int
+
+PV input current (mA)
+
+bms_emsStatus.bmsIsConnt
+
+[int]
+
+BMS in-place signal (3 byte): BIT0: Hardware in-place signal; BIT1: Software in-place signal
+
+bms_emsStatus.dsgCmd
+
+int
+
+Discharge command
+
+bms_bmsStatus.fullCap
+
+int
+
+Full capacity (mAh)
+
+mppt.inVol
+
+int
+
+PV input voltage (mV)
+
+bms_emsStatus.chgVol
+
+int
+
+Charging voltage
+
+pd.icoBytes
+
+int
+
+ICO flag bit: BYTE0-BYTE13
+
+inv.fanState
+
+int
+
+Fan status: 0: disabled; 1: Level 1; 2: Level 2; 3: Level 3
+
+pd.usb1Watts
+
+int
+
+Common USB1 output power (W)
+
+inv.cfgAcXboost
+
+int
+
+X-Boost switch: 0: off; 1: on
+
+inv.outTemp
+
+int
+
+INV temperature (℃)
+
+mppt.cfgAcEnabled
+
+int
+
+AC switch: 0: off; 1: on
+
+mppt.res
+
+[int]
+
+Reserve 10 bytes
+
+mppt.dcdc12vAmp
+
+int
+
+DC 12 V 30 A output current (mA)
+
+inv.invOutVol
+
+int
+
+Inverter actual output voltage (mV)
+
+pd.extRj45Port
+
+int
+
+RJ45 port: 0: NULL; 1: RC(BLE_CTL)
+
+bms_emsStatus.chgAmp
+
+int
+
+Charging current
+
+bms_bmsStatus.errCode
+
+int
+
+Global error code
+
+inv.inputWatts
+
+int
+
+Charging power (W)
+
+mppt.cfgAcOutVol
+
+int
+
+Output voltage configured for the inverter (V)
+
+bms_emsStatus.chgState
+
+int
+
+Charging status
+
+bms_bmsStatus.inputWatts
+
+int
+
+Input power [key indicator]
+
+bms_emsStatus.openBmsIdx
+
+int
+
+Battery pack enabling status
+
+pd.typec2Temp
+
+int
+
+Type-C 2 temperature (℃)
+
+pd.carUsedTime
+
+int
+
+CAR use time (s)
+
+pd.typec1Watts
+
+int
+
+Type-C 1 output power (W) [key indicator]
+
+pd.chgDsgState
+
+int
+
+Charging/discharging status on screen: 1: discharging; 2: charging
+
+inv.chgPauseFlag
+
+int
+
+PV charging pause flag bit: 1: charging stopped
+
+inv.acInFreq
+
+int
+
+Inverter input frequency (Hz)
+
+mppt.carStandbyMin
+
+int
+
+Auto shutdown when there is no load: 0: Never shut down; default value: 12*60mins; unit: min [key indicator]
+
+pd.soc
+
+int
+
+Display SOC [key indicator]
+
+inv.invOutAmp
+
+int
+
+Inverter output current (mA)
+
+bms_emsStatus.fanLevel
+
+int
+
+Fan level
+
+mppt.cfgAcOutFreq
+
+int
+
+Output frequency configured for the inverter (Hz)
+
+mppt.carOutVol
+
+int
+
+Car charger output voltage (mV)
+
+inv.dcInVol
+
+int
+
+DC input voltage (mV)
+
+pd.ext3p8Port
+
+int
+
+3+8 ports: 0: NULL; 1: CC; 2: PR; 3: SP (BC)
+
+mppt.cfgAcXboost
+
+int
+
+X-Boost switch: 1: On; 0: Off [key indicator]
+
+pd.dsgPowerDC
+
+int
+
+Cumulative DC discharge capacity (Wh)
+
+inv.dcInAmp
+
+int
+
+DC input current (mA)
+
+pd.typecUsedTime
+
+int
+
+Type-C use time (s)
+
+mppt.carOutAmp
+
+int
+
+Car charger output current (mA)
+
+bms_bmsStatus.remainCap
+
+int
+
+Remaining capacity (mAh)
+
+pd.brightLevel
+
+int
+
+LCD brightness level: 0-3 levels
+
+inv.dcInTemp
+
+int
+
+DC temperature (℃)
+
+bms_emsStatus.maxAvailNum
+
+int
+
+Maximum available quantity
+
+bms_emsStatus.maxCloseOilEb
+
+int
+
+Disable SOC of Smart Generator [key indicator]
+
+mppt.dcdc12vVol
+
+int
+
+DC 12 V 30 A output voltage (mV)
+
+pd.wattsOutSum
+
+int
+
+Total output power (W) [key indicator]
+
+mppt.scrStandbyMin
+
+int
+
+Auto shutdown when there is no load: 0: never shut down, default value: 12 x 60 mins, unit: minutes
+
+mppt.carOutWatts
+
+int
+
+Car charger output power (W)
+
+bms_emsStatus.f32LcdShowSoc
+
+float
+
+SoC value displayed on LCD - used for displaying SOC with decimal point [key indicator]
+
+inv.cfgAcEnabled
+
+int
+
+AC switch: 0: off; 1: on
+
+mppt.outVol
+
+int
+
+PV output voltage (mV)
+
+bms_emsStatus.paraVolMax
+
+int
+
+Maximum voltage when two devices work in parallel
+
+mppt.chgType
+
+int
+
+Actual charging type: 0: null; 1: Adapter (adapter/DC power); 2: MPPT (solar energy); 3: AC (grid charging); 4: Gas (petrol and electricity); 5: Wind (wind power) [key indicator]
+
+bms_bmsStatus.bmsFault
+
+int
+
+BMS permanent fault
+
+inv.acDipSwitch
+
+int
+
+AC fast/slow charging dip switch: 0: unknown; 1: fast charging mode; 2: slow charging mode
+
+mppt.cfgChgType
+
+int
+
+Configured charging type, which is valid when xt60_chg_type is 0: 0: Auto; 1: MPPT; 2: Adapter
+
+bms_emsStatus.paraVolMin
+
+int
+
+Minimum voltage when two devices work in parallel
+
+inv.standbyMins
+
+int
+
+Auto shutdown when there is no load: 0: never shut down, default value: 12 x 60 mins, unit: minutes
+
+inv.dischargeType
+
+int
+
+Discharging type: 1: AC discharging; 2: PR; 3: BC
+
+pd.carState
+
+int
+
+CAR button status: 0: OFF; 1: ON
+
+mppt.chgState
+
+int
+
+Charging status: 0: Off; 1: Charging; 2: Standby (during AC charging, DC charging stops)
+
+pd.invUsedTime
+
+int
+
+Inverter use time (s)
+
+bms_emsStatus.bmsWarState
+
+int
+
+BMS warning state: bit0: hi_temp; bit1: low_temp; bit2: overload; bit3: chg_flag
+
+mppt.carState
+
+int
+
+Car charger switch status: 0: Off; 1: On [key indicator]
+
+mppt.dischargeType
+
+int
+
+Discharging type: 1: AC discharging; 2: PR; 3: BC
+
+pd.typec1Temp
+
+int
+
+Type-C 1 temperature (℃)
+
+pd.dcInUsedTime
+
+int
+
+DC charging time (s)
+
+bms_bmsStatus.sysVer
+
+int
+
+System version
+
+mppt.carTemp
+
+int
+
+Car charging temperature (℃)
+
+pd.model
+
+int
+
+Product model: see ems_model enumeration for details
+
+bms_bmsStatus.minCellVol
+
+int
+
+Minimum cell voltage
+
+mppt.outWatts
+
+int
+
+PV output power (W)
+
+pd.wifiAutoRcvy
+
+int
+
+1: Wi-Fi automatically restores the last usage mode (STA/AP) after being powered on; 0: Default mode (STA)
+
+pd.remainTime
+
+int
+
+Available time (min): >0: Time remaining before full charging; <0: Time remaining before full discharge [key indicator]
+
+bms_bmsStatus.maxCellVol
+
+int
+
+Maximum cell voltage
+
+bms_bmsStatus.type
+
+int
+
+BMS type: 1: lithium battery; 2: oil-powered
+
+bms_bmsStatus.maxCellTemp
+
+int
+
+Maximum cell temperature
+
+mppt.outAmp
+
+int
+
+PV output current (mA)
+
+pd.ext4p8Port
+
+int
+
+4+8 ports; only supports left port status identification: 0: NULL; 1: Extra battery; 2: Smart generator
+
+bms_bmsStatus.cellId
+
+int
+
+Cell material LI/LFP/LA, battery capacity type: 1: 2.5 Ah per battery; 2: 2 Ah per battery
+
+bms_bmsStatus.minMosTemp
+
+int
+
+Minimum MOS temperature
+
+mppt.chgPauseFlag
+
+int
+
+PV charging pause flag bit: 1: charging stopped
+
+bms_emsStatus.minOpenOilEb
+
+int
+
+Enable SOC of Smart Generator [key indicator]
+
+mppt.acStandbyMins
+
+int
+
+Auto shutdown when there is no load: 0: Never shut down; default: 12*60mins; unit: min [key indicator]
+
+mppt.powStandbyMin
+
+int
+
+Auto shutdown when there is no load: 0: Never shut down; default: 12*60mins; unit: min
+
+inv.chargerType
+
+int
+
+Charger type: 1: AC charging; 2: DC adapter charging; 3: solar charging; 4: CC; 5: BC
+
+pd.chgSunPower
+
+int
+
+Cumulative solar charge capacity (Wh)
+
+pd.carTemp
+
+int
+
+CAR temperature (℃)
+
+bms_bmsStatus.bqSysStatReg
+
+int
+
+BQ hardware protection register
+
+inv.acInAmp
+
+int
+
+Inverter input current (mA)
+
+bms_emsStatus.chgRemainTime
+
+int
+
+Remaining charging time (min)
+
+pd.dsgPowerAC
+
+int
+
+Cumulative AC power discharged (Wh)
+
+bms_bmsStatus.openBmsIdx
+
+int
+
+Battery pack enabling status
+
+pd.qcUsb2Watts
+
+int
+
+qc_usb2 output power (W)
+
+pd.wireWatts
+
+int
+
+Wireless charging output power (W); reserved and not in use
+
+bms_bmsStatus.num
+
+int
+
+BMS number: 0–2
+
+pd.chgPowerAC
+
+int
+
+Cumulative AC charge (wall socket) (Wh)
+
+pd.lcdOffSec
+
+int
+
+LCD screen timeout: 0: Always on [key indicator]
+
+bms_bmsStatus.soc
+
+int
+
+Battery level
+
+inv.acInVol
+
+int
+
+Inverter input voltage (mV)
+
+inv.FastChgWatts
+
+int
+
+Maximum charging power for AC fast charging (W)
+
+mppt.beepState
+
+int
+
+Buzzer status: 0: Default; 1: Silent mode [Key Indicators]
+
+pd.sysVer
+
+int
+
+System version: 0x0102002F = V1.2.0.47
+
+mppt.dc24vTemp
+
+int
+
+DCDC 24 V temperature (℃)
+
+bms_emsStatus.chgCmd
+
+int
+
+Charge command
+
+bms_bmsStatus.tagChgAmp
+
+int
+
+Target charging current
+
+bms_bmsStatus.maxMosTemp
+
+int
+
+Maximum MOS temperature
+
+mppt.cfgChgWatts
+
+int
+
+AC maximum charging power (W) [key indicator]
+
+pd.qcUsb1Watts
+
+int
+
+qc_usb1 output power (W)
+
+pd.reserved
+
+int
+
+Reserve 2 bytes
+
+bms_bmsStatus.minCellTemp
+
+int
+
+Minimum cell temperature
+
+pd.chgPowerDC
+
+int
+
+Cumulative DC charge (adapter) (Wh)
+
+pd.standbyMin
+
+int
+
+Standby auto shutdown time (min): 0: Never standby; maximum 5999 minutes (99 hours and 59 minutes) [key indicator]
+
+mppt.swVer
+
+int
+
+MPPT version number
+
+inv.cfgAcOutFreq
+
+int
+
+Configured output frequency for inverter (Hz) [key indicator]
+
+mppt.x60ChgType
+
+int
+
+XT60 paddle status: 0: Not detected; 1: MPPT; 2: Adapter
+
+bms_bmsStatus.soh
+
+int
+
+Health status
+
+inv.errCode
+
+int
+
+Global error code
+
+bms_emsStatus.openUpsFlag
+
+int
+
+UPS mode enable flag
+
+bms_emsStatus.minDsgSoc
+
+int
+
+Minimum discharge SoC [key indicator]
+
+mppt.dcdc12vWatts
+
+int
+
+DC 12 V 30 A output power (W)
+
+pd.usbqcUsedTime
+
+int
+
+USB QC use time (s)
+
+pd.dcOutState
+
+int
+
+DC button status: 0: OFF; 1: ON [key indicator]
+
+bms_bmsStatus.remainTime
+
+int
+
+Time remaining
+
+bms_emsStatus.emsIsNormalFlag
+
+int
+
+0:sleep 1:normal
+
+mppt.inWatts
+
+int
+
+PV input power (W) [key indicator]
+
+pd.usbUsedTime
+
+int
+
+USB use time (s)
+
+pd.mpptUsedTime
+
+int
+
+MPPT use time (s)
+
+inv.reserved
+
+[int]
+
+Reserve 8 bytes
+
+mppt.mpptTemp
+
+int
+
+MPPT temperature (℃)
+
+pd.wifiRssi
+
+int
+
+Wi-Fi signal strength
+
+bms_bmsStatus.amp
+
+int
+
+Current (mA)
+
+inv.invType
+
+int
+
+PSDR model code (corresponds to dip Switch and high-low voltage switch)
+
+bms_emsStatus.lcdShowSoc
+
+int
+
+SoC value displayed on LCD [key indicator]
+
+inv.cfgAcOutVol
+
+int
+
+Output voltage configured for the inverter (V)
+
+bms_emsStatus.bmsModel
+
+int
+
+BMS model [key indicator]
+
+pd.errCode
+
+int
+
+Global error code
+
+pd.carWatts
+
+int
+
+Car output power (W) [key indicator]
+
+pd.usb2Watts
+
+int
+
+Normal USB2 output power (W)
+
+mppt.dcChgCurrent
+
+int
+
+DC maximum charging current (mA) [key indicator]
+
+bms_emsStatus.dsgRemainTime
+
+int
+
+Remaining discharging time (min)
+
+inv.sysVer
+
+int
+
+System version
+
+Example
+
+{
+    "code": "0",
+    "message": "Success",
+    "data": {
+        "pd.wattsInSum": 0,
+        "bms_emsStatus.maxChargeSoc": 83,
+        "pd.wifiVer": 0,
+        "inv.cfgAcWorkMode": 0,
+        "bms_bmsStatus.designCap": 20000,
+        "bms_bmsStatus.temp": 32,
+        "bms_bmsStatus.f32ShowSoc": 79.4,
+        "pd.beepMode": 0,
+        "bms_bmsStatus.outputWatts": 0,
+        "pd.typec2Watts": 0,
+        "inv.outputWatts": 0,
+        "bms_bmsStatus.vol": 53252,
+        "inv.invOutFreq": 0,
+        "mppt.inAmp": 1,
+        "bms_emsStatus.chgAmp": 25000,
+        "bms_bmsStatus.errCode": 0,
+        "inv.inputWatts": 0,
+        "mppt.cfgAcOutVol": 0,
+        "bms_emsStatus.chgState": 1,
+        "bms_bmsStatus.inputWatts": 0,
+        "bms_emsStatus.openBmsIdx": 1,
+        ...
+    }
+}
+MQTT communication mode
+
+Set & Set Reply
+
+Usage of Topic	Topic	From	To
+Set device function
+
+/open/${certificateAccount}/${sn}/set
+
+app
+
+device
+
+Reply to the set result
+
+/open/${certificateAccount}/${sn}/set_reply
+
+device
+
+app
+
+Full Format Example
+
+Set Data Format	Set Reply Data Format
+            
+{
+    "id": 123,
+    "version": "1.0",
+    "moduleType": 1,
+    "operateType": "standbyTime",
+    "params": {
+        "standbyMin": 60
+    }
+}
+            
+        
+            
+{
+    "id": 123,
+    "version": "1.0",
+    "moduleType": 1,
+    "time": 2557051,
+    "code": 0,
+    "operateType": "standbyTime",
+    "data": {
+        "ack": 0
+    }
+}
+            
+        
+ParamInfo Message Format
+
+MPPT
+
+Set Command	SetTopic's ParamInfo	SetReplyTopic's ParamInfo	Indicator
+Set buzzer silent mode(0: Disable silent mode; 1: Enable silent mode)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 5,
+    "operateType": "quietMode",
+    "params": {
+        "enabled": 1
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 5,
+    "data": {
+        "ack": 0
+    },
+    "operateType": "quietMode",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 12508887
+}
+            
+        
+quietMode
+
+Set car charger switch(1: On; 0: Off)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 5,
+    "operateType": "mpptCar",
+    "params": {
+        "enalbed": 1
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 5,
+    "data": {
+        "ack": 1
+    },
+    "operateType": "mpptCar",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 12755887
+}
+            
+        
+mpptCar
+
+Set AC discharge("enabled" and X-Boost switch settings)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 5,
+    "operateType": "acOutCfg",
+    "params": {
+        "enabled": 0,
+        "xboost": 0,
+        "out_voltage": 30,
+        "out_freq": 1
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 5,
+    "data": {
+        "ack": 0
+    },
+    "operateType": "acOutCfg",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 13010777
+}
+            
+        
+acOutCfg
+xboost
+out_voltage
+out_freq
+
+AC charging settings(chgPauseFlag: 0: AC charging in normal operation, 1: AC charging paused (not saved, restored by plugging))
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 5,
+    "operateType": "acChgCfg",
+    "params": {
+        "chgWatts": 120,
+        "chgPauseFlag": 0
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 5,
+    "data": {
+        "ack": 0
+    },
+    "operateType": "acChgCfg",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 13137427
+}
+            
+        
+chgWatts
+chgPauseFlag
+
+AC standby time when there is no load(0: never shuts down, default value: 12 x 60 mins, unit: minute)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 5,
+    "operateType": "standbyTime",
+    "params": {
+        "standbyMins": 240
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 5,
+    "data": {
+        "ack": 0
+    },
+    "operateType": "standbyTime",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 13212227
+}
+            
+        
+standbyTime
+
+CAR standby duration settings(Auto shutdown when there is no load, unit: minute)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 5,
+    "operateType": "carStandby",
+    "params": {
+        "standbyMins": 300
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 5,
+    "data": {
+        "ack": 0
+    },
+    "operateType": "carStandby",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 13408207
+}
+            
+        
+carStandby
+
+Set 12 V DC (car charger) charging current(Maximum DC charging current (mA), range: 4000 mA–10000 mA, default value: 8000 mA)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 5,
+    "operateType": "dcChgCfg",
+    "params": {
+        "dcChgCfg": 6000
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 5,
+    "data": {
+        "ack": 1
+    },
+    "operateType": "dcChgCfg",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 13508217
+}
+            
+        
+dcChgCfg
+
+PD
+
+Set Command	SetTopic's ParamInfo	SetReplyTopic's ParamInfo	Observation Indicator
+Set standby time(0 for never standby; other values indicate the standby time; in minutes)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 1,
+    "operateType": "standbyTime",
+    "params": {
+        "standbyMin": 10
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 1,
+    "data": {
+        "ack": 0
+    },
+    "operateType": "standbyTime",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 13988947
+}
+            
+        
+standbyMin
+
+Set DC(USB) switch(0: off, 1: on)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 1,
+    "operateType": "dcOutCfg",
+    "params": {
+        "enabled": 1
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 1,
+    "data": {
+        "ack": 0
+    },
+    "operateType": "dcOutCfg",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 14136757
+}
+            
+        
+dcOutCfg
+
+LCD screen(delayOff: screen timeout, unit: seconds;brightLevel: must be set to 3; other values are invalid.)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 1,
+    "operateType": "lcdCfg",
+    "params": {
+        "delayOff": 60,
+        "brighLevel": 1
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 1,
+    "data": {
+        "ack": 0
+    },
+    "operateType": "lcdCfg",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 14277817
+}
+            
+        
+delayOff
+brighLevel
+
+Prioritize solar charging
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 1,
+    "operateType": "pvChangePrio",
+    "params": {
+        "pvChangeSet": 1
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 1,
+    "data": {
+        "ack": 0
+    },
+    "operateType": "pvChangePrio",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 2859321
+}
+            
+        
+pd.pvChgPrioSet
+
+Set energy management(isConfig: energy management configuration, 0: disabled, 1: enabled; bpPowerSoc: backup reserve level; minDsgSoc: discharge limit (not in use);minChgSoc: charge limit (not in use))
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 1,
+    "operateType": "watthConfig",
+    "params": {
+        "isConfig": 1,
+        "bpPowerSoc": 95,
+        "minDsgSoc": 255,
+        "minChgSoc": 255
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 1,
+    "data": {
+        "ack": 0
+    },
+    "operateType": "watthConfig",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 4915011
+}
+            
+        
+pd.watchIsConfig
+pd.bpPowerSoc
+
+Set AC always on (acAutoOutConfig: 0: disabled; 1: enabled;minAcOutSoc: minimum SoC for turning on "AC always on" )
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 1,
+    "operateType": "acAutoOutConfig",
+    "params": {
+        "acAutoOutConfig": 0,
+        "minAcOutSoc": 20
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 1,
+    "data": {
+        "ack": 0
+    },
+    "operateType": "acAutoOutConfig",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 6675061
+}
+            
+        
+pd.acAutoOutConfig
+pd.minAcoutSoc
+
+BMS
+
+Set Command	SetTopic's ParamInfo	SetReplyTopic's ParamInfo	Observation Indicator
+UPS settings(UPS, upper SoC limit when charging)
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 2,
+    "operateType": "upsConfig",
+    "params": {
+        "maxChgSoc": 50
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 2,
+    "data": {
+        "ack": 0
+    },
+    "operateType": "upsConfig",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 77047697
+}
+            
+        
+maxChgSoc
+
+SOC lower limit when discharging
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 2,
+    "operateType": "dsgCfg",
+    "params": {
+        "minDsgSoc": 20
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 2,
+    "data": {
+        "ack": 0
+    },
+    "operateType": "dsgCfg",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 77117117
+}
+            
+        
+minDsgSoc
+
+SoC that triggers EMS to turn on Smart Generator
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "moduleType": 2,
+    "operateType": "openOilSoc",
+    "params": {
+        "openOilSoc": 40
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 2,
+    "data": {
+        "ack": 0
+    },
+    "operateType": "openOilSoc",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 77215347
+}
+            
+        
+openOilSoc
+
+SoC that triggers EMS to turn off Smart Generator
+
+            
+{
+    "id": 123456789,
+    "version": "1.0",
+    "sn": "R331ZEB4ZEAL0528",
+    "moduleType": 2,
+    "operateType": "closeOilSoc",
+    "params": {
+        "closeOilSoc": 90
+    }
+}
+            
+        
+            
+{
+    "code": "0",
+    "moduleType": 2,
+    "data": {
+        "ack": 0
+    },
+    "operateType": "closeOilSoc",
+    "version": "1.0",
+    "id": 123456789,
+    "time": 77268677
+}
+            
+        
+closeOilSoc
+
+Report Device Quota
+
+Usage of Topic	Topic	From	To
+Report device quota
+
+/open/${certificateAccount}/${sn}/quota
+
+device
+
+app
+
+Please see HTTP GetAllQuotaResponse and Set & Set Reply for the fields definition.
+
+Example
+
+PD
+
+{
+    "id": 73607317,
+    "version": "1.0",
+    "time": 73607327,
+    "moduleType": 1,
+    "typeCode": "pdStatus",
+    "params": {
+        "model": 80,
+        "errCode": 0,
+        "sysVer": 16908376,
+        "wifiVer": 0,
+        "wifiAutoRcvy": 0,
+        "soc": 79,
+        "wattsOutSum": 0,
+        "wattsInSum": 0,
+        "remainTime": -5939,
+        "beepMode": 0,
+        "dcOutState": 0,
+        "usb1Watts": 0,
+        "usb2Watts": 0,
+        "qcUsb1Watts": 0,
+        "qcUsb2Watts": 0,
+        "typec1Watts": 0,
+        "typec2Watts": 0,
+        "typec1Temp": 0,
+        "typec2Temp": 0,
+        "carState": 0,
+        "carWatts": 0,
+        "carTemp": 38,
+        "standbyMin": 0,
+        "lcdOffSec": 0,
+        "brightLevel": 3,
+        "chgPowerDC": 0,
+        "chgSunPower": 0,
+        "chgPowerAC": 0,
+        "dsgPowerDC": 0,
+        "dsgPowerAC": 0,
+        "usbUsedTime": 0,
+        "usbqcUsedTime": 0,
+        "typecUsedTime": 0,
+        "carUsedTime": 0,
+        "invUsedTime": 0,
+        "dcInUsedTime": 0,
+        "mpptUsedTime": 0,
+        "reserved": [
+            0,
+            0
+        ],
+        "extRj45Port": 0,
+        "ext3p8Port": 0,
+        "ext4p8Port": 0,
+        "chgDsgState": 0,
+        "wifiRssi": 0,
+        "wireWatts": 0
+    }
+}
+BMS-bmsStatus
+
+{
+    "id": 536890212,
+    "version": "1.0",
+    "time": 73628997,
+    "moduleType": 2,
+    "typeCode": "bmsStatus",
+    "params": {
+        "vol": 53251,
+        "amp": -138,
+        "f32ShowSoc": 79.3
+    }
+}
+BMS-emsStatus
+
+{
+    "id": 536890212,
+    "version": "1.0",
+    "time": 73607827,
+    "moduleType": 2,
+    "typeCode": "emsStatus",
+    "params": {
+        "chgState": 1,
+        "chgCmd": 1,
+        "dsgCmd": 1,
+        "chgVol": 55251,
+        "chgAmp": 25000,
+        "fanLevel": 0,
+        "maxChargeSoc": 83,
+        "bmsModel": 13,
+        "lcdShowSoc": 79,
+        "openUpsFlag": 1,
+        "bmsWarState": 0,
+        "chgRemainTime": 5939,
+        "dsgRemainTime": 5939,
+        "emsIsNormalFlag": 1,
+        "f32LcdShowSoc": 79.3,
+        "bmsIsConnt": [
+            3,
+            3,
+            0
+        ],
+        "maxAvailNum": 1,
+        "openBmsIdx": 1,
+        "paraVolMin": 52259,
+        "paraVolMax": 54259,
+        "minDsgSoc": 22,
+        "minOpenOilEb": 40,
+        "maxCloseOilEb": 90
+    }
+}
+MPPT
+
+{
+    "id": 73607607,
+    "version": "1.0",
+    "time": 73607617,
+    "moduleType": 5,
+    "typeCode": "mpptStatus",
+    "params": {
+        "faultCode": 0,
+        "swVer": 83951779,
+        "inVol": 1522,
+        "inAmp": 1,
+        "inWatts": 0,
+        "outVol": 52821,
+        "outAmp": 0,
+        "outWatts": 0,
+        "mpptTemp": 36,
+        "x60ChgType": 0,
+        "cfgChgType": 0,
+        "chgType": 0,
+        "chgState": 0,
+        "dcdc12vVol": 0,
+        "dcdc12vAmp": 0,
+        "dcdc12vWatts": 0,
+        "carOutVol": 51,
+        "carOutAmp": 0,
+        "carOutWatts": 0,
+        "carTemp": 38,
+        "carState": 0,
+        "dc24vTemp": 0,
+        "dc24vState": 0,
+        "chgPauseFlag": 0,
+        "dcChgCurrent": 6000,
+        "beepState": 0,
+        "cfgAcEnabled": 0,
+        "cfgAcXboost": 1,
+        "cfgAcOutVol": 0,
+        "cfgAcOutFreq": 50,
+        "cfgChgWatts": 120,
+        "acStandbyMins": 0,
+        "dischargeType": 0,
+        "carStandbyMin": 0,
+        "powStandbyMin": 720,
+        "scrStandbyMin": 120,
+        "res": [
+            0,
+            0,
+            0,
+            0,
+            0
+        ]
+    }
+}
+INV
+
+{
+    "id": 6910941,
+    "version": "1.0",
+    "time": 6910941,
+    "moduleType": 3,
+    "needAck": 0,
+    "typeCode": "invStatus",
+    "params": {
+        "errCode": 0,
+        "sysVer": 50331766,
+        "chargerType": 0,
+        "inputWatts": 0,
+        "outputWatts": 0,
+        "invType": 0,
+        "invOutVol": 229104,
+        "invOutAmp": 0,
+        "invOutFreq": 50,
+        "acInVol": 0,
+        "acInAmp": 0,
+        "acInFreq": 0,
+        "outTemp": 39,
+        "dcInVol": 0,
+        "dcInAmp": 0,
+        "dcInTemp": 0,
+        "fanState": 0,
+        "cfgAcEnabled": 1,
+        "cfgAcXboost": 0,
+        "cfgAcOutVol": 230000,
+        "cfgAcOutFreq": 1,
+        "cfgAcWorkMode": 0,
+        "chgPauseFlag": 0,
+        "acDipSwitch": 0,
+        "FastChgWatts": 0,
+        "SlowChgWatts": 0,
+        "standbyMins": 720,
+        "dischargeType": 0,
+        "reserved": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+        ]
+    }
+}
+Report Device status
+
+Usage of Topic	Topic	From	To
+Report Device status
+
+/open/${certificateAccount}/${sn}/status
+
+device
+
+app
+
+Message Format
+
+{
+    "id": "123456789",
+    "version": "1.0",
+    "timestamp": 1634841971000,
+    "params": {
+        "status": 0
+    }
+}
+Field
+
+Field	Field Type	Description
+status
+
+int
+
+Device online or not
+0: No, 1: Yes
+
+Was this page helpful?

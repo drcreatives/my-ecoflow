@@ -136,7 +136,7 @@ export default function DevicePage({ params }: DevicePageProps) {
       <div className="min-h-screen bg-primary-black text-accent-gray flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-white mb-2">Device Not Found</h1>
-          <p className="text-accent-gray mb-6">The device you're looking for doesn't exist.</p>
+          <p className="text-accent-gray mb-6">The device you&apos;re looking for doesn&apos;t exist.</p>
           <button
             onClick={() => router.push('/dashboard')}
             className="bg-accent-green hover:bg-accent-green/80 text-primary-black px-6 py-3 rounded-lg font-medium transition-colors"

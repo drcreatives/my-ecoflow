@@ -115,7 +115,7 @@ export class EcoFlowAPI {
     const nonce = Math.floor(100000 + Math.random() * 900000).toString() // 6-digit random number
     const url = `${this.baseURL}${endpoint}`
     
-    // Generate signature
+    // Generate signature (revert to simple approach that works for device list)
     const signature = this.generateSignature(method, endpoint, params, timestamp, nonce)
 
     // Prepare headers
@@ -205,12 +205,57 @@ export class EcoFlowAPI {
     }
 
     try {
-      const response = await this.makeRequest<DeviceQuotaData>(
-        '/iot-open/sign/device/quota',
-        'GET',
-        { sn: deviceSN }
-      )
-      return response.data || null
+      // IMPORTANT: Quota API signature excludes sn parameter (unlike other endpoints)
+      // The sn goes in the URL query string but NOT in the signature calculation
+      
+      const timestamp = Date.now()
+      const nonce = Math.floor(100000 + Math.random() * 900000).toString()
+      
+      // Generate signature with only auth params (no sn)
+      const signature = this.generateSignature('GET', '/iot-open/sign/device/quota/all', {}, timestamp, nonce)
+      
+      // Build URL with sn as query parameter
+      const url = `${this.baseURL}/iot-open/sign/device/quota/all?sn=${deviceSN}`
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'accessKey': this.credentials.accessKey,
+          'nonce': nonce,
+          'timestamp': timestamp.toString(),
+          'sign': signature,
+        }
+      })
+
+      if (!response.ok) {
+        throw new EcoFlowAPIError(
+          `HTTP ${response.status}: ${response.statusText}`,
+          response.status.toString(),
+          response.status
+        )
+      }
+
+      const data: APIResponse<any> = await response.json()
+
+      if (data.code !== '0') {
+        throw new EcoFlowAPIError(
+          data.message || 'Quota API request failed',
+          data.code,
+          response.status,
+          data
+        )
+      }
+      
+      // Transform the response to match our DeviceQuotaData interface
+      if (data.data) {
+        return {
+          sn: deviceSN,
+          quotaMap: this.transformQuotaAllResponse(data.data)
+        }
+      }
+      
+      return null
     } catch (error) {
       throw new EcoFlowAPIError(
         `Failed to fetch device quota for ${deviceSN}`,
@@ -219,6 +264,28 @@ export class EcoFlowAPI {
         error
       )
     }
+  }
+
+  /**
+   * Transform the quota/all response to our quotaMap format
+   * EcoFlow Delta 2 returns: { "bms_bmsStatus.soc": 79, "pd.remainTime": -5939 }
+   * We need: { "bms_bmsStatus.soc": { val: 79, scale: 0 } }
+   */
+  private transformQuotaAllResponse(data: Record<string, string | number>): Record<string, { val: number, scale: number }> {
+    const quotaMap: Record<string, { val: number, scale: number }> = {}
+    
+    for (const [key, value] of Object.entries(data)) {
+      // Convert string/number values to numbers
+      const numValue = typeof value === 'string' ? parseFloat(value) : value
+      const finalValue = isNaN(numValue) ? 0 : numValue
+      
+      quotaMap[key] = {
+        val: finalValue,
+        scale: 0 // Delta 2 values don't seem to need scaling based on examples
+      }
+    }
+    
+    return quotaMap
   }
 
   /**
