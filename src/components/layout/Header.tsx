@@ -3,10 +3,8 @@
 import {
   Bell,
   Menu,
-  Power,
   Wifi,
   WifiOff,
-  Battery,
   Settings,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'

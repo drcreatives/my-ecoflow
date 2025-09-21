@@ -236,7 +236,7 @@ export class EcoFlowAPI {
         )
       }
 
-      const data: APIResponse<any> = await response.json()
+      const data: APIResponse<Record<string, unknown>> = await response.json()
 
       if (data.code !== '0') {
         throw new EcoFlowAPIError(
@@ -251,7 +251,7 @@ export class EcoFlowAPI {
       if (data.data) {
         return {
           sn: deviceSN,
-          quotaMap: this.transformQuotaAllResponse(data.data)
+          quotaMap: this.transformQuotaAllResponse(data.data as Record<string, string | number>)
         }
       }
       

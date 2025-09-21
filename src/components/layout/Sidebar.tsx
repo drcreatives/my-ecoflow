@@ -5,12 +5,10 @@ import {
   Battery,
   BarChart3,
   Settings,
-  Power,
   LogOut,
   Menu,
   Zap,
   TrendingUp,
-  Bell,
 } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'

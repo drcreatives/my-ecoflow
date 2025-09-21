@@ -26,7 +26,7 @@ export interface DeviceReading {
   remainingTime?: number
   temperature?: number
   status?: string
-  rawData?: any
+  rawData?: Record<string, unknown>
   recordedAt: Date
 }
 
@@ -67,7 +67,7 @@ export interface ControlResponse {
   command: {
     cmdSet: number
     cmdId: number
-    param: any
+    param: Record<string, unknown>
     timestamp: string
   }
 }
@@ -118,7 +118,7 @@ export async function registerDevice(device: {
  */
 export async function fetchDeviceDetails(deviceId: string): Promise<{
   device: DeviceData
-  quotaData: any
+  quotaData: Record<string, unknown>
 }> {
   const response = await fetch(`/api/devices/${deviceId}`, {
     method: 'GET',
@@ -175,7 +175,7 @@ export async function controlDevice(
   command: {
     cmdSet: number
     cmdId: number
-    param: any
+    param: Record<string, unknown>
   }
 ): Promise<ControlResponse> {
   const response = await fetch(`/api/devices/${deviceId}/control`, {
@@ -250,7 +250,7 @@ export const DeviceCommands = {
 /**
  * Error handler for API calls
  */
-export function handleAPIError(error: any): string {
+export function handleAPIError(error: unknown): string {
   if (error instanceof Error) {
     return error.message
   }
