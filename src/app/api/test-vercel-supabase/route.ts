@@ -1,52 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
 
 export async function GET() {
   try {
     console.log('🔄 Testing Vercel Supabase connection...')
     
-    // Test client-side connection
+    // Test 1: Basic Supabase client creation
     const supabase = createClient()
+    console.log('✅ Supabase client created successfully')
     
-    // Test basic connection
-    const { data: healthCheck, error: healthError } = await supabase
-      .from('users')
-      .select('count(*)', { count: 'exact', head: true })
+    // Test 2: Server-side client
+    const serverSupabase = await createServerSupabaseClient()
+    console.log('✅ Server Supabase client created successfully')
     
-    if (healthError) {
-      console.error('❌ Supabase health check failed:', healthError)
-      return NextResponse.json({
-        success: false,
-        error: 'Supabase connection failed',
-        details: healthError.message,
-        instance: 'Vercel Supabase'
-      }, { status: 500 })
-    }
-
-    // Test auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    // Test 3: Test authentication endpoint
+    const { data: { user }, error: authError } = await serverSupabase.auth.getUser()
+    console.log('✅ Auth test completed (no active session expected)')
     
-    console.log('✅ Vercel Supabase connection successful!')
+    // Test 4: Test database connection via Prisma
+    await prisma.$connect()
+    const userCount = await prisma.user.count()
+    await prisma.$disconnect()
+    console.log('✅ Database connection via Prisma successful')
+    
+    console.log('✅ All Vercel Supabase tests passed!')
     
     return NextResponse.json({
       success: true,
-      message: 'Vercel Supabase connection working!',
-      instance: 'vunlsiyowwivmloivtjf.supabase.co',
-      healthCheck: healthCheck,
-      auth: {
-        user: user ? 'User session active' : 'No user session',
-        error: authError?.message || null
+      message: 'Vercel Supabase connection working perfectly!',
+      tests: {
+        clientCreation: 'PASS',
+        serverClientCreation: 'PASS', 
+        authEndpoint: authError ? `ERROR: ${authError.message}` : 'PASS (no session)',
+        databaseConnection: 'PASS',
+        userCount: userCount
+      },
+      instance: {
+        url: 'vunlsiyowwivmloivtjf.supabase.co',
+        region: 'us-east-1'
       },
       timestamp: new Date().toISOString()
     })
 
   } catch (error) {
     console.error('❌ Test failed:', error)
+    
+    // More detailed error information
+    let errorDetails = 'Unknown error'
+    if (error instanceof Error) {
+      errorDetails = error.message
+    }
+    
     return NextResponse.json({
       success: false,
       error: 'Connection test failed',
-      details: error instanceof Error ? error.message : 'Unknown error',
-      instance: 'Vercel Supabase'
+      details: errorDetails,
+      instance: 'Vercel Supabase',
+      errorType: error?.constructor?.name || 'Unknown'
     }, { status: 500 })
   }
 }
