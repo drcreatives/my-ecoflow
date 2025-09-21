@@ -16,7 +16,7 @@ export async function GET() {
     }
 
     // Test 2: Import Tests
-    let importTests = {
+    const importTests: { [key: string]: string } = {
       supabase: 'UNKNOWN',
       prisma: 'UNKNOWN',
       ecoflow: 'UNKNOWN'
