@@ -133,3 +133,7 @@ body {
 .status-warning {
   color: #ffa500;
 }
+
+.bg-accent-green {
+  background-color: #44af21;
+}
