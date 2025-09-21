@@ -4,73 +4,74 @@ import { withPrisma } from '@/lib/prisma'
 export async function GET() {
   try {
     const result = await withPrisma(async (prisma) => {
-      // Get recent readings
-    const recentReadings = await prisma.deviceReading.findMany({
-      take: 10,
-      orderBy: {
-        recordedAt: 'desc'
-      },
-      include: {
-        device: {
-          select: {
-            deviceSn: true,
-            deviceName: true
-          }
-        }
-      }
-    })
+      // Use raw SQL to bypass prepared statement conflicts
+      const recentReadings = await prisma.$queryRaw<Array<{
+        id: string
+        deviceId: string
+        batteryLevel: number
+        inputWatts: number
+        outputWatts: number
+        recordedAt: Date
+        deviceSn: string | null
+        deviceName: string | null
+      }>>`
+        SELECT 
+          dr.id,
+          dr."deviceId",
+          dr."batteryLevel",
+          dr."inputWatts", 
+          dr."outputWatts",
+          dr."recordedAt",
+          d."deviceSn",
+          d."deviceName"
+        FROM "DeviceReading" dr
+        LEFT JOIN "Device" d ON dr."deviceId" = d.id
+        ORDER BY dr."recordedAt" DESC
+        LIMIT 10
+      `
 
-    // Get reading counts by device
-    const readingStats = await prisma.deviceReading.groupBy({
-      by: ['deviceId'],
-      _count: {
-        id: true
-      },
-      orderBy: {
-        _count: {
-          id: 'desc'
-        }
-      }
-    })
+      // Get reading counts by device using raw SQL
+      const readingStats = await prisma.$queryRaw<Array<{
+        deviceId: string
+        deviceSn: string | null
+        deviceName: string | null
+        readingCount: number
+      }>>`
+        SELECT 
+          dr."deviceId",
+          d."deviceSn",
+          d."deviceName",
+          COUNT(dr.id)::int as "readingCount"
+        FROM "DeviceReading" dr
+        LEFT JOIN "Device" d ON dr."deviceId" = d.id
+        GROUP BY dr."deviceId", d."deviceSn", d."deviceName"
+        ORDER BY COUNT(dr.id) DESC
+      `
 
-    // Get device names for stats
-    const devices = await prisma.device.findMany({
-      select: {
-        id: true,
-        deviceSn: true,
-        deviceName: true
-      }
-    })
-
-    const statsWithNames = readingStats.map(stat => {
-      const device = devices.find(d => d.id === stat.deviceId)
       return {
-        deviceId: stat.deviceId,
-        deviceName: device?.deviceName || 'Unknown Device',
-        deviceSn: device?.deviceSn || 'Unknown SN',
-        readingCount: stat._count.id
+        status: 'success',
+        message: 'Successfully monitoring readings',
+        timestamp: new Date().toISOString(),
+        readings: recentReadings.map(reading => ({
+          id: reading.id,
+          deviceId: reading.deviceId,
+          deviceName: reading.deviceName || 'Unknown',
+          deviceSn: reading.deviceSn || 'Unknown',
+          batteryLevel: reading.batteryLevel,
+          inputWatts: reading.inputWatts,
+          outputWatts: reading.outputWatts,
+          recordedAt: reading.recordedAt
+        })),
+        deviceStats: readingStats.map(stat => ({
+          deviceId: stat.deviceId,
+          deviceName: stat.deviceName || 'Unknown Device',
+          deviceSn: stat.deviceSn || 'Unknown SN',
+          readingCount: stat.readingCount
+        }))
       }
     })
 
-    return {
-      status: 'success',
-      message: 'Successfully monitoring readings',
-      timestamp: new Date().toISOString(),
-      readings: recentReadings.map(reading => ({
-        id: reading.id,
-        deviceId: reading.deviceId,
-        deviceName: reading.device?.deviceName || 'Unknown',
-        deviceSn: reading.device?.deviceSn || 'Unknown',
-        batteryLevel: reading.batteryLevel,
-        inputWatts: reading.inputWatts,
-        outputWatts: reading.outputWatts,
-        recordedAt: reading.recordedAt
-      })),
-      deviceStats: statsWithNames
-    }
-  })
-
-  return NextResponse.json(result)
+    return NextResponse.json(result)
 
   } catch (error) {
     console.error('Error monitoring readings:', error)

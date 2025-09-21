@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ecoflowAPI, EcoFlowAPIError } from '@/lib/ecoflow-api'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { getPrismaClient, disconnectPrisma } from '@/lib/prisma'
+import { withPrisma } from '@/lib/prisma'
 
 export async function GET(_request: NextRequest) {
-  const prisma = getPrismaClient()
-  
   try {
     // Verify authentication
     const supabase = await createServerSupabaseClient()
@@ -21,9 +19,21 @@ export async function GET(_request: NextRequest) {
     // Fetch devices from EcoFlow API
     const devices = await ecoflowAPI.getDeviceList()
 
-    // Get user's registered devices from database using Prisma
-    const userDevices = await prisma.device.findMany({
-      where: { userId: user.id }
+    const userDevices = await withPrisma(async (prisma) => {
+      // Get user's registered devices from database using raw SQL
+      return await prisma.$queryRaw<Array<{
+        id: string
+        deviceSn: string
+        deviceName: string
+        userId: string
+        isActive: boolean | null
+        createdAt: Date | null
+        updatedAt: Date | null
+      }>>`
+        SELECT id, "deviceSn", "deviceName", "userId", "isActive", "createdAt", "updatedAt"
+        FROM "Device" 
+        WHERE "userId" = ${user.id}
+      `
     })
 
     console.log(`Found ${userDevices.length} registered devices for user ${user.id}`)
@@ -131,15 +141,10 @@ export async function GET(_request: NextRequest) {
       { error: 'Internal server error' },
       { status: 500 }
     )
-  } finally {
-    // Always disconnect in serverless
-    await disconnectPrisma(prisma)
   }
 }
 
 export async function POST(request: NextRequest) {
-  const prisma = getPrismaClient()
-  
   try {
     // Verify authentication
     const supabase = await createServerSupabaseClient()
@@ -162,21 +167,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Register device in our database using Prisma
-    const device = await prisma.device.create({
-      data: {
-        userId: user.id,
-        deviceSn: deviceSn,
-        deviceName: deviceName,
-        deviceType: deviceType || 'DELTA_2',
-        isActive: true,
-      }
+    const result = await withPrisma(async (prisma) => {
+      // Register device in our database using raw SQL
+      const device = await prisma.$queryRaw<Array<{
+        id: string
+        userId: string
+        deviceSn: string
+        deviceName: string
+        deviceType: string
+        isActive: boolean
+        createdAt: Date
+        updatedAt: Date
+      }>>`
+        INSERT INTO "Device" ("userId", "deviceSn", "deviceName", "deviceType", "isActive", "createdAt", "updatedAt")
+        VALUES (${user.id}, ${deviceSn}, ${deviceName}, ${deviceType || 'DELTA_2'}, true, NOW(), NOW())
+        RETURNING id, "userId", "deviceSn", "deviceName", "deviceType", "isActive", "createdAt", "updatedAt"
+      `
+
+      return device[0]
     })
 
-    console.log('Device registered successfully:', device.id)
+    console.log('Device registered successfully:', result.id)
 
     return NextResponse.json({
-      device,
+      device: result,
       message: 'Device registered successfully'
     })
 
@@ -187,8 +201,5 @@ export async function POST(request: NextRequest) {
       { error: 'Internal server error' },
       { status: 500 }
     )
-  } finally {
-    // Always disconnect in serverless
-    await disconnectPrisma(prisma)
   }
 }
