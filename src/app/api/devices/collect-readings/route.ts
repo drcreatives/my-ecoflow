@@ -21,12 +21,17 @@ export async function POST(_request: NextRequest) {
     
     const result = await withPrisma(async (prisma) => {
 
-    // Get all devices for this user
-    const devices = await prisma.device.findMany({
-      where: {
-        userId: user.id
-      }
-    })
+    // Get all devices for this user using raw SQL
+    const devices = await prisma.$queryRaw<Array<{
+      id: string
+      deviceSn: string
+      deviceName: string
+      userId: string
+    }>>`
+      SELECT id, "deviceSn", "deviceName", "userId"
+      FROM "Device"
+      WHERE "userId" = ${user.id}
+    `
 
     if (devices.length === 0) {
       console.log('ℹ️ No devices found for user')
@@ -62,26 +67,41 @@ export async function POST(_request: NextRequest) {
           continue
         }
         
-        // Save to database
-        const savedReading = await prisma.deviceReading.create({
-          data: {
-            deviceId: device.id,
-            batteryLevel: reading.batteryLevel || 0,
-            inputWatts: reading.inputWatts || 0,
-            outputWatts: reading.outputWatts || 0,
-            remainingTime: reading.remainingTime,
-            temperature: reading.temperature || 0,
-            status: reading.status || 'unknown',
-            rawData: JSON.parse(JSON.stringify(reading.rawData || {}))
-          }
-        })
+        // Save to database using raw SQL
+        const savedReading = await prisma.$queryRaw<Array<{
+          id: string
+        }>>`
+          INSERT INTO "DeviceReading" (
+            "deviceId", 
+            "batteryLevel", 
+            "inputWatts", 
+            "outputWatts", 
+            "remainingTime", 
+            "temperature", 
+            "status", 
+            "rawData",
+            "recordedAt"
+          )
+          VALUES (
+            ${device.id},
+            ${reading.batteryLevel || 0},
+            ${reading.inputWatts || 0},
+            ${reading.outputWatts || 0},
+            ${reading.remainingTime},
+            ${reading.temperature || 0},
+            ${reading.status || 'unknown'},
+            ${JSON.stringify(reading.rawData || {})},
+            NOW()
+          )
+          RETURNING id
+        `
 
         console.log(`✅ Saved reading for ${device.deviceSn} - Battery: ${reading.batteryLevel}%`)
         
         results.push({
           deviceSn: device.deviceSn,
           deviceName: device.deviceName,
-          readingId: savedReading.id,
+          readingId: savedReading[0].id,
           batteryLevel: reading.batteryLevel,
           outputWatts: reading.outputWatts,
           status: reading.status
