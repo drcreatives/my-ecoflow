@@ -11,6 +11,7 @@ import {
   ArrowRight
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatRemainingTime } from '@/lib/data-utils'
 
 interface DeviceData {
   id: string
@@ -198,11 +199,11 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
       </div>
 
       {/* Additional Info for non-compact view */}
-      {!isCompact && remainingTime && (
+      {!isCompact && remainingTime && remainingTime !== 0 && (
         <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-700">
           <Clock size={16} className="text-accent-green" />
           <span className="text-sm text-accent-gray">
-            {Math.floor(remainingTime / 60)}h {remainingTime % 60}m remaining
+            {formatRemainingTime(remainingTime)}
           </span>
         </div>
       )}

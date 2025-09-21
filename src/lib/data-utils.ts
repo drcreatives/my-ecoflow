@@ -306,15 +306,43 @@ export function formatBatteryLevel(level: number): string {
 }
 
 /**
- * Format remaining time
+ * Format remaining time based on EcoFlow API logic
+ * Positive values = time until full charge
+ * Negative values = time until full discharge 
  */
-export function formatRemainingTime(minutes: number): string {
-  if (minutes >= 60) {
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
-    return `${hours}h ${mins}m`
+export function formatRemainingTime(minutes: number | null | undefined): string {
+  if (!minutes || minutes === 0) return 'N/A'
+  
+  // Get absolute value for time calculation
+  const absoluteMinutes = Math.abs(minutes)
+  
+  // Determine if charging or discharging
+  const isCharging = minutes > 0
+  const isDischarging = minutes < 0
+  
+  // Format the time
+  let timeStr = ''
+  if (absoluteMinutes < 60) {
+    timeStr = `${absoluteMinutes}m`
+  } else if (absoluteMinutes < 1440) { // Less than 24 hours
+    const hours = Math.floor(absoluteMinutes / 60)
+    const remainingMins = absoluteMinutes % 60
+    timeStr = remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`
+  } else { // 24 hours or more
+    const totalHours = Math.floor(absoluteMinutes / 60)
+    const days = Math.floor(totalHours / 24)
+    const remainingHours = totalHours % 24
+    timeStr = remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`
   }
-  return `${minutes}m`
+  
+  // Add appropriate suffix based on charging/discharging
+  if (isCharging) {
+    return `${timeStr} until full`
+  } else if (isDischarging) {
+    return `${timeStr} remaining`
+  }
+  
+  return timeStr
 }
 
 /**

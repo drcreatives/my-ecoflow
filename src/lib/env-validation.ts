@@ -15,6 +15,9 @@ interface EnvironmentVariables {
   // Database Configuration
   DATABASE_URL: string
   
+  // Cron Job Security
+  CRON_SECRET: string
+  
   // Optional: NextAuth Configuration
   NEXTAUTH_SECRET?: string
   NEXTAUTH_URL?: string
@@ -26,7 +29,8 @@ export function validateEnvironmentVariables(): { isValid: boolean; missingVars:
     'ECOFLOW_SECRET_KEY',
     'NEXT_PUBLIC_SUPABASE_URL',
     'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-    'DATABASE_URL'
+    'DATABASE_URL',
+    'CRON_SECRET'
   ]
   
   const optional: (keyof EnvironmentVariables)[] = [

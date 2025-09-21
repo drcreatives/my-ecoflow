@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ecoflowAPI, EcoFlowAPIError } from '@/lib/ecoflow-api'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(_request: NextRequest) {
   try {
@@ -52,10 +53,37 @@ export async function GET(_request: NextRequest) {
             currentReading = {
               batteryLevel: getQuotaValue('bms_bmsStatus.soc') || getQuotaValue('pd.soc') || 0,
               inputWatts: getQuotaValue('inv.inputWatts') || getQuotaValue('pd.wattsInSum') || 0,
-              outputWatts: getQuotaValue('inv.outputWatts') || getQuotaValue('pd.wattsOutSum') || 0,
+              outputWatts: getQuotaValue('pd.wattsOutSum') || getQuotaValue('inv.outputWatts') || 0, // Total output (AC + DC)
               temperature: getQuotaValue('bms_bmsStatus.temp') || 20,
               remainingTime: getQuotaValue('pd.remainTime') || null,
               status: 'connected'
+            }
+
+            // 📊 SAVE READING TO DATABASE for analytics
+            if (userDevice?.id && currentReading) {
+              try {
+                const { error: insertError } = await supabase
+                  .from('device_readings')
+                  .insert({
+                    device_id: userDevice.id,
+                    battery_level: currentReading.batteryLevel,
+                    input_watts: currentReading.inputWatts,
+                    output_watts: currentReading.outputWatts,
+                    remaining_time: currentReading.remainingTime,
+                    temperature: currentReading.temperature,
+                    status: currentReading.status,
+                    raw_data: quota.quotaMap,
+                    recorded_at: new Date().toISOString()
+                  })
+                
+                if (insertError) {
+                  console.error(`Failed to save reading for device ${ecoDevice.sn}:`, insertError)
+                } else {
+                  console.log(`✅ Saved reading for device ${ecoDevice.sn}`)
+                }
+              } catch (dbError) {
+                console.error(`Database error saving reading for ${ecoDevice.sn}:`, dbError)
+              }
             }
           }
         } catch (error) {

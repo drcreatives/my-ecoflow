@@ -331,7 +331,7 @@ export class EcoFlowAPI {
       deviceId,
       batteryLevel: this.getQuotaValue(quota, 'bms_bmsStatus.soc'),
       inputWatts: this.getQuotaValue(quota, 'inv.inputWatts'),
-      outputWatts: this.getQuotaValue(quota, 'inv.outputWatts'),
+      outputWatts: this.getQuotaValue(quota, 'pd.wattsOutSum') || this.getQuotaValue(quota, 'inv.outputWatts'), // Total output (AC + DC)
       remainingTime: this.getQuotaValue(quota, 'bms_bmsStatus.remainTime'),
       temperature: this.getQuotaValue(quota, 'bms_bmsStatus.temp'),
       status: this.determineDeviceStatus(quota),
@@ -359,7 +359,7 @@ export class EcoFlowAPI {
    */
   private determineDeviceStatus(quotaMap: Record<string, { val: number; scale?: number }>): string {
     const inputWatts = this.getQuotaValue(quotaMap, 'inv.inputWatts') || 0
-    const outputWatts = this.getQuotaValue(quotaMap, 'inv.outputWatts') || 0
+    const outputWatts = this.getQuotaValue(quotaMap, 'pd.wattsOutSum') || this.getQuotaValue(quotaMap, 'inv.outputWatts') || 0 // Total output (AC + DC)
     const batteryLevel = this.getQuotaValue(quotaMap, 'bms_bmsStatus.soc') || 0
 
     if (inputWatts > 10) {

@@ -23,8 +23,8 @@ export interface DeviceReading {
   deviceId: string
   batteryLevel?: number
   inputWatts?: number
-  outputWatts?: number
-  remainingTime?: number // in minutes
+  outputWatts?: number // Total output power (AC + DC) from pd.wattsOutSum
+  remainingTime?: number // in minutes: positive = time until full charge, negative = time until full discharge
   temperature?: number
   status?: string
   rawData?: Record<string, unknown>
