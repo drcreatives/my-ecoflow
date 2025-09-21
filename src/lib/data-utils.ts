@@ -23,6 +23,10 @@ export interface DeviceReading {
   batteryLevel?: number
   inputWatts?: number
   outputWatts?: number
+  // Granular power output breakdown
+  acOutputWatts?: number
+  dcOutputWatts?: number
+  usbOutputWatts?: number
   remainingTime?: number
   temperature?: number
   status?: string

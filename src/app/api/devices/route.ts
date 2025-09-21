@@ -57,6 +57,10 @@ export async function GET(_request: NextRequest) {
               batteryLevel: getQuotaValue('bms_bmsStatus.soc') || getQuotaValue('pd.soc') || 0,
               inputWatts: getQuotaValue('inv.inputWatts') || getQuotaValue('pd.wattsInSum') || 0,
               outputWatts: getQuotaValue('pd.wattsOutSum') || getQuotaValue('inv.outputWatts') || 0, // Total output (AC + DC)
+              // Granular power output breakdown
+              acOutputWatts: getQuotaValue('inv.outputWatts') || getQuotaValue('inv.acWattsOut') || 0,
+              dcOutputWatts: getQuotaValue('mppt.outWatts') || getQuotaValue('pd.dcOutWatts') || 0,
+              usbOutputWatts: getQuotaValue('pd.usbWatts') || getQuotaValue('pd.usb1Watts') || 0,
               temperature: getQuotaValue('bms_bmsStatus.temp') || 20,
               remainingTime: getQuotaValue('pd.remainTime') || null,
               status: 'connected'
