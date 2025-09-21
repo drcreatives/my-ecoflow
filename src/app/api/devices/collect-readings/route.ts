@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ecoflowAPI } from '@/lib/ecoflow-api'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { prisma } from '@/lib/prisma'
+import { getPrismaClient, disconnectPrisma } from '@/lib/prisma'
 
 /**
  * Background job endpoint to collect and store device readings
  * This can be called periodically by a cron job or monitoring system
  */
 export async function POST(_request: NextRequest) {
+  const prisma = getPrismaClient()
+  
   try {
     console.log('📊 Starting background reading collection...')
     
@@ -113,19 +115,12 @@ export async function POST(_request: NextRequest) {
   } catch (error) {
     console.error('❌ Error in reading collection:', error)
     
-    // Handle Prisma connection errors
-    if (error instanceof Error && error.message.includes('prepared statement')) {
-      try {
-        await prisma.$disconnect()
-        console.log('Disconnected Prisma due to prepared statement error')
-      } catch (disconnectError) {
-        console.error('Error disconnecting Prisma:', disconnectError)
-      }
-    }
-    
     return NextResponse.json({
       error: 'Failed to collect readings',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
+  } finally {
+    // Always disconnect in serverless
+    await disconnectPrisma(prisma)
   }
 }
