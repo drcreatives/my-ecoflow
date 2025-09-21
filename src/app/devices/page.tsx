@@ -20,7 +20,8 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
-  Loader2
+  Loader2,
+  ChevronDown
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout';
 import AuthWrapper from '@/components/AuthWrapper';
@@ -53,6 +54,7 @@ const DevicesPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'online' | 'offline'>('all');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   useEffect(() => {
     fetchDevices();
@@ -293,17 +295,77 @@ const DevicesPage = () => {
               </div>
 
               {/* Status Filter */}
-              <div className="flex items-center gap-2">
-                <Filter size={16} className="text-gray-400" />
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value as 'all' | 'online' | 'offline')}
-                  className="bg-primary-dark border border-gray-700 rounded-lg px-3 py-2 text-white focus:border-accent-green focus:outline-none"
-                >
-                  <option value="all">All Devices</option>
-                  <option value="online">Online Only</option>
-                  <option value="offline">Offline Only</option>
-                </select>
+              <div className="relative">
+                <div className="flex items-center gap-2">
+                  <Filter size={16} className="text-gray-400" />
+                  <button
+                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                    className="bg-primary-dark border border-gray-700 rounded-lg px-3 py-2 text-white focus:border-accent-green focus:outline-none hover:border-gray-600 transition-colors flex items-center gap-2 min-w-[140px] justify-between"
+                  >
+                    <span>
+                      {filterStatus === 'all' && 'All Devices'}
+                      {filterStatus === 'online' && 'Online Only'}
+                      {filterStatus === 'offline' && 'Offline Only'}
+                    </span>
+                    <ChevronDown 
+                      size={16} 
+                      className={cn(
+                        "text-gray-400 transition-transform",
+                        isFilterOpen && "rotate-180"
+                      )} 
+                    />
+                  </button>
+                </div>
+                
+                {/* Custom Dropdown */}
+                {isFilterOpen && (
+                  <>
+                    {/* Backdrop */}
+                    <div 
+                      className="fixed inset-0 z-10" 
+                      onClick={() => setIsFilterOpen(false)}
+                    />
+                    {/* Dropdown Menu */}
+                    <div className="absolute top-full left-6 mt-1 w-40 bg-primary-dark border border-gray-700 rounded-lg shadow-lg z-20 overflow-hidden">
+                      <button
+                        onClick={() => {
+                          setFilterStatus('all');
+                          setIsFilterOpen(false);
+                        }}
+                        className={cn(
+                          "w-full px-3 py-2 text-left text-white hover:bg-gray-800 transition-colors",
+                          filterStatus === 'all' && "bg-accent-green/20 text-accent-green"
+                        )}
+                      >
+                        All Devices
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFilterStatus('online');
+                          setIsFilterOpen(false);
+                        }}
+                        className={cn(
+                          "w-full px-3 py-2 text-left text-white hover:bg-gray-800 transition-colors",
+                          filterStatus === 'online' && "bg-accent-green/20 text-accent-green"
+                        )}
+                      >
+                        Online Only
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFilterStatus('offline');
+                          setIsFilterOpen(false);
+                        }}
+                        className={cn(
+                          "w-full px-3 py-2 text-left text-white hover:bg-gray-800 transition-colors",
+                          filterStatus === 'offline' && "bg-accent-green/20 text-accent-green"
+                        )}
+                      >
+                        Offline Only
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
