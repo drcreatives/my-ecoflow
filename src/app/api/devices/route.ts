@@ -175,6 +175,17 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('API Error:', error)
+    
+    // Handle Prisma connection errors
+    if (error instanceof Error && error.message.includes('prepared statement')) {
+      try {
+        await prisma.$disconnect()
+        console.log('Disconnected Prisma due to prepared statement error')
+      } catch (disconnectError) {
+        console.error('Error disconnecting Prisma:', disconnectError)
+      }
+    }
+    
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
