@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ecoflowAPI, EcoFlowAPIError } from '@/lib/ecoflow-api'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { prisma } from '@/lib/prisma'
+import { getPrismaClient, disconnectPrisma } from '@/lib/prisma'
 
 export async function GET(_request: NextRequest) {
+  const prisma = getPrismaClient()
+  
   try {
     // Verify authentication
     const supabase = await createServerSupabaseClient()
@@ -129,10 +131,15 @@ export async function GET(_request: NextRequest) {
       { error: 'Internal server error' },
       { status: 500 }
     )
+  } finally {
+    // Always disconnect in serverless
+    await disconnectPrisma(prisma)
   }
 }
 
 export async function POST(request: NextRequest) {
+  const prisma = getPrismaClient()
+  
   try {
     // Verify authentication
     const supabase = await createServerSupabaseClient()
@@ -176,19 +183,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('API Error:', error)
     
-    // Handle Prisma connection errors
-    if (error instanceof Error && error.message.includes('prepared statement')) {
-      try {
-        await prisma.$disconnect()
-        console.log('Disconnected Prisma due to prepared statement error')
-      } catch (disconnectError) {
-        console.error('Error disconnecting Prisma:', disconnectError)
-      }
-    }
-    
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     )
+  } finally {
+    // Always disconnect in serverless
+    await disconnectPrisma(prisma)
   }
 }

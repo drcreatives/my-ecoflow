@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getPrismaClient, disconnectPrisma } from '@/lib/prisma'
 
 export async function GET() {
+  const prisma = getPrismaClient()
+  
   try {
     // Get recent readings
     const recentReadings = await prisma.deviceReading.findMany({
@@ -75,20 +77,13 @@ export async function GET() {
   } catch (error) {
     console.error('Error monitoring readings:', error)
     
-    // Try to reconnect if it's a connection error
-    if (error instanceof Error && error.message.includes('prepared statement')) {
-      try {
-        await prisma.$disconnect()
-        console.log('Disconnected Prisma due to prepared statement error')
-      } catch (disconnectError) {
-        console.error('Error disconnecting Prisma:', disconnectError)
-      }
-    }
-    
     return NextResponse.json({
       status: 'error',
       message: 'Failed to monitor readings',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
+  } finally {
+    // Always disconnect in serverless
+    await disconnectPrisma(prisma)
   }
 }
