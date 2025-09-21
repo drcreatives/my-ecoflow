@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getPrismaClient, disconnectPrisma } from '@/lib/prisma'
+import { withPrisma } from '@/lib/prisma'
 
 export async function GET() {
-  const prisma = getPrismaClient()
-  
   try {
-    // Get recent readings
+    const result = await withPrisma(async (prisma) => {
+      // Get recent readings
     const recentReadings = await prisma.deviceReading.findMany({
       take: 10,
       orderBy: {
@@ -47,32 +46,31 @@ export async function GET() {
       const device = devices.find(d => d.id === stat.deviceId)
       return {
         deviceId: stat.deviceId,
-        deviceSn: device?.deviceSn || 'Unknown',
-        deviceName: device?.deviceName || 'Unknown',
+        deviceName: device?.deviceName || 'Unknown Device',
+        deviceSn: device?.deviceSn || 'Unknown SN',
         readingCount: stat._count.id
       }
     })
 
-    return NextResponse.json({
+    return {
       status: 'success',
-      message: 'Reading persistence monitoring',
+      message: 'Successfully monitoring readings',
       timestamp: new Date().toISOString(),
-      summary: {
-        totalReadings: await prisma.deviceReading.count(),
-        totalDevices: devices.length,
-        recentReadings: recentReadings.length
-      },
-      recentReadings: recentReadings.map(reading => ({
+      readings: recentReadings.map(reading => ({
         id: reading.id,
-        deviceSn: reading.device.deviceSn,
-        deviceName: reading.device.deviceName,
+        deviceId: reading.deviceId,
+        deviceName: reading.device?.deviceName || 'Unknown',
+        deviceSn: reading.device?.deviceSn || 'Unknown',
         batteryLevel: reading.batteryLevel,
+        inputWatts: reading.inputWatts,
         outputWatts: reading.outputWatts,
-        status: reading.status,
         recordedAt: reading.recordedAt
       })),
       deviceStats: statsWithNames
-    })
+    }
+  })
+
+  return NextResponse.json(result)
 
   } catch (error) {
     console.error('Error monitoring readings:', error)
@@ -82,8 +80,5 @@ export async function GET() {
       message: 'Failed to monitor readings',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
-  } finally {
-    // Always disconnect in serverless
-    await disconnectPrisma(prisma)
   }
 }
