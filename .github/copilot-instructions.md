@@ -4,9 +4,30 @@
 
 This is a full-stack Next.js dashboard for monitoring EcoFlow Delta 2 power stations. The application provides real-time device monitoring, historical data analytics, and device control capabilities with **fully functional authentication and EcoFlow API integration**.
 
-## Current Project Status (COMPLETED ✅)
+## Current Project Status (COMPLETED ✅)### UI/UX Guidelines
 
-### ✅ **Authentication System**
+### Tailwind CSS & Custom Components
+```typescript
+// Use Tailwind CSS with consistent dark theme classes
+<div className="bg-primary-dark border border-gray-700 rounded-lg p-4">
+  <h3 className="text-white font-semibold mb-2">Device Status</h3>
+  <p className="text-gray-400 text-sm">Battery Level</p>
+  <p className="text-accent-green text-2xl font-bold">{batteryLevel}%</p>
+</div>
+
+// Custom dropdown components for dark theme consistency
+const CustomDropdown = ({ options, value, onChange }) => {
+  return (
+    <div className="relative">
+      <button className="bg-primary-dark border border-gray-700 rounded-lg px-3 py-2 text-white">
+        {value}
+        <ChevronDown className="ml-2" />
+      </button>
+      {/* Custom dropdown menu with dark styling */}
+    </div>
+  );
+};
+```ation System**
 - **Supabase Authentication**: Fully implemented with email/password signup and login
 - **Modern Auth UI**: Beautiful, responsive login/signup page with form validation
 - **Protected Routes**: AuthWrapper component protecting dashboard and sensitive pages
@@ -30,6 +51,13 @@ This is a full-stack Next.js dashboard for monitoring EcoFlow Delta 2 power stat
 - **Comprehensive Test Suite**: Multiple API testing endpoints
 - **Debug Tools**: Detailed logging and error tracking
 - **Validation**: Database, authentication, and API connection testing
+
+### ✅ **Device Management System**
+- **Complete Devices Page**: Full-featured device listing with search, filtering, and status monitoring
+- **Device Registration**: Add device page with EcoFlow API discovery and manual entry
+- **Responsive Design**: Mobile-first approach with floating action buttons and adaptive layouts
+- **Real-time Status**: Live device status monitoring with battery, power, and temperature metrics
+- **Custom UI Components**: Dark-themed custom dropdowns and interactive elements
 
 ### ✅ **Production Issues Resolved**
 - **Prepared Statement Conflicts**: Completely bypassed Prisma ORM with direct pg library to eliminate serverless prepared statement naming conflicts
@@ -57,9 +85,17 @@ src/
 ├── app/                           # Next.js App Router pages
 │   ├── login/                    # Modern authentication page ✅
 │   ├── dashboard/                # Protected dashboard ✅
+│   ├── devices/                  # Device management pages ✅
+│   │   ├── page.tsx             # Main devices listing page ✅
+│   │   └── add/                 # Add device page ✅
+│   │       └── page.tsx         # Device discovery & registration ✅
 │   └── api/                      # API routes ✅
 │       ├── auth/                 # Authentication endpoints ✅
 │       ├── devices/              # Device management APIs ✅
+│       │   ├── route.ts         # Device CRUD operations ✅
+│       │   ├── discover/        # EcoFlow device discovery ✅
+│       │   ├── register/        # Device registration ✅
+│       │   └── collect-readings/ # Reading collection (partial) ⚠️
 │       └── test-*/               # Comprehensive testing suite ✅
 ├── components/                    # Reusable UI components
 │   ├── ui/                       # Base UI components
@@ -73,6 +109,8 @@ src/
 │   ├── database.ts              # Direct PostgreSQL connection ✅
 │   ├── supabase.ts              # Supabase client ✅
 │   ├── supabase-server.ts       # Server-side Supabase ✅
+│   ├── data-utils.ts            # Data formatting utilities ✅
+│   ├── utils.ts                 # General utilities ✅
 │   └── env-validation.ts        # Environment validation ✅
 ├── stores/                       # Zustand stores
 ├── types/                        # TypeScript type definitions
@@ -408,11 +446,20 @@ const animateCard = (element: HTMLElement) => {
 
 ### Responsive Design
 ```typescript
-// Use Chakra UI responsive syntax
-<Box
-  display={{ base: 'block', md: 'flex' }}
-  gridTemplateColumns={{ base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }}
+// Use Tailwind CSS responsive classes
+<div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+  <div className="bg-primary-dark rounded-lg p-6">
+    {/* Device card content */}
+  </div>
+</div>
+
+// Mobile-first approach with floating action buttons
+<Link
+  href="/devices/add"
+  className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-accent-green rounded-full flex items-center justify-center"
 >
+  <Plus size={24} />
+</Link>
 ```
 
 ## Development Workflow
@@ -450,7 +497,15 @@ const animateCard = (element: HTMLElement) => {
 - **Prepared Statement Conflicts**: Completely resolved by bypassing Prisma ORM
 - **SSL Certificate Issues**: Fixed with proper Supabase SSL configuration
 - **Serverless Compatibility**: Optimized for Vercel deployment environment
-- **API Endpoints**: All critical endpoints (monitor-readings, devices, collect-readings) fully functional
+- **API Endpoints**: All critical endpoints (monitor-readings, devices, collect-readings) functional
+- **Database Permissions**: Minor permissions issue identified in collect-readings endpoint
+
+#### 🎨 **UI/UX Implementation**:
+- **Complete Devices Management**: Full-featured /devices page with search, filtering, and device cards
+- **Device Registration Flow**: /devices/add page with EcoFlow API discovery and manual entry
+- **Dark Theme Consistency**: Custom dropdown components and consistent styling
+- **Mobile-First Design**: Responsive layouts with floating action buttons
+- **Multiple Navigation Paths**: Header buttons, grid cards, floating FAB, and empty state CTAs
 
 ### Development Commands
 ```bash
@@ -458,25 +513,52 @@ const animateCard = (element: HTMLElement) => {
 npm run dev
 
 # Test EcoFlow API connection
-curl http://localhost:3002/api/test-ecoflow
+curl http://localhost:3000/api/test-ecoflow
 
 # Test authentication
-# Visit: http://localhost:3002/login
+# Visit: http://localhost:3000/login
 
 # Access protected dashboard
-# Visit: http://localhost:3002/dashboard (requires login)
+# Visit: http://localhost:3000/dashboard (requires login)
+
+# Access devices management
+# Visit: http://localhost:3000/devices (requires login)
+
+# Add new devices
+# Visit: http://localhost:3000/devices/add (requires login)
 ```
 
 ### Key Files & Their Status
 - ✅ `src/app/login/page.tsx` - Modern auth UI (COMPLETED)
+- ✅ `src/app/devices/page.tsx` - Full devices management page (COMPLETED)
+- ✅ `src/app/devices/add/page.tsx` - Device registration page (COMPLETED)
 - ✅ `src/lib/ecoflow-api.ts` - Working API wrapper (COMPLETED)
 - ✅ `src/components/AuthWrapper.tsx` - Route protection (COMPLETED)
 - ✅ `src/lib/supabase.ts` - Auth client (COMPLETED)
 - ✅ `src/lib/database.ts` - Direct PostgreSQL connection (COMPLETED)
 - ✅ `prisma/schema.prisma` - Database schema (COMPLETED)
 - ✅ `.env.local` - All credentials configured (COMPLETED)
+- ⚠️ `src/app/api/devices/collect-readings/route.ts` - Database permissions issue
 
 ## Future Development Notes
+
+### Current Status Summary
+🎉 **The EcoFlow Dashboard is now FULLY FUNCTIONAL with Complete Device Management!**
+
+#### ✅ **Core Infrastructure** (COMPLETED):
+1. **Modern Authentication System** - Supabase auth with beautiful UI
+2. **Working EcoFlow API Integration** - Real device data (DELTA 2: R331ZKB5SG7V0293)
+3. **Production Database** - Direct PostgreSQL connection with SSL
+4. **Comprehensive Testing Suite** - Full API validation
+
+#### ✅ **Device Management** (COMPLETED):
+5. **Devices Listing Page** - `/devices` with search, filtering, and device cards
+6. **Device Registration** - `/devices/add` with API discovery and manual entry
+7. **Custom UI Components** - Dark-themed dropdowns and responsive design
+8. **Multiple Navigation Paths** - Header buttons, grid cards, floating FAB
+
+#### ⚠️ **Minor Issues**:
+- Database permissions for collect-readings endpoint (identified, needs service role auth)
 
 The core infrastructure is complete. Future enhancements could include:
 - Real-time device monitoring dashboards
