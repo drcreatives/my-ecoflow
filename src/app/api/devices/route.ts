@@ -19,23 +19,16 @@ export async function GET(_request: NextRequest) {
     // Fetch devices from EcoFlow API
     const devices = await ecoflowAPI.getDeviceList()
 
-    // Get user's registered devices from database
-    const { data: userDevices, error: dbError } = await supabase
-      .from('devices')
-      .select('*')
-      .eq('user_id', user.id)
+    // Get user's registered devices from database using Prisma
+    const userDevices = await prisma.device.findMany({
+      where: { userId: user.id }
+    })
 
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Database error' },
-        { status: 500 }
-      )
-    }
+    console.log(`Found ${userDevices.length} registered devices for user ${user.id}`)
 
     // Merge EcoFlow API data with our database data and current readings
     const mergedDevices = await Promise.all(devices.map(async (ecoDevice) => {
-      const userDevice = userDevices?.find(ud => ud.device_sn === ecoDevice.sn)
+      const userDevice = userDevices?.find(ud => ud.deviceSn === ecoDevice.sn)
       
         // Fetch current device readings from EcoFlow API
         let currentReading = null
@@ -101,14 +94,14 @@ export async function GET(_request: NextRequest) {
         }      return {
         id: userDevice?.id || `temp-${ecoDevice.sn}`,
         deviceSn: ecoDevice.sn,
-        deviceName: userDevice?.device_name || ecoDevice.productName || 'EcoFlow Device',
+        deviceName: userDevice?.deviceName || ecoDevice.productName || 'EcoFlow Device',
         deviceType: ecoDevice.productType || 'DELTA_2',
-        isActive: userDevice?.is_active ?? ecoDevice.online === 1,
+        isActive: userDevice?.isActive ?? ecoDevice.online === 1,
         online: ecoDevice.online === 1,
         status: ecoDevice.status || 'standby',
         userId: user.id,
-        createdAt: userDevice?.created_at,
-        updatedAt: userDevice?.updated_at,
+        createdAt: userDevice?.createdAt,
+        updatedAt: userDevice?.updatedAt,
         currentReading
       }
     }))
@@ -162,26 +155,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Register device in our database
-    const { data: device, error: dbError } = await supabase
-      .from('devices')
-      .insert({
-        user_id: user.id,
-        device_sn: deviceSn,
-        device_name: deviceName,
-        device_type: deviceType || 'DELTA_2',
-        is_active: true,
-      })
-      .select()
-      .single()
+    // Register device in our database using Prisma
+    const device = await prisma.device.create({
+      data: {
+        userId: user.id,
+        deviceSn: deviceSn,
+        deviceName: deviceName,
+        deviceType: deviceType || 'DELTA_2',
+        isActive: true,
+      }
+    })
 
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to register device' },
-        { status: 500 }
-      )
-    }
+    console.log('Device registered successfully:', device.id)
 
     return NextResponse.json({
       device,
