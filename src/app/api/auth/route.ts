@@ -4,6 +4,39 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+// Helper function to ensure user exists in our database
+async function ensureUserInDatabase(userId: string, email: string) {
+  try {
+    await prisma.$connect()
+    
+    // Check if user exists
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId }
+    })
+    
+    if (!existingUser) {
+      // Create user if doesn't exist
+      const dbUser = await prisma.user.create({
+        data: {
+          id: userId,
+          email: email,
+          passwordHash: 'managed-by-supabase',
+        }
+      })
+      console.log('✅ Created user in database:', dbUser.id)
+      return dbUser
+    } else {
+      console.log('✅ User already exists in database:', existingUser.id)
+      return existingUser
+    }
+  } catch (dbError) {
+    console.error('❌ Database user creation error:', dbError)
+    throw dbError
+  } finally {
+    await prisma.$disconnect()
+  }
+}
+
 export async function POST(_request: NextRequest) {
   try {
     const body = await _request.json()
@@ -35,19 +68,10 @@ export async function POST(_request: NextRequest) {
       // Create user record in our database
       if (data.user) {
         try {
-          await prisma.$connect()
-          const dbUser = await prisma.user.create({
-            data: {
-              id: data.user.id,
-              email: data.user.email || email,
-              passwordHash: 'managed-by-supabase', // Supabase handles password hashing
-            }
-          })
-          console.log('Created user in database:', dbUser.id)
+          await ensureUserInDatabase(data.user.id, data.user.email || email)
         } catch (dbError) {
-          console.log('User might already exist in database:', dbError)
-        } finally {
-          await prisma.$disconnect()
+          console.error('Failed to create user in database:', dbError)
+          // Continue with signup even if database creation fails
         }
       }
 
@@ -73,6 +97,16 @@ export async function POST(_request: NextRequest) {
           { error: 'Login failed', message: error.message },
           { status: 401 }
         )
+      }
+
+      // Ensure user exists in our database (for users from old instance)
+      if (data.user) {
+        try {
+          await ensureUserInDatabase(data.user.id, data.user.email || email)
+        } catch (dbError) {
+          console.error('Failed to create user in database, but login succeeded:', dbError)
+          // Continue with login even if database creation fails
+        }
       }
 
       return NextResponse.json({
