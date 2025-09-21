@@ -13,6 +13,14 @@ const config: Config = {
       },
       colors: {
         // EcoFlow Brand Colors
+        'primary-black': '#000000',
+        'primary-dark': '#2b2b2b',
+        'accent-green': '#44af21',
+        'accent-green-secondary': '#00c356',
+        'accent-green-light': '#00e16e',
+        'accent-blue': '#3a6fe3',
+        'accent-gray': '#ebebeb',
+        // Keep nested format for backward compatibility
         primary: {
           black: '#000000',
           dark: '#2b2b2b',
