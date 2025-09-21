@@ -169,6 +169,64 @@ export default function DevicePage({ params }: DevicePageProps) {
           </button>
         </div>
 
+        {/* Analytics Registration Status */}
+        <div className="mb-6">
+          <div className="bg-primary-dark border border-accent-green/20 rounded-lg p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                {!device.id.startsWith('temp-') ? (
+                  <Activity className="w-5 h-5 text-accent-green" />
+                ) : (
+                  <Activity className="w-5 h-5 text-gray-400" />
+                )}
+                <div>
+                  <h3 className={`font-semibold ${!device.id.startsWith('temp-') ? 'text-accent-green' : 'text-gray-400'}`}>
+                    {!device.id.startsWith('temp-') ? 'Analytics Enabled' : 'Analytics Disabled'}
+                  </h3>
+                  <p className="text-sm text-accent-gray">
+                    {!device.id.startsWith('temp-') 
+                      ? 'This device is registered for data collection, analytics, and history tracking.' 
+                      : 'Register this device to enable data collection, analytics, and history tracking.'
+                    }
+                  </p>
+                </div>
+              </div>
+              
+              <div className="ml-4">
+                {!device.id.startsWith('temp-') ? (
+                  <button
+                    onClick={() => {
+                      if (confirm('Are you sure you want to disable analytics for this device? This will stop data collection and remove historical data.')) {
+                        fetch('/api/unregister-device', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ deviceSn: device.deviceSn, userId: device.userId })
+                        }).then(() => window.location.reload())
+                      }
+                    }}
+                    className="px-4 py-2 border border-red-400 text-red-400 hover:bg-red-400 hover:text-white rounded-lg transition-colors text-sm font-medium"
+                  >
+                    Disable Analytics
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      fetch('/api/register-device', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ deviceSn: device.deviceSn, userId: device.userId })
+                      }).then(() => window.location.reload())
+                    }}
+                    className="px-4 py-2 border border-accent-green text-accent-green hover:bg-accent-green hover:text-black rounded-lg transition-colors text-sm font-medium"
+                  >
+                    Enable Analytics
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Status Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
           {/* Battery Level */}
