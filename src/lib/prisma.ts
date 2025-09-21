@@ -2,23 +2,25 @@ import { PrismaClient } from '@prisma/client'
 
 // Create a function that returns a completely isolated Prisma client
 export function createIsolatedPrismaClient() {
-  // Build URL with parameters to disable prepared statements
+  // Build URL with direct connection (no pgbouncer) and unique session parameters
   let dbUrl = process.env.DATABASE_URL || ''
   
-  // Remove pgbouncer if present and add prepared statement disabling parameters
+  // Remove pgbouncer if present - use direct connection
   if (dbUrl.includes('pgbouncer')) {
     dbUrl = dbUrl.replace('pgbouncer=true', 'pgbouncer=false').replace(/aws-.*pooler/, 'db')
   }
   
-  // Add parameters to disable prepared statements and avoid naming conflicts
+  // Create completely unique connection to avoid any conflicts
   const urlObj = new URL(dbUrl)
-  urlObj.searchParams.set('prepared_statement_cache_queries', 'false')
-  urlObj.searchParams.set('statement_cache_size', '0')
-  urlObj.searchParams.set('connection_limit', '1')
-  // Add unique session identifier to prevent statement name conflicts
-  urlObj.searchParams.set('application_name', `prisma_${Date.now()}_${Math.random().toString(36).substring(7)}`)
+  const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(7)}`
   
-  return new PrismaClient({
+  // Add unique session parameters
+  urlObj.searchParams.set('application_name', `ecoflow_${uniqueId}`)
+  urlObj.searchParams.set('connect_timeout', '10')
+  urlObj.searchParams.set('statement_timeout', '30000')
+  
+  // Create client with aggressive isolation settings
+  const client = new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
     datasources: {
       db: {
@@ -26,6 +28,13 @@ export function createIsolatedPrismaClient() {
       }
     }
   })
+  
+  // Force immediate connection to prevent lazy loading conflicts
+  client.$connect().catch(() => {
+    // Ignore connection errors during initialization
+  })
+  
+  return client
 }
 
 // For backward compatibility in development
@@ -45,10 +54,21 @@ export async function withPrisma<T>(
 ): Promise<T> {
   const client = createIsolatedPrismaClient()
   try {
+    // Ensure client is connected before operation
+    await client.$connect()
+    
+    // Add small delay to prevent race conditions in serverless
+    await new Promise(resolve => setTimeout(resolve, Math.random() * 10))
+    
     const result = await operation(client)
     return result
   } finally {
-    await client.$disconnect()
+    // Force immediate disconnection
+    try {
+      await client.$disconnect()
+    } catch (error) {
+      console.error('Error disconnecting Prisma:', error)
+    }
   }
 }
 
