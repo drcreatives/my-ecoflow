@@ -112,6 +112,17 @@ export async function POST(_request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Error in reading collection:', error)
+    
+    // Handle Prisma connection errors
+    if (error instanceof Error && error.message.includes('prepared statement')) {
+      try {
+        await prisma.$disconnect()
+        console.log('Disconnected Prisma due to prepared statement error')
+      } catch (disconnectError) {
+        console.error('Error disconnecting Prisma:', disconnectError)
+      }
+    }
+    
     return NextResponse.json({
       error: 'Failed to collect readings',
       details: error instanceof Error ? error.message : 'Unknown error'
