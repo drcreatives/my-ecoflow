@@ -52,7 +52,7 @@ export async function GET(_request: NextRequest) {
             currentReading = {
               batteryLevel: getQuotaValue('bms_bmsStatus.soc') || getQuotaValue('pd.soc') || 0,
               inputWatts: getQuotaValue('inv.inputWatts') || getQuotaValue('pd.wattsInSum') || 0,
-              outputWatts: getQuotaValue('inv.outputWatts') || getQuotaValue('pd.wattsOutSum') || 0,
+              outputWatts: getQuotaValue('pd.wattsOutSum') || getQuotaValue('inv.outputWatts') || 0, // Total output (AC + DC)
               temperature: getQuotaValue('bms_bmsStatus.temp') || 20,
               remainingTime: getQuotaValue('pd.remainTime') || null,
               status: 'connected'
