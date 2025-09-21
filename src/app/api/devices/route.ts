@@ -30,9 +30,9 @@ export async function GET(_request: NextRequest) {
         createdAt: Date | null
         updatedAt: Date | null
       }>>`
-        SELECT id, "deviceSn", "deviceName", "userId", "isActive", "createdAt", "updatedAt"
-        FROM "Device" 
-        WHERE "userId" = ${user.id}
+        SELECT id, device_sn as "deviceSn", device_name as "deviceName", user_id as "userId", is_active as "isActive", created_at as "createdAt", updated_at as "updatedAt"
+        FROM devices 
+        WHERE user_id = ${user.id}
       `
     })
 
@@ -179,9 +179,9 @@ export async function POST(request: NextRequest) {
         createdAt: Date
         updatedAt: Date
       }>>`
-        INSERT INTO "Device" ("userId", "deviceSn", "deviceName", "deviceType", "isActive", "createdAt", "updatedAt")
+        INSERT INTO devices (user_id, device_sn, device_name, device_type, is_active, created_at, updated_at)
         VALUES (${user.id}, ${deviceSn}, ${deviceName}, ${deviceType || 'DELTA_2'}, true, NOW(), NOW())
-        RETURNING id, "userId", "deviceSn", "deviceName", "deviceType", "isActive", "createdAt", "updatedAt"
+        RETURNING id, user_id as "userId", device_sn as "deviceSn", device_name as "deviceName", device_type as "deviceType", is_active as "isActive", created_at as "createdAt", updated_at as "updatedAt"
       `
 
       return device[0]
