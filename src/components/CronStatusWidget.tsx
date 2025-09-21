@@ -1,6 +1,6 @@
 'use client'
 
-import { Clock, Smartphone, Database, Play, Pause, CheckCircle } from 'lucide-react'
+import { Clock, Smartphone, Database, Play, Pause } from 'lucide-react'
 import { useClientSideReadingCollection } from '@/hooks/useClientSideReadingCollection'
 import { useState, useEffect } from 'react'
 
@@ -178,7 +178,7 @@ export default function CronStatusWidget() {
         <div className="bg-accent-blue/10 border border-accent-blue/30 rounded-md p-3">
           <div className="text-xs text-accent-blue">
             💡 <strong>Hybrid Collection:</strong> Daily Vercel cron ensures data backup, 
-            while active collection runs when you're using the dashboard for real-time data.
+            while active collection runs when you&apos;re using the dashboard for real-time data.
           </div>
         </div>
       </div>

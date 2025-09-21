@@ -70,7 +70,7 @@ export async function POST(_request: NextRequest) {
             remainingTime: reading.remainingTime,
             temperature: reading.temperature || 0,
             status: reading.status || 'unknown',
-            rawData: reading.rawData as any || {}
+            rawData: JSON.parse(JSON.stringify(reading.rawData || {}))
           }
         })
 
