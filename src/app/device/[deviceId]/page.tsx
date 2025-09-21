@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { formatRemainingTime } from '@/lib/data-utils'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { 
   ArrowLeft, 
   Battery, 
@@ -232,9 +233,13 @@ export default function DevicePage({ params }: DevicePageProps) {
             </div>
           </div>
           
-          <button className="p-2 hover:bg-primary-dark rounded-lg transition-colors group">
+          <Link
+            href={`/device/${device.id}/settings`}
+            className="p-2 hover:bg-primary-dark rounded-lg transition-colors group"
+            title="Device Settings"
+          >
             <Settings className="w-6 h-6 group-hover:text-accent-green transition-colors" />
-          </button>
+          </Link>
         </div>
 
         {/* Analytics Registration Status */}
