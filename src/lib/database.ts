@@ -5,13 +5,24 @@ let pool: Pool | null = null
 
 function getPool(): Pool {
   if (!pool) {
+    // For production, disable SSL rejection globally
+    if (process.env.NODE_ENV === 'production') {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+    }
+    
     // Parse the DATABASE_URL to extract connection details
-    const dbUrl = process.env.DATABASE_URL || ''
+    let dbUrl = process.env.DATABASE_URL || ''
+    
+    // For production, try to modify the connection string to handle SSL
+    if (process.env.NODE_ENV === 'production') {
+      // Remove any existing SSL parameters and add sslmode=require
+      dbUrl = dbUrl.replace(/\?.*$/, '') + '?sslmode=require'
+    }
     
     // Create pool with direct connection (no prepared statements)
     pool = new Pool({
       connectionString: dbUrl,
-      // SSL configuration for production (Supabase) - minimal verification
+      // SSL configuration for production (Supabase) - try different approach
       ssl: process.env.NODE_ENV === 'production' ? {
         rejectUnauthorized: false
       } : false,
