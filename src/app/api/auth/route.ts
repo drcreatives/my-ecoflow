@@ -1,27 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { prisma } from '@/lib/prisma'
+import { executeQuery, executeQuerySingle } from '@/lib/database'
 
 // Helper function to ensure user exists in our database
 async function ensureUserInDatabase(userId: string, email: string) {
   try {
     console.log('🔄 Ensuring user exists in database:', userId, email)
     
-    // Check if user exists
-    const existingUser = await prisma.user.findUnique({
-      where: { id: userId }
-    })
+    // Check if user exists using direct PostgreSQL
+    const existingUser = await executeQuerySingle<{
+      id: string
+      email: string
+      password_hash: string
+      created_at: Date
+      updated_at: Date
+    }>(`
+      SELECT id, email, password_hash, created_at, updated_at
+      FROM users 
+      WHERE id = $1
+    `, [userId])
     
     if (!existingUser) {
       // Create user if doesn't exist
-      const dbUser = await prisma.user.create({
-        data: {
-          id: userId,
-          email: email,
-          passwordHash: 'managed-by-supabase',
-        }
-      })
-      console.log('✅ Created user in database:', dbUser.id)
+      const dbUser = await executeQuerySingle<{
+        id: string
+        email: string
+        password_hash: string
+        created_at: Date
+        updated_at: Date
+      }>(`
+        INSERT INTO users (id, email, password_hash, created_at, updated_at)
+        VALUES ($1, $2, $3, NOW(), NOW())
+        RETURNING id, email, password_hash, created_at, updated_at
+      `, [userId, email, 'managed-by-supabase'])
+      
+      console.log('✅ Created user in database:', dbUser?.id)
       return dbUser
     } else {
       console.log('✅ User already exists in database:', existingUser.id)

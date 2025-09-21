@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ecoflowAPI } from '@/lib/ecoflow-api'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { withPrisma } from '@/lib/prisma'
+import { executeQuery } from '@/lib/database'
 
 /**
  * Background job endpoint to collect and store device readings
@@ -19,26 +19,24 @@ export async function POST(_request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    const result = await withPrisma(async (prisma) => {
-
-    // Get all devices for this user using raw SQL
-    const devices = await prisma.$queryRaw<Array<{
+    // Get all devices for this user using direct PostgreSQL
+    const devices = await executeQuery<{
       id: string
       deviceSn: string
       deviceName: string
       userId: string
-    }>>`
+    }>(`
       SELECT id, device_sn as "deviceSn", device_name as "deviceName", user_id as "userId"
       FROM devices
-      WHERE user_id = ${user.id}
-    `
+      WHERE user_id = $1
+    `, [user.id])
 
     if (devices.length === 0) {
       console.log('ℹ️ No devices found for user')
-      return {
+      return NextResponse.json({
         message: 'No devices found',
         collected: 0 
-      }
+      })
     }
 
     let successCount = 0
@@ -67,10 +65,10 @@ export async function POST(_request: NextRequest) {
           continue
         }
         
-        // Save to database using raw SQL
-        const savedReading = await prisma.$queryRaw<Array<{
+        // Save to database using direct PostgreSQL
+        const savedReading = await executeQuery<{
           id: string
-        }>>`
+        }>(`
           INSERT INTO device_readings (
             device_id, 
             battery_level, 
@@ -83,18 +81,27 @@ export async function POST(_request: NextRequest) {
             recorded_at
           )
           VALUES (
-            ${device.id},
-            ${reading.batteryLevel || 0},
-            ${reading.inputWatts || 0},
-            ${reading.outputWatts || 0},
-            ${reading.remainingTime},
-            ${reading.temperature || 0},
-            ${reading.status || 'unknown'},
-            ${JSON.stringify(reading.rawData || {})},
+            $1,
+            $2,
+            $3,
+            $4,
+            $5,
+            $6,
+            $7,
+            $8,
             NOW()
           )
           RETURNING id
-        `
+        `, [
+          device.id,
+          reading.batteryLevel || 0,
+          reading.inputWatts || 0,
+          reading.outputWatts || 0,
+          reading.remainingTime,
+          reading.temperature || 0,
+          reading.status || 'unknown',
+          JSON.stringify(reading.rawData || {})
+        ])
 
         console.log(`✅ Saved reading for ${device.deviceSn} - Battery: ${reading.batteryLevel}%`)
         
@@ -121,7 +128,7 @@ export async function POST(_request: NextRequest) {
 
     console.log(`📊 Collection complete: ${successCount} success, ${errorCount} errors`)
 
-    return {
+    const result = {
       message: 'Reading collection completed',
       timestamp: new Date().toISOString(),
       summary: {
@@ -131,9 +138,8 @@ export async function POST(_request: NextRequest) {
       },
       results
     }
-  })
 
-  return NextResponse.json(result)
+    return NextResponse.json(result)
 
   } catch (error) {
     console.error('❌ Error in reading collection:', error)
