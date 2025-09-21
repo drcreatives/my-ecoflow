@@ -19,8 +19,10 @@ This is a full-stack Next.js dashboard for monitoring EcoFlow Delta 2 power stat
 - **API Endpoints**: All device endpoints functional with proper error handling
 
 ### ✅ **Database & Infrastructure**
-- **Supabase Database**: PostgreSQL database with Prisma ORM
+- **Supabase Database**: PostgreSQL database with direct connection (bypassing Prisma ORM)
 - **Complete Schema**: User, Device, DeviceReading, DeviceAlert tables
+- **Production-Ready**: Resolved Prisma prepared statement conflicts with direct pg library
+- **SSL Configuration**: Proper SSL handling for Supabase in production environment
 - **Client/Server Separation**: Proper Next.js App Router configuration
 - **Environment Setup**: All credentials configured and validated
 
@@ -28,6 +30,12 @@ This is a full-stack Next.js dashboard for monitoring EcoFlow Delta 2 power stat
 - **Comprehensive Test Suite**: Multiple API testing endpoints
 - **Debug Tools**: Detailed logging and error tracking
 - **Validation**: Database, authentication, and API connection testing
+
+### ✅ **Production Issues Resolved**
+- **Prepared Statement Conflicts**: Completely bypassed Prisma ORM with direct pg library to eliminate serverless prepared statement naming conflicts
+- **SSL Certificate Configuration**: Properly configured SSL settings for Supabase production environment
+- **Serverless Compatibility**: Optimized database connections for Vercel serverless functions
+- **Error Handling**: Comprehensive error tracking and resolution for production stability
 
 ## Tech Stack & Architecture
 
@@ -38,7 +46,7 @@ This is a full-stack Next.js dashboard for monitoring EcoFlow Delta 2 power stat
 - **Forms**: Formik + Yup validation
 - **Animations**: GSAP
 - **Icons**: Lucide React
-- **Database**: Supabase (PostgreSQL) with Prisma ORM
+- **Database**: Supabase (PostgreSQL) with direct pg library connection (Prisma ORM bypassed for production stability)
 - **Authentication**: Supabase Auth (fully implemented)
 - **API Integration**: EcoFlow API (fully working)
 - **Deployment**: Vercel
@@ -62,6 +70,7 @@ src/
 │   └── LogoutButton.tsx          # Auth controls ✅
 ├── lib/                          # Utility functions and configs
 │   ├── ecoflow-api.ts           # Working EcoFlow API wrapper ✅
+│   ├── database.ts              # Direct PostgreSQL connection ✅
 │   ├── supabase.ts              # Supabase client ✅
 │   ├── supabase-server.ts       # Server-side Supabase ✅
 │   └── env-validation.ts        # Environment validation ✅
@@ -126,7 +135,17 @@ const devices = await api.getDeviceList()
 // Returns: [{ sn: 'R331ZKB5SG7V0293', deviceName: "Daniel Runor's DELTA 2", online: 1 }]
 ```
 
-### 🗄️ **Database Schema**
+### 🗄️ **Database Schema & Direct Connection**
+```typescript
+// Direct PostgreSQL connection (bypasses Prisma prepared statement conflicts)
+import { executeQuery } from '@/lib/database'
+
+// Example query using direct connection
+const devices = await executeQuery<Device[]>(
+  'SELECT * FROM devices WHERE user_id = $1',
+  [userId]
+)
+```
 ```prisma
 model User {
   id        String   @id @default(uuid())
@@ -298,36 +317,57 @@ interface APIError {
 
 ## Database Patterns
 
-### Prisma Schema Conventions
-```prisma
-// Use descriptive model names
-model DeviceReading {
-  id         String   @id @default(uuid())
-  deviceId   String
-  device     Device   @relation(fields: [deviceId], references: [id])
-  batteryLevel Int
-  inputWatts   Decimal  @db.Decimal(10, 2)
-  recordedAt   DateTime @default(now())
-  
-  @@index([deviceId, recordedAt(sort: Desc)])
-}
-```
-
-### Database Query Patterns
+### Direct PostgreSQL Connection (Production-Ready)
 ```typescript
-// Use Prisma client with proper error handling
+// IMPORTANT: Use direct pg library instead of Prisma for production
+import { executeQuery } from '@/lib/database'
+
+// Direct query execution (no prepared statement conflicts)
 const getDeviceReadings = async (deviceId: string, limit = 100) => {
   try {
-    return await prisma.deviceReading.findMany({
-      where: { deviceId },
-      orderBy: { recordedAt: 'desc' },
-      take: limit,
-      include: { device: true },
-    });
+    return await executeQuery<DeviceReading[]>(
+      `SELECT 
+        device_id as "deviceId",
+        battery_level as "batteryLevel", 
+        input_watts as "inputWatts",
+        output_watts as "outputWatts",
+        recorded_at as "recordedAt"
+      FROM device_readings 
+      WHERE device_id = $1 
+      ORDER BY recorded_at DESC 
+      LIMIT $2`,
+      [deviceId, limit]
+    );
   } catch (error) {
     throw new DatabaseError('Failed to fetch device readings', error);
   }
 };
+```
+
+### SSL Configuration for Production
+```typescript
+// Database connection with SSL for Supabase
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? {
+    rejectUnauthorized: false // Required for Supabase
+  } : false
+})
+```
+
+### Critical Production Notes
+```typescript
+// IMPORTANT: Prisma ORM causes prepared statement conflicts in serverless
+// Use direct PostgreSQL queries instead:
+
+// ❌ AVOID: Prisma in production serverless
+const data = await prisma.device.findMany()
+
+// ✅ USE: Direct PostgreSQL connection
+const data = await executeQuery<Device[]>(
+  'SELECT * FROM devices WHERE user_id = $1',
+  [userId]
+)
 ```
 
 ## UI/UX Guidelines
@@ -395,8 +435,9 @@ const animateCard = (element: HTMLElement) => {
 
 3. **Complete Database Infrastructure**
    - Supabase PostgreSQL database
-   - Prisma ORM with full schema
+   - Direct pg library connection (bypassing Prisma ORM for production stability)
    - User, Device, DeviceReading, DeviceAlert tables
+   - SSL configuration for production environment
    - Client/server separation for Next.js App Router
 
 4. **Comprehensive Testing Suite**
@@ -404,6 +445,12 @@ const animateCard = (element: HTMLElement) => {
    - Authentication flow testing
    - Database connection validation
    - Environment variable verification
+
+#### 🚀 **Production Stability Achieved**:
+- **Prepared Statement Conflicts**: Completely resolved by bypassing Prisma ORM
+- **SSL Certificate Issues**: Fixed with proper Supabase SSL configuration
+- **Serverless Compatibility**: Optimized for Vercel deployment environment
+- **API Endpoints**: All critical endpoints (monitor-readings, devices, collect-readings) fully functional
 
 ### Development Commands
 ```bash
@@ -425,6 +472,7 @@ curl http://localhost:3002/api/test-ecoflow
 - ✅ `src/lib/ecoflow-api.ts` - Working API wrapper (COMPLETED)
 - ✅ `src/components/AuthWrapper.tsx` - Route protection (COMPLETED)
 - ✅ `src/lib/supabase.ts` - Auth client (COMPLETED)
+- ✅ `src/lib/database.ts` - Direct PostgreSQL connection (COMPLETED)
 - ✅ `prisma/schema.prisma` - Database schema (COMPLETED)
 - ✅ `.env.local` - All credentials configured (COMPLETED)
 
