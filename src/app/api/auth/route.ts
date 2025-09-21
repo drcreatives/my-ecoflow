@@ -4,9 +4,9 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
-    const body = await request.json()
+    const body = await _request.json()
     const { email, password, action } = body
 
     if (!email || !password) {
