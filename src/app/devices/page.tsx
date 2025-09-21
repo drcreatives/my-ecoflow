@@ -369,6 +369,28 @@ const DevicesPage = () => {
                     {filteredDevices.map((device) => (
                       <DeviceCard key={device.id} device={device} />
                     ))}
+                    
+                    {/* Add Device Card */}
+                    <Link 
+                      href="/devices/add"
+                      className="bg-primary-dark rounded-lg border-2 border-dashed border-gray-700 hover:border-accent-green transition-all duration-200 group"
+                    >
+                      <div className="p-6 h-full flex flex-col items-center justify-center text-center min-h-[300px]">
+                        <div className="w-16 h-16 bg-gray-800 group-hover:bg-accent-green/20 rounded-full flex items-center justify-center mb-4 transition-colors">
+                          <Plus size={32} className="text-gray-400 group-hover:text-accent-green transition-colors" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-400 group-hover:text-white transition-colors mb-2">
+                          Add Another Device
+                        </h3>
+                        <p className="text-sm text-gray-500 group-hover:text-gray-300 transition-colors mb-4">
+                          Connect more EcoFlow devices to your dashboard
+                        </p>
+                        <div className="bg-accent-green hover:bg-accent-green/90 text-black font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2">
+                          <Plus size={16} />
+                          Add Device
+                        </div>
+                      </div>
+                    </Link>
                   </div>
                 ) : (
                   <div className="text-center py-12">
@@ -411,6 +433,15 @@ const DevicesPage = () => {
             )}
           </div>
         </div>
+
+        {/* Floating Action Button */}
+        <Link
+          href="/devices/add"
+          className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-accent-green hover:bg-accent-green/90 text-black rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center group"
+          title="Add Device"
+        >
+          <Plus size={24} className="group-hover:scale-110 transition-transform" />
+        </Link>
       </AppLayout>
     </AuthWrapper>
   );
