@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
 
 // Helper function to ensure user exists in our database
 async function ensureUserInDatabase(userId: string, email: string) {
   try {
-    await prisma.$connect()
+    console.log('🔄 Ensuring user exists in database:', userId, email)
     
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
@@ -32,8 +30,6 @@ async function ensureUserInDatabase(userId: string, email: string) {
   } catch (dbError) {
     console.error('❌ Database user creation error:', dbError)
     throw dbError
-  } finally {
-    await prisma.$disconnect()
   }
 }
 
