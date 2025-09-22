@@ -146,31 +146,61 @@ export async function GET(request: NextRequest) {
     // Apply aggregation
     let aggregatedQuery = baseQuery
     if (params.aggregation && params.aggregation !== 'raw') {
-      const interval = params.aggregation === '5m' ? '5 minutes' :
-                      params.aggregation === '1h' ? '1 hour' :
-                      params.aggregation === '1d' ? '1 day' : '1 hour'
-
-      aggregatedQuery = `
-        SELECT 
-          MIN(dr.id) as id,
-          dr.device_id as "deviceId",
-          AVG(dr.battery_level) as "batteryLevel",
-          AVG(dr.input_watts) as "inputWatts",
-          AVG(dr.output_watts) as "outputWatts",
-          AVG(dr.temperature) as "temperature",
-          AVG(dr.remaining_time) as "remainingTime",
-          MODE() WITHIN GROUP (ORDER BY dr.status) as status,
-          date_trunc('${interval.split(' ')[1]}', dr.recorded_at) + 
-          INTERVAL '${interval}' * FLOOR(EXTRACT(${interval.split(' ')[1] === 'minutes' ? 'minute' : interval.split(' ')[1] === 'hour' ? 'hour' : 'day'} FROM dr.recorded_at) / ${interval.split(' ')[0]}) as "recordedAt"
-        FROM device_readings dr
-        JOIN devices d ON dr.device_id = d.id
-        WHERE d.user_id = $1
-          AND dr.recorded_at >= $2
-          AND dr.recorded_at <= $3
-        ${params.deviceId && params.deviceId !== 'all' ? `AND dr.device_id = $${queryParams.length}` : ''}
-        GROUP BY dr.device_id, date_trunc('${interval.split(' ')[1]}', dr.recorded_at) + 
-                 INTERVAL '${interval}' * FLOOR(EXTRACT(${interval.split(' ')[1] === 'minutes' ? 'minute' : interval.split(' ')[1] === 'hour' ? 'hour' : 'day'} FROM dr.recorded_at) / ${interval.split(' ')[0]})
-      `
+      const truncInterval = params.aggregation === '5m' ? 'hour' :  // For 5min, truncate to hour then group by 5min intervals
+                           params.aggregation === '1h' ? 'hour' :
+                           params.aggregation === '1d' ? 'day' : 'hour'
+      
+      if (params.aggregation === '5m') {
+        // For 5-minute intervals, group by 5-minute buckets within each hour
+        aggregatedQuery = `
+          SELECT 
+            MIN(dr.id) as id,
+            dr.device_id as "deviceId",
+            AVG(dr.battery_level) as "batteryLevel",
+            AVG(dr.input_watts) as "inputWatts",
+            AVG(dr.output_watts) as "outputWatts",
+            AVG(dr.ac_output_watts) as "acOutputWatts",
+            AVG(dr.dc_output_watts) as "dcOutputWatts",
+            AVG(dr.usb_output_watts) as "usbOutputWatts",
+            AVG(dr.temperature) as "temperature",
+            AVG(dr.remaining_time) as "remainingTime",
+            MODE() WITHIN GROUP (ORDER BY dr.status) as status,
+            date_trunc('hour', dr.recorded_at) + 
+            INTERVAL '5 minutes' * FLOOR(EXTRACT(minute FROM dr.recorded_at) / 5) as "recordedAt"
+          FROM device_readings dr
+          JOIN devices d ON dr.device_id = d.id
+          WHERE d.user_id = $1
+            AND dr.recorded_at >= $2
+            AND dr.recorded_at <= $3
+          ${params.deviceId && params.deviceId !== 'all' ? `AND dr.device_id = $${queryParams.length}` : ''}
+          GROUP BY dr.device_id, date_trunc('hour', dr.recorded_at) + 
+                   INTERVAL '5 minutes' * FLOOR(EXTRACT(minute FROM dr.recorded_at) / 5)
+        `
+      } else {
+        // For hourly and daily intervals, use simple date_trunc
+        aggregatedQuery = `
+          SELECT 
+            MIN(dr.id) as id,
+            dr.device_id as "deviceId",
+            AVG(dr.battery_level) as "batteryLevel",
+            AVG(dr.input_watts) as "inputWatts",
+            AVG(dr.output_watts) as "outputWatts",
+            AVG(dr.ac_output_watts) as "acOutputWatts",
+            AVG(dr.dc_output_watts) as "dcOutputWatts",
+            AVG(dr.usb_output_watts) as "usbOutputWatts",
+            AVG(dr.temperature) as "temperature",
+            AVG(dr.remaining_time) as "remainingTime",
+            MODE() WITHIN GROUP (ORDER BY dr.status) as status,
+            date_trunc('${truncInterval}', dr.recorded_at) as "recordedAt"
+          FROM device_readings dr
+          JOIN devices d ON dr.device_id = d.id
+          WHERE d.user_id = $1
+            AND dr.recorded_at >= $2
+            AND dr.recorded_at <= $3
+          ${params.deviceId && params.deviceId !== 'all' ? `AND dr.device_id = $${queryParams.length}` : ''}
+          GROUP BY dr.device_id, date_trunc('${truncInterval}', dr.recorded_at)
+        `
+      }
     }
 
     // Add ordering and limits
