@@ -136,10 +136,34 @@ function SettingsPage() {
         console.error('Failed to load profile:', await profileResponse.text())
       }
       
-      // Load saved settings from localStorage if available
-      const savedNotifications = localStorage.getItem('notificationSettings')
-      if (savedNotifications) {
-        setNotificationSettings(JSON.parse(savedNotifications))
+      // Load notification settings from API
+      try {
+        const notificationResponse = await fetch('/api/user/notifications')
+        if (notificationResponse.ok) {
+          const { settings } = await notificationResponse.json()
+          setNotificationSettings({
+            deviceAlerts: settings.deviceAlerts,
+            lowBattery: settings.lowBattery,
+            powerThreshold: settings.powerThreshold,
+            systemUpdates: settings.systemUpdates,
+            weeklyReports: settings.weeklyReports,
+            emailNotifications: settings.emailNotifications,
+            pushNotifications: settings.pushNotifications
+          })
+        } else {
+          // Fallback to localStorage if API fails
+          const savedNotifications = localStorage.getItem('notificationSettings')
+          if (savedNotifications) {
+            setNotificationSettings(JSON.parse(savedNotifications))
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load notification settings:', error)
+        // Fallback to localStorage
+        const savedNotifications = localStorage.getItem('notificationSettings')
+        if (savedNotifications) {
+          setNotificationSettings(JSON.parse(savedNotifications))
+        }
       }
       
       const savedDataSettings = localStorage.getItem('dataSettings')
@@ -183,6 +207,32 @@ function SettingsPage() {
         } else {
           const error = await response.json()
           toast.error(error.error || 'Failed to update profile')
+        }
+      } else if (settingsType === 'notificationSettings') {
+        // Save notification settings via API
+        const response = await fetch('/api/user/notifications', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(settings)
+        })
+        
+        if (response.ok) {
+          const { settings: updatedSettings } = await response.json()
+          setNotificationSettings({
+            deviceAlerts: updatedSettings.deviceAlerts,
+            lowBattery: updatedSettings.lowBattery,
+            powerThreshold: updatedSettings.powerThreshold,
+            systemUpdates: updatedSettings.systemUpdates,
+            weeklyReports: updatedSettings.weeklyReports,
+            emailNotifications: updatedSettings.emailNotifications,
+            pushNotifications: updatedSettings.pushNotifications
+          })
+          toast.success('Notification settings updated successfully')
+        } else {
+          const error = await response.json()
+          toast.error(error.error || 'Failed to update notification settings')
         }
       } else {
         // Save other settings to localStorage for now (will be API later)
@@ -228,30 +278,40 @@ function SettingsPage() {
     }
   }
 
-  const exportData = async () => {
+  const exportData = async (format: string = 'json') => {
     setSaving(true)
     try {
-      // Simulate data export
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Call our data export API
+      const response = await fetch(`/api/user/export?format=${format}`)
       
-      const exportData = {
-        profile: userProfile,
-        notifications: notificationSettings,
-        dataSettings: dataSettings,
-        exportedAt: new Date().toISOString()
+      if (!response.ok) {
+        throw new Error('Failed to export data')
       }
+
+      // Get the filename from the response headers
+      const contentDisposition = response.headers.get('content-disposition')
+      let filename = `ecoflow-export-${new Date().toISOString().split('T')[0]}.${format}`
       
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="([^"]+)"/)
+        if (filenameMatch) {
+          filename = filenameMatch[1]
+        }
+      }
+
+      // Create download
+      const blob = await response.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `ecoflow-settings-${new Date().toISOString().split('T')[0]}.json`
+      a.download = filename
       a.click()
       URL.revokeObjectURL(url)
       
-      toast.success('Settings exported successfully')
+      toast.success(`Data exported successfully as ${format.toUpperCase()}`)
     } catch (error) {
-      toast.error('Failed to export settings')
+      console.error('Export error:', error)
+      toast.error('Failed to export data')
     } finally {
       setSaving(false)
     }
@@ -392,7 +452,7 @@ function SettingsPage() {
                       <h3 className="text-lg font-semibold text-white mb-4">Account Actions</h3>
                       <div className="space-y-3">
                         <button
-                          onClick={exportData}
+                          onClick={() => exportData('json')}
                           disabled={saving}
                           className="flex items-center gap-2 text-accent-green hover:text-accent-green/80 transition-colors"
                         >
@@ -614,12 +674,20 @@ function SettingsPage() {
                       <h3 className="text-lg font-semibold text-white mb-4">Data Export</h3>
                       <div className="space-y-3">
                         <button
-                          onClick={exportData}
+                          onClick={() => exportData('json')}
                           disabled={saving}
                           className="flex items-center gap-2 text-accent-green hover:text-accent-green/80 transition-colors"
                         >
                           <Download size={16} />
-                          Export All Data
+                          Export All Data (JSON)
+                        </button>
+                        <button
+                          onClick={() => exportData('csv')}
+                          disabled={saving}
+                          className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors"
+                        >
+                          <Download size={16} />
+                          Export Readings (CSV)
                         </button>
                         <div className="text-sm text-gray-400">
                           Download a complete copy of your data including device readings, settings, and profile information.
