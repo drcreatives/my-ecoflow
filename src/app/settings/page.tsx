@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { 
   Settings,
   User,
@@ -20,11 +21,9 @@ import {
   Save,
   Eye,
   EyeOff,
-  AlertTriangle,
-  CheckCircle,
-  X,
   ChevronRight,
-  Loader2
+  Loader2,
+  AlertTriangle
 } from 'lucide-react'
 import { AppLayout } from '@/components/layout'
 import AuthWrapper from '@/components/AuthWrapper'
@@ -71,7 +70,6 @@ function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   
   // Settings state
   const [userProfile, setUserProfile] = useState<UserProfile>({
@@ -124,16 +122,19 @@ function SettingsPage() {
   const loadUserSettings = async () => {
     setLoading(true)
     try {
-      // Load user profile and settings from the server
-      // This would be an API call in a real app
-      
-      // For now, simulate loading user data
-      setUserProfile({
-        email: user?.email || '',
-        firstName: '',
-        lastName: '',
-        createdAt: '2025-09-21'
-      })
+      // Load user profile from API
+      const profileResponse = await fetch('/api/user/profile')
+      if (profileResponse.ok) {
+        const { profile } = await profileResponse.json()
+        setUserProfile({
+          email: profile.email,
+          firstName: profile.firstName || '',
+          lastName: profile.lastName || '',
+          createdAt: profile.createdAt
+        })
+      } else {
+        console.error('Failed to load profile:', await profileResponse.text())
+      }
       
       // Load saved settings from localStorage if available
       const savedNotifications = localStorage.getItem('notificationSettings')
@@ -153,7 +154,7 @@ function SettingsPage() {
       
     } catch (error) {
       console.error('Failed to load settings:', error)
-      setMessage({ type: 'error', text: 'Failed to load settings' })
+      toast.error('Failed to load settings')
     } finally {
       setLoading(false)
     }
@@ -162,17 +163,35 @@ function SettingsPage() {
   const saveSettings = async (settingsType: string, settings: any) => {
     setSaving(true)
     try {
-      // Save settings to localStorage (in a real app, this would be an API call)
-      localStorage.setItem(settingsType, JSON.stringify(settings))
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      setMessage({ type: 'success', text: 'Settings saved successfully' })
-      setTimeout(() => setMessage(null), 3000)
+      if (settingsType === 'userProfile') {
+        // Save user profile via API
+        const response = await fetch('/api/user/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            firstName: settings.firstName,
+            lastName: settings.lastName
+          })
+        })
+        
+        if (response.ok) {
+          const { profile } = await response.json()
+          setUserProfile(profile)
+          toast.success('Profile updated successfully')
+        } else {
+          const error = await response.json()
+          toast.error(error.error || 'Failed to update profile')
+        }
+      } else {
+        // Save other settings to localStorage for now (will be API later)
+        localStorage.setItem(settingsType, JSON.stringify(settings))
+        toast.success('Settings saved successfully')
+      }
     } catch (error) {
       console.error('Failed to save settings:', error)
-      setMessage({ type: 'error', text: 'Failed to save settings' })
+      toast.error('Failed to save settings')
     } finally {
       setSaving(false)
     }
@@ -180,12 +199,12 @@ function SettingsPage() {
 
   const handlePasswordChange = async () => {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setMessage({ type: 'error', text: 'New passwords do not match' })
+      toast.error('New passwords do not match')
       return
     }
     
     if (passwordForm.newPassword.length < 8) {
-      setMessage({ type: 'error', text: 'Password must be at least 8 characters long' })
+      toast.error('Password must be at least 8 characters long')
       return
     }
     
@@ -201,9 +220,9 @@ function SettingsPage() {
       
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
       setShowPasswordForm(false)
-      setMessage({ type: 'success', text: 'Password changed successfully' })
+      toast.success('Password changed successfully')
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to change password' })
+      toast.error('Failed to change password')
     } finally {
       setSaving(false)
     }
@@ -230,9 +249,9 @@ function SettingsPage() {
       a.click()
       URL.revokeObjectURL(url)
       
-      setMessage({ type: 'success', text: 'Settings exported successfully' })
+      toast.success('Settings exported successfully')
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to export settings' })
+      toast.error('Failed to export settings')
     } finally {
       setSaving(false)
     }
@@ -270,24 +289,6 @@ function SettingsPage() {
               <p className="text-gray-400">Manage your account and app preferences</p>
             </div>
           </div>
-
-          {/* Message Display */}
-          {message && (
-            <div className={cn(
-              "mb-6 p-4 rounded-lg flex items-center gap-2",
-              message.type === 'success' ? "bg-green-900/20 border border-green-600 text-green-400" :
-              "bg-red-900/20 border border-red-600 text-red-400"
-            )}>
-              {message.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
-              <span>{message.text}</span>
-              <button
-                onClick={() => setMessage(null)}
-                className="ml-auto hover:opacity-70"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Sidebar Navigation */}
