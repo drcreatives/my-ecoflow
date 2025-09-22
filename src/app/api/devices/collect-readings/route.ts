@@ -65,6 +65,15 @@ export async function POST(_request: NextRequest) {
           continue
         }
         
+        // DEBUG: Log the transformed reading values
+        console.log(`🔍 [DEBUG] Transformed reading for ${device.deviceSn}:`, {
+          acOutputWatts: reading.acOutputWatts,
+          dcOutputWatts: reading.dcOutputWatts,
+          usbOutputWatts: reading.usbOutputWatts,
+          outputWatts: reading.outputWatts,
+          batteryLevel: reading.batteryLevel
+        })
+        
         // Save to database using direct PostgreSQL
         const savedReading = await executeQuery<{
           id: string
@@ -115,6 +124,7 @@ export async function POST(_request: NextRequest) {
         ])
 
         console.log(`✅ Saved reading for ${device.deviceSn} - Battery: ${reading.batteryLevel}%`)
+        console.log(`🔍 [DEBUG] Inserted values: AC:${reading.acOutputWatts}, DC:${reading.dcOutputWatts}, USB:${reading.usbOutputWatts}`)
         
         results.push({
           deviceSn: device.deviceSn,

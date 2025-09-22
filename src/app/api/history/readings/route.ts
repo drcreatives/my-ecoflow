@@ -116,9 +116,9 @@ export async function GET(request: NextRequest) {
         dr.battery_level as "batteryLevel",
         dr.input_watts as "inputWatts",
         dr.output_watts as "outputWatts",
-        COALESCE(dr.ac_output_watts, 0) as "acOutputWatts",
-        COALESCE(dr.dc_output_watts, 0) as "dcOutputWatts",
-        COALESCE(dr.usb_output_watts, 0) as "usbOutputWatts",
+        dr.ac_output_watts as "acOutputWatts",
+        dr.dc_output_watts as "dcOutputWatts",
+        dr.usb_output_watts as "usbOutputWatts",
         dr.temperature,
         dr.remaining_time as "remainingTime",
         dr.status,
@@ -198,56 +198,17 @@ export async function GET(request: NextRequest) {
       endTime: endTime.toISOString()
     })
 
-    // Transform readings and extract AC/DC/USB breakdown from rawData
+    // Transform readings - use database column values for AC/DC/USB breakdown
     const readings: DeviceReading[] = rawReadings.map(reading => {
-      let acOutputWatts: number | null = null
-      let dcOutputWatts: number | null = null
-      let usbOutputWatts: number | null = null
-
-      // Try to extract breakdown from rawData JSON
-      if (reading.rawData && typeof reading.rawData === 'object') {
-        try {
-          const rawData = reading.rawData
-          
-          // Extract AC output (various possible field names)
-          acOutputWatts = rawData.acOutputWatts || 
-                         rawData.acInvOutWatts || 
-                         rawData['acInvOutWatts'] ||
-                         rawData.quota?.acInvOutWatts ||
-                         null
-
-          // Extract DC output
-          dcOutputWatts = rawData.dcOutputWatts || 
-                         rawData.dcOutWatts || 
-                         rawData['dcOutWatts'] ||
-                         rawData.quota?.dcOutWatts ||
-                         null
-
-          // Extract USB output
-          usbOutputWatts = rawData.usbOutputWatts || 
-                          rawData.usbOutWatts || 
-                          rawData['usbOutWatts'] ||
-                          rawData.quota?.usbOutWatts ||
-                          null
-
-          // Convert to numbers if they exist
-          if (acOutputWatts !== null) acOutputWatts = Number(acOutputWatts)
-          if (dcOutputWatts !== null) dcOutputWatts = Number(dcOutputWatts)
-          if (usbOutputWatts !== null) usbOutputWatts = Number(usbOutputWatts)
-        } catch (e) {
-          console.error('Error parsing rawData for breakdown:', e)
-        }
-      }
-
       return {
         id: reading.id,
         deviceId: reading.deviceId,
         batteryLevel: reading.batteryLevel ? Number(reading.batteryLevel) : null,
         inputWatts: reading.inputWatts ? Number(reading.inputWatts) : null,
         outputWatts: reading.outputWatts ? Number(reading.outputWatts) : null,
-        acOutputWatts,
-        dcOutputWatts,
-        usbOutputWatts,
+        acOutputWatts: reading.acOutputWatts ? Number(reading.acOutputWatts) : null,
+        dcOutputWatts: reading.dcOutputWatts ? Number(reading.dcOutputWatts) : null,
+        usbOutputWatts: reading.usbOutputWatts ? Number(reading.usbOutputWatts) : null,
         temperature: reading.temperature ? Number(reading.temperature) : null,
         remainingTime: reading.remainingTime,
         status: reading.status,
