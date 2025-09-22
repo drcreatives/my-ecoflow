@@ -59,8 +59,14 @@ export async function GET(_request: NextRequest) {
               outputWatts: getQuotaValue('pd.wattsOutSum') || getQuotaValue('inv.outputWatts') || 0, // Total output (AC + DC)
               // Granular power output breakdown
               acOutputWatts: getQuotaValue('inv.outputWatts') || getQuotaValue('inv.acWattsOut') || 0,
-              dcOutputWatts: getQuotaValue('mppt.outWatts') || getQuotaValue('pd.dcOutWatts') || 0,
-              usbOutputWatts: getQuotaValue('pd.usbWatts') || getQuotaValue('pd.usb1Watts') || 0,
+              dcOutputWatts: getQuotaValue('pd.carWatts') || getQuotaValue('mppt.outWatts') || getQuotaValue('pd.dcOutWatts') || 0,
+              // USB Output (combine all USB sources like in transformQuotaToReading)
+              usbOutputWatts: (getQuotaValue('pd.usb1Watts') || 0) + 
+                             (getQuotaValue('pd.usb2Watts') || 0) + 
+                             (getQuotaValue('pd.typec1Watts') || 0) + 
+                             (getQuotaValue('pd.typec2Watts') || 0) + 
+                             (getQuotaValue('pd.qcUsb1Watts') || 0) + 
+                             (getQuotaValue('pd.qcUsb2Watts') || 0),
               temperature: getQuotaValue('bms_bmsStatus.temp') || 20,
               remainingTime: getQuotaValue('pd.remainTime') || null,
               status: 'connected'
@@ -76,6 +82,9 @@ export async function GET(_request: NextRequest) {
                     battery_level: currentReading.batteryLevel,
                     input_watts: currentReading.inputWatts,
                     output_watts: currentReading.outputWatts,
+                    ac_output_watts: currentReading.acOutputWatts,
+                    dc_output_watts: currentReading.dcOutputWatts,
+                    usb_output_watts: currentReading.usbOutputWatts,
                     remaining_time: currentReading.remainingTime,
                     temperature: currentReading.temperature,
                     status: currentReading.status,
@@ -101,6 +110,9 @@ export async function GET(_request: NextRequest) {
             batteryLevel: 62, // Consistent realistic battery level
             inputWatts: 0, // Not charging currently
             outputWatts: 45, // Moderate load (laptop + small devices)
+            acOutputWatts: 35, // AC output (laptop charger)
+            dcOutputWatts: 8, // DC output (car port charging)
+            usbOutputWatts: 2, // USB output (phone charging)
             temperature: 24, // Room temperature
             remainingTime: 180, // 3 hours at current usage
             status: ecoDevice.online === 1 ? 'connected' : 'offline'
