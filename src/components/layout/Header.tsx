@@ -36,15 +36,13 @@ export const Header = ({ title }: HeaderProps) => {
       <div className="flex items-center justify-between">
         {/* Left side */}
         <div className="flex items-center gap-2 sm:gap-4">
-          {isMobile && (
-            <button
-              onClick={toggleSidebar}
-              className="p-2 text-accent-gray hover:bg-gray-700 rounded-md transition-colors touch-manipulation"
-              aria-label="Toggle navigation menu"
-            >
-              <Menu size={20} />
-            </button>
-          )}
+          <button
+            onClick={toggleSidebar}
+            className="p-2 text-accent-gray hover:bg-gray-700 rounded-md transition-colors touch-manipulation"
+            aria-label="Toggle navigation menu"
+          >
+            <Menu size={20} />
+          </button>
           
           <div className="flex flex-col gap-1">
             <h1 className="text-lg sm:text-xl font-bold text-accent-gray">
