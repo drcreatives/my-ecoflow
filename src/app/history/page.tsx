@@ -27,13 +27,6 @@ import AuthWrapper from '@/components/AuthWrapper'
 import { useDeviceStore } from '@/stores/deviceStore'
 import { DeviceReading } from '@/lib/data-utils'
 import { cn } from '@/lib/utils'
-import { 
-  CombinedChart, 
-  PowerUsageChart, 
-  BatteryLevelChart, 
-  TemperatureChart,
-  transformReadingsToChartData 
-} from '@/components/charts/HistoryCharts'
 
 // Types for history data
 interface HistoryFilters {
@@ -80,6 +73,10 @@ function HistoryPage() {
   // UI state
   const [showFilters, setShowFilters] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   // Device options for dropdown
   const deviceOptions: DeviceOption[] = [
@@ -93,6 +90,17 @@ function HistoryPage() {
   ]
 
   const selectedDevice = deviceOptions.find(d => d.id === filters.deviceId)
+
+  // Pagination calculations
+  const totalPages = Math.ceil(readings.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedReadings = readings.slice(startIndex, endIndex)
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filters])
 
   // Fetch devices on mount
   useEffect(() => {
@@ -130,7 +138,9 @@ function HistoryPage() {
       }
 
       // Fetch data from API
-      const response = await fetch(`/api/history/readings?${params.toString()}`)
+      const response = await fetch(`/api/history/readings?${params.toString()}`, {
+        credentials: 'include'
+      })
       const data = await response.json()
 
       if (!data.success) {
@@ -150,13 +160,13 @@ function HistoryPage() {
       console.error('Error fetching history data:', err)
       setError(err instanceof Error ? err.message : 'Failed to load historical data')
       
-      // Fallback to mock data for development
-      console.log('Falling back to mock data for development')
-      const mockReadings: DeviceReading[] = generateMockHistoryData()
-      const mockSummary: HistorySummary = calculateSummary(mockReadings)
-      setReadings(mockReadings)
-      setSummary(mockSummary)
-      setLastUpdated(new Date())
+      // For debugging: Log the exact error details
+      console.log('API Response Error Details:', {
+        error: err,
+        deviceId: filters.deviceId,
+        timeRange: filters.timeRange,
+        aggregation: filters.aggregation
+      })
     } finally {
       setIsLoading(false)
     }
@@ -174,12 +184,20 @@ function HistoryPage() {
 
     for (let i = hoursBack; i >= 0; i--) {
       const timestamp = new Date(now.getTime() - i * 60 * 60 * 1000)
+      const totalOutput = Math.max(0, 300 + Math.cos(i / 8) * 200)
+      const acOutput = Math.max(0, totalOutput * 0.6) // 60% AC
+      const dcOutput = Math.max(0, totalOutput * 0.3) // 30% DC  
+      const usbOutput = Math.max(0, totalOutput * 0.1) // 10% USB
+      
       readings.push({
         id: `reading-${i}`,
         deviceId: devices[0]?.id || 'mock-device',
         batteryLevel: Math.max(20, Math.min(100, 80 + Math.sin(i / 10) * 20)),
         inputWatts: Math.max(0, 200 + Math.sin(i / 5) * 150),
-        outputWatts: Math.max(0, 300 + Math.cos(i / 8) * 200),
+        outputWatts: totalOutput,
+        acOutputWatts: acOutput,
+        dcOutputWatts: dcOutput,
+        usbOutputWatts: usbOutput,
         temperature: 25 + Math.sin(i / 12) * 8,
         remainingTime: Math.floor(Math.random() * 600) + 120,
         status: 'normal',
@@ -235,6 +253,7 @@ function HistoryPage() {
         headers: {
           'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({
           format: 'csv',
           filters: {
@@ -352,11 +371,11 @@ function HistoryPage() {
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 text-accent-green">
                   <BarChart3 size={28} />
-                  <h1 className="text-2xl sm:text-3xl font-bold">History & Analytics</h1>
+                  <h1 className="text-2xl sm:text-3xl font-bold">Historical Data</h1>
                 </div>
               </div>
               <p className="text-gray-400">
-                Historical device data and usage trends
+                Detailed device readings and power consumption data
               </p>
               {lastUpdated && (
                 <p className="text-xs text-gray-500">
@@ -562,24 +581,26 @@ function HistoryPage() {
             </div>
           )}
 
-          {/* Charts Section */}
-          <div className="bg-primary-dark border border-gray-700 rounded-lg p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-white">Power Usage Trends</h3>
-              <div className="text-sm text-gray-400">
-                Showing {getTimeRangeLabel(filters.timeRange)} • {selectedDevice?.name}
+          {/* Data Table Section */}
+          <div className="bg-primary-dark border border-gray-700 rounded-lg">
+            <div className="p-6 border-b border-gray-700">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-white">Device Readings History</h3>
+                <div className="text-sm text-gray-400">
+                  Showing {getTimeRangeLabel(filters.timeRange)} • {selectedDevice?.name}
+                </div>
               </div>
             </div>
-            
+
             {isLoading ? (
               <div className="flex items-center justify-center h-64">
                 <div className="text-center">
                   <Loader2 className="w-8 h-8 text-accent-green animate-spin mx-auto mb-4" />
-                  <p className="text-gray-400">Loading chart data...</p>
+                  <p className="text-gray-400">Loading historical data...</p>
                 </div>
               </div>
             ) : readings.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 text-center">
+              <div className="flex flex-col items-center justify-center h-64 text-center p-6">
                 <BarChart3 className="w-16 h-16 text-gray-600 mb-4" />
                 <h3 className="text-lg font-semibold text-gray-400 mb-2">No Historical Data</h3>
                 <p className="text-gray-500 mb-4">
@@ -594,42 +615,158 @@ function HistoryPage() {
                 </Link>
               </div>
             ) : (
-              <CombinedChart 
-                data={transformReadingsToChartData(readings)} 
-                height={400}
-                defaultChart="power"
-              />
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-800/50">
+                    <tr>
+                      <th className="text-left p-4 text-sm font-medium text-gray-300">Timestamp</th>
+                      <th className="text-left p-4 text-sm font-medium text-gray-300">Device</th>
+                      <th className="text-left p-4 text-sm font-medium text-gray-300">Battery</th>
+                      <th className="text-left p-4 text-sm font-medium text-gray-300">Input Power</th>
+                      <th className="text-left p-4 text-sm font-medium text-gray-300">Output Power</th>
+                      <th className="text-left p-4 text-sm font-medium text-gray-300">AC Output</th>
+                      <th className="text-left p-4 text-sm font-medium text-gray-300">DC Output</th>
+                      <th className="text-left p-4 text-sm font-medium text-gray-300">USB Output</th>
+                      <th className="text-left p-4 text-sm font-medium text-gray-300">Temperature</th>
+                      <th className="text-left p-4 text-sm font-medium text-gray-300">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-700">
+                    {paginatedReadings.map((reading, index) => {
+                      const device = devices.find(d => d.id === reading.deviceId)
+                      return (
+                        <tr key={reading.id || index} className="hover:bg-gray-800/30 transition-colors">
+                          <td className="p-4 text-sm text-gray-300">
+                            {reading.recordedAt.toLocaleString()}
+                          </td>
+                          <td className="p-4 text-sm text-gray-300">
+                            <div className="flex flex-col">
+                              <span className="font-medium">{device?.deviceName || 'Unknown Device'}</span>
+                              <span className="text-xs text-gray-500">{device?.deviceSn || reading.deviceId}</span>
+                            </div>
+                          </td>
+                          <td className="p-4 text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${
+                                (reading.batteryLevel && typeof reading.batteryLevel === 'number' && reading.batteryLevel > 50) ? 'bg-green-400' :
+                                (reading.batteryLevel && typeof reading.batteryLevel === 'number' && reading.batteryLevel > 20) ? 'bg-yellow-400' : 'bg-red-400'
+                              }`} />
+                              <span className="text-white font-medium">
+                                {reading.batteryLevel && typeof reading.batteryLevel === 'number' ? reading.batteryLevel.toFixed(1) : '0'}%
+                              </span>
+                            </div>
+                          </td>
+                          <td className="p-4 text-sm text-purple-400 font-medium">
+                            {reading.inputWatts && typeof reading.inputWatts === 'number' ? reading.inputWatts.toFixed(0) : '0'}W
+                          </td>
+                          <td className="p-4 text-sm text-yellow-400 font-medium">
+                            {reading.outputWatts && typeof reading.outputWatts === 'number' ? reading.outputWatts.toFixed(0) : '0'}W
+                          </td>
+                          <td className="p-4 text-sm text-blue-400 font-medium">
+                            {reading.acOutputWatts && typeof reading.acOutputWatts === 'number' ? reading.acOutputWatts.toFixed(0) : '0'}W
+                          </td>
+                          <td className="p-4 text-sm text-orange-400 font-medium">
+                            {reading.dcOutputWatts && typeof reading.dcOutputWatts === 'number' ? reading.dcOutputWatts.toFixed(0) : '0'}W
+                          </td>
+                          <td className="p-4 text-sm text-green-400 font-medium">
+                            {reading.usbOutputWatts && typeof reading.usbOutputWatts === 'number' ? reading.usbOutputWatts.toFixed(0) : '0'}W
+                          </td>
+                          <td className="p-4 text-sm text-red-400 font-medium">
+                            {reading.temperature && typeof reading.temperature === 'number' ? reading.temperature.toFixed(1) : '0'}°C
+                          </td>
+                          <td className="p-4 text-sm">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              reading.status === 'normal' ? 'bg-green-900/50 text-green-300' :
+                              reading.status === 'charging' ? 'bg-blue-900/50 text-blue-300' :
+                              reading.status === 'discharging' ? 'bg-yellow-900/50 text-yellow-300' :
+                              'bg-gray-900/50 text-gray-300'
+                            }`}>
+                              {reading.status || 'unknown'}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {readings.length > 0 && (
+              <div className="p-4 border-t border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-sm text-gray-400">
+                  Showing {startIndex + 1}-{Math.min(endIndex, readings.length)} of {readings.length} readings
+                </div>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded border border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  
+                  {/* Page Numbers */}
+                  <div className="flex items-center gap-1">
+                    {/* First page */}
+                    {currentPage > 3 && (
+                      <>
+                        <button
+                          onClick={() => setCurrentPage(1)}
+                          className="w-8 h-8 flex items-center justify-center text-sm text-gray-300 hover:bg-gray-700 rounded border border-gray-600 transition-colors"
+                        >
+                          1
+                        </button>
+                        {currentPage > 4 && <span className="text-gray-500 px-1">...</span>}
+                      </>
+                    )}
+                    
+                    {/* Current page and neighbors */}
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
+                      if (pageNum > totalPages) return null
+                      
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`w-8 h-8 flex items-center justify-center text-sm rounded border transition-colors ${
+                            pageNum === currentPage
+                              ? 'bg-accent-green text-black border-accent-green'
+                              : 'text-gray-300 hover:bg-gray-700 border-gray-600'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      )
+                    })}
+                    
+                    {/* Last page */}
+                    {currentPage < totalPages - 2 && (
+                      <>
+                        {currentPage < totalPages - 3 && <span className="text-gray-500 px-1">...</span>}
+                        <button
+                          onClick={() => setCurrentPage(totalPages)}
+                          className="w-8 h-8 flex items-center justify-center text-sm text-gray-300 hover:bg-gray-700 rounded border border-gray-600 transition-colors"
+                        >
+                          {totalPages}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  
+                  <button 
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded border border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             )}
           </div>
-
-          {/* Additional Chart Views */}
-          {readings.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Battery Level Chart */}
-              <div className="bg-primary-dark border border-gray-700 rounded-lg p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Battery className="w-5 h-5 text-green-400" />
-                  <h3 className="text-lg font-semibold text-white">Battery Level</h3>
-                </div>
-                <BatteryLevelChart 
-                  data={transformReadingsToChartData(readings)} 
-                  height={250}
-                />
-              </div>
-
-              {/* Temperature Chart */}
-              <div className="bg-primary-dark border border-gray-700 rounded-lg p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Thermometer className="w-5 h-5 text-red-400" />
-                  <h3 className="text-lg font-semibold text-white">Temperature</h3>
-                </div>
-                <TemperatureChart 
-                  data={transformReadingsToChartData(readings)} 
-                  height={250}
-                />
-              </div>
-            </div>
-          )}
 
           {/* No Devices State */}
           {devices.length === 0 && (

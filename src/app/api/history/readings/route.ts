@@ -1,28 +1,25 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { executeQuery } from '@/lib/database'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
-
-// Types for API request/response
-interface HistoryQueryParams {
-  deviceId?: string
-  startDate?: string
-  endDate?: string
-  timeRange?: '1h' | '6h' | '24h' | '7d' | '30d'
-  aggregation?: 'raw' | '5m' | '1h' | '1d'
-  limit?: string
-  offset?: string
-}
+import { NextRequest, NextResponse } from 'next/server';
+import { executeQuery } from '@/lib/database';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 
 interface DeviceReading {
-  id: string
-  deviceId: string
-  batteryLevel: number | null
-  inputWatts: number | null
-  outputWatts: number | null
-  temperature: number | null
-  remainingTime: number | null
-  status: string | null
-  recordedAt: Date
+  id: string;
+  deviceId: string;
+  batteryLevel: number | null;
+  inputWatts: number | null;
+  outputWatts: number | null;
+  temperature: number | null;
+  status: string;
+  recordedAt: string;
+  deviceName?: string;
+  deviceSn?: string;
+  userId?: string;
+  // AC/DC/USB power breakdown fields
+  acOutputWatts?: number | null;
+  dcOutputWatts?: number | null;
+  usbOutputWatts?: number | null;
+  // Raw data for extraction
+  rawData?: any;
 }
 
 interface HistorySummary {
@@ -38,24 +35,34 @@ interface HistorySummary {
   endTime: string
 }
 
+interface HistoryQueryParams {
+  deviceId?: string
+  startDate?: string
+  endDate?: string
+  timeRange?: string
+  aggregation?: string
+  limit?: string
+  offset?: string
+}
+
 /**
  * GET /api/history/readings
  * Fetch historical device readings with filtering and aggregation
  */
 export async function GET(request: NextRequest) {
   try {
-    // Check authentication
+    // Check authentication using the same pattern as working endpoints
     const supabase = await createServerSupabaseClient()
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     
-    if (!session?.user?.id) {
+    if (authError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    const userId = session.user.id
+    const userId = user.id
     const searchParams = request.nextUrl.searchParams
     
     // Parse query parameters
@@ -112,7 +119,10 @@ export async function GET(request: NextRequest) {
         dr.temperature,
         dr.remaining_time as "remainingTime",
         dr.status,
-        dr.recorded_at as "recordedAt"
+        dr.raw_data as "rawData",
+        dr.recorded_at as "recordedAt",
+        d.device_name as "deviceName",
+        d.device_sn as "deviceSn"
       FROM device_readings dr
       JOIN devices d ON dr.device_id = d.id
       WHERE d.user_id = $1
@@ -172,8 +182,77 @@ export async function GET(request: NextRequest) {
     }
 
     // Execute main query
-    const queryResult = await executeQuery<DeviceReading>(aggregatedQuery, queryParams)
-    const readings: DeviceReading[] = Array.isArray(queryResult) ? queryResult : []
+    const queryResult = await executeQuery<any>(aggregatedQuery, queryParams)
+    let rawReadings: any[] = Array.isArray(queryResult) ? queryResult : []
+
+    // Debug: Log query results
+    console.log('History API Debug:', {
+      userId,
+      deviceId: params.deviceId,
+      timeRange: params.timeRange,
+      rawReadingsCount: rawReadings.length,
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString()
+    })
+
+    // Transform readings and extract AC/DC/USB breakdown from rawData
+    const readings: DeviceReading[] = rawReadings.map(reading => {
+      let acOutputWatts: number | null = null
+      let dcOutputWatts: number | null = null
+      let usbOutputWatts: number | null = null
+
+      // Try to extract breakdown from rawData JSON
+      if (reading.rawData && typeof reading.rawData === 'object') {
+        try {
+          const rawData = reading.rawData
+          
+          // Extract AC output (various possible field names)
+          acOutputWatts = rawData.acOutputWatts || 
+                         rawData.acInvOutWatts || 
+                         rawData['acInvOutWatts'] ||
+                         rawData.quota?.acInvOutWatts ||
+                         null
+
+          // Extract DC output
+          dcOutputWatts = rawData.dcOutputWatts || 
+                         rawData.dcOutWatts || 
+                         rawData['dcOutWatts'] ||
+                         rawData.quota?.dcOutWatts ||
+                         null
+
+          // Extract USB output
+          usbOutputWatts = rawData.usbOutputWatts || 
+                          rawData.usbOutWatts || 
+                          rawData['usbOutWatts'] ||
+                          rawData.quota?.usbOutWatts ||
+                          null
+
+          // Convert to numbers if they exist
+          if (acOutputWatts !== null) acOutputWatts = Number(acOutputWatts)
+          if (dcOutputWatts !== null) dcOutputWatts = Number(dcOutputWatts)
+          if (usbOutputWatts !== null) usbOutputWatts = Number(usbOutputWatts)
+        } catch (e) {
+          console.error('Error parsing rawData for breakdown:', e)
+        }
+      }
+
+      return {
+        id: reading.id,
+        deviceId: reading.deviceId,
+        batteryLevel: reading.batteryLevel ? Number(reading.batteryLevel) : null,
+        inputWatts: reading.inputWatts ? Number(reading.inputWatts) : null,
+        outputWatts: reading.outputWatts ? Number(reading.outputWatts) : null,
+        acOutputWatts,
+        dcOutputWatts,
+        usbOutputWatts,
+        temperature: reading.temperature ? Number(reading.temperature) : null,
+        remainingTime: reading.remainingTime,
+        status: reading.status,
+        recordedAt: reading.recordedAt,
+        deviceName: reading.deviceName,
+        deviceSn: reading.deviceSn
+      }
+    })
 
     // Calculate summary statistics
     let summary: HistorySummary | null = null
