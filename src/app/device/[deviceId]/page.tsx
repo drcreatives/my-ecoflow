@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, use } from 'react'
 import { formatRemainingTime } from '@/lib/data-utils'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -25,10 +25,11 @@ import { AppLayout } from '@/components/layout'
 import AuthWrapper from '@/components/AuthWrapper'
 
 interface DevicePageProps {
-  params: { deviceId: string }
+  params: Promise<{ deviceId: string }>
 }
 
 export default function DevicePage({ params }: DevicePageProps) {
+  const { deviceId } = use(params)
   const router = useRouter()
   const [device, setDevice] = useState<DeviceData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -36,7 +37,7 @@ export default function DevicePage({ params }: DevicePageProps) {
 
   useEffect(() => {
     fetchDeviceDetails()
-  }, [params.deviceId])
+  }, [deviceId])
 
   const handleBack = () => {
     // Check if there's navigation history
@@ -57,7 +58,7 @@ export default function DevicePage({ params }: DevicePageProps) {
       }
       
       const data: { devices: DeviceData[], total: number } = await response.json()
-      const deviceData = data.devices.find(d => d.id === params.deviceId)
+      const deviceData = data.devices.find(d => d.id === deviceId)
       
       if (!deviceData) {
         throw new Error('Device not found')
@@ -376,78 +377,69 @@ export default function DevicePage({ params }: DevicePageProps) {
         </div>
 
         {/* Power Output Breakdown */}
-        {device.online && reading && (
-          <div className="mb-8">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
-              <Power className="w-5 h-5 text-accent-green" />
-              <span>Power Output Breakdown</span>
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* AC Output */}
-              <div className="bg-primary-dark border border-accent-green/20 rounded-lg p-4 hover:border-accent-green/40 transition-colors">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                    <Zap className="w-5 h-5 text-blue-400" />
-                    <span className="text-accent-gray text-sm font-medium">AC Output</span>
-                  </div>
-                </div>
-                <div className="text-xl font-bold text-blue-400">
-                  {reading.acOutputWatts || 0}W
-                </div>
-                <div className="text-xs text-accent-gray mt-1">
-                  Inverter Output
+        <div className="bg-primary-dark border border-gray-700 rounded-lg p-6 mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Zap className="w-5 h-5 text-yellow-400" />
+            <h3 className="text-lg font-semibold text-white">Power Output Breakdown</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            {/* AC Output */}
+            <div className="bg-gray-800 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded"></div>
+                  <span className="text-sm font-medium text-gray-300">AC Output</span>
                 </div>
               </div>
-
-              {/* DC Output */}
-              <div className="bg-primary-dark border border-accent-green/20 rounded-lg p-4 hover:border-accent-green/40 transition-colors">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                    <Battery className="w-5 h-5 text-yellow-400" />
-                    <span className="text-accent-gray text-sm font-medium">DC Output</span>
-                  </div>
-                </div>
-                <div className="text-xl font-bold text-yellow-400">
-                  {reading.dcOutputWatts || 0}W
-                </div>
-                <div className="text-xs text-accent-gray mt-1">
-                  12V Car Port
-                </div>
+              <div className="text-2xl font-bold text-blue-400">
+                {reading?.acOutputWatts?.toFixed(0) || '0'}W
               </div>
-
-              {/* USB Output */}
-              <div className="bg-primary-dark border border-accent-green/20 rounded-lg p-4 hover:border-accent-green/40 transition-colors">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                    <Power className="w-5 h-5 text-green-400" />
-                    <span className="text-accent-gray text-sm font-medium">USB Output</span>
-                  </div>
-                </div>
-                <div className="text-xl font-bold text-green-400">
-                  {reading.usbOutputWatts || 0}W
-                </div>
-                <div className="text-xs text-accent-gray mt-1">
-                  USB Ports
-                </div>
-              </div>
+              <div className="text-xs text-gray-500">Alternating Current</div>
             </div>
 
-            {/* Total Output Summary */}
-            <div className="mt-4 bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-accent-gray font-medium">Total Output Power</span>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-accent-green">
-                    {(reading.acOutputWatts || 0) + (reading.dcOutputWatts || 0) + (reading.usbOutputWatts || 0)}W
-                  </div>
-                  <div className="text-xs text-accent-gray">
-                    Combined from all outputs
-                  </div>
+            {/* DC Output */}
+            <div className="bg-gray-800 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                  <span className="text-sm font-medium text-gray-300">DC Output</span>
                 </div>
               </div>
+              <div className="text-2xl font-bold text-yellow-400">
+                {reading?.dcOutputWatts?.toFixed(0) || '0'}W
+              </div>
+              <div className="text-xs text-gray-500">Direct Current</div>
+            </div>
+
+            {/* USB Output */}
+            <div className="bg-gray-800 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-green-500 rounded"></div>
+                  <span className="text-sm font-medium text-gray-300">USB Output</span>
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-green-400">
+                {reading?.usbOutputWatts?.toFixed(0) || '0'}W
+              </div>
+              <div className="text-xs text-gray-500">USB Ports</div>
             </div>
           </div>
-        )}
+
+          {/* Total Power Summary */}
+          <div className="bg-gray-800/50 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-300">Total Output</span>
+              <div className="text-xl font-bold text-white">
+                {reading?.outputWatts?.toFixed(0) || '0'}W
+              </div>
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              Combined AC + DC + USB power output
+            </div>
+          </div>
+        </div>
 
         {/* Additional Info Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">

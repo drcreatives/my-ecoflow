@@ -340,11 +340,31 @@ export class EcoFlowAPI {
 
     const quota = quotaData.quotaMap
     
+    // Try to get granular power output data
+    const acOutputWatts = this.getQuotaValue(quota, 'inv.outputWatts') || 
+                         this.getQuotaValue(quota, 'inv.acOutputWatts') || 
+                         this.getQuotaValue(quota, 'ac.outputWatts') || 0
+    
+    const dcOutputWatts = this.getQuotaValue(quota, 'pd.dcOutputWatts') || 
+                         this.getQuotaValue(quota, 'dcdc.outputWatts') || 0
+    
+    const usbOutputWatts = this.getQuotaValue(quota, 'pd.usbOutputWatts') || 
+                          this.getQuotaValue(quota, 'usb.outputWatts') || 
+                          this.getQuotaValue(quota, 'pd.usbUsedWatts') || 0
+    
+    // Calculate total output (fallback to API total if granular data not available)
+    const totalOutput = this.getQuotaValue(quota, 'pd.wattsOutSum') || 
+                       this.getQuotaValue(quota, 'inv.outputWatts') || 
+                       (acOutputWatts + dcOutputWatts + usbOutputWatts)
+    
     return {
       deviceId,
       batteryLevel: this.getQuotaValue(quota, 'bms_bmsStatus.soc'),
       inputWatts: this.getQuotaValue(quota, 'inv.inputWatts'),
-      outputWatts: this.getQuotaValue(quota, 'pd.wattsOutSum') || this.getQuotaValue(quota, 'inv.outputWatts'), // Total output (AC + DC)
+      outputWatts: totalOutput,
+      acOutputWatts: acOutputWatts,
+      dcOutputWatts: dcOutputWatts,
+      usbOutputWatts: usbOutputWatts,
       remainingTime: this.getQuotaValue(quota, 'bms_bmsStatus.remainTime'),
       temperature: this.getQuotaValue(quota, 'bms_bmsStatus.temp'),
       status: this.determineDeviceStatus(quota),
