@@ -174,7 +174,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Add ordering and limits
-    aggregatedQuery += ` ORDER BY "recordedAt" ASC`
+    aggregatedQuery += ` ORDER BY "recordedAt" DESC`
     
     const limit = parseInt(params.limit || '1000')
     const offset = parseInt(params.offset || '0')
