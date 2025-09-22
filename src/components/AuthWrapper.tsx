@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 import { Loader2 } from 'lucide-react'
+import { useClientSideReadingCollection } from '@/hooks/useClientSideReadingCollection'
+import { useDeviceStore } from '@/stores/deviceStore'
 
 interface AuthWrapperProps {
   children: React.ReactNode
@@ -16,6 +18,10 @@ export default function AuthWrapper({ children, redirectTo = '/login' }: AuthWra
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const supabase = createClient()
+  const { fetchDevices } = useDeviceStore()
+  
+  // Start automatic reading collection for authenticated users (every 5 minutes)
+  const { startCollection } = useClientSideReadingCollection(5)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -24,6 +30,10 @@ export default function AuthWrapper({ children, redirectTo = '/login' }: AuthWra
         
         if (session?.user) {
           setUser(session.user)
+          // Start background reading collection for authenticated users
+          console.log('🔄 User already authenticated - starting background reading collection')
+          await fetchDevices()
+          startCollection()
         } else {
           router.push(redirectTo)
           return
@@ -44,6 +54,10 @@ export default function AuthWrapper({ children, redirectTo = '/login' }: AuthWra
       async (event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
           setUser(session.user)
+          // Start background reading collection when user signs in
+          console.log('🔄 User authenticated - starting background reading collection')
+          await fetchDevices()
+          startCollection()
         } else if (event === 'SIGNED_OUT') {
           setUser(null)
           router.push(redirectTo)
@@ -53,7 +67,7 @@ export default function AuthWrapper({ children, redirectTo = '/login' }: AuthWra
     )
 
     return () => subscription.unsubscribe()
-  }, [router, redirectTo, supabase.auth])
+  }, [router, redirectTo, supabase.auth, fetchDevices, startCollection])
 
   if (loading) {
     return (

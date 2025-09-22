@@ -340,21 +340,26 @@ export class EcoFlowAPI {
 
     const quota = quotaData.quotaMap
     
-    // Try to get granular power output data
-    const acOutputWatts = this.getQuotaValue(quota, 'inv.outputWatts') || 
-                         this.getQuotaValue(quota, 'inv.acOutputWatts') || 
-                         this.getQuotaValue(quota, 'ac.outputWatts') || 0
+    // AC Output (from inverter)
+    const acOutputWatts = this.getQuotaValue(quota, 'inv.outputWatts') || 0
     
-    const dcOutputWatts = this.getQuotaValue(quota, 'pd.dcOutputWatts') || 
-                         this.getQuotaValue(quota, 'dcdc.outputWatts') || 0
+    // DC Output (car outlet and other DC sources)
+    const carWatts = this.getQuotaValue(quota, 'pd.carWatts') || 0
+    const dcOutputWatts = carWatts // 12V car outlet is the main DC output
     
-    const usbOutputWatts = this.getQuotaValue(quota, 'pd.usbOutputWatts') || 
-                          this.getQuotaValue(quota, 'usb.outputWatts') || 
-                          this.getQuotaValue(quota, 'pd.usbUsedWatts') || 0
+    // USB Output (combine all USB sources)
+    const usb1Watts = this.getQuotaValue(quota, 'pd.usb1Watts') || 0
+    const usb2Watts = this.getQuotaValue(quota, 'pd.usb2Watts') || 0
+    const typec1Watts = this.getQuotaValue(quota, 'pd.typec1Watts') || 0
+    const typec2Watts = this.getQuotaValue(quota, 'pd.typec2Watts') || 0
+    const qcUsb1Watts = this.getQuotaValue(quota, 'pd.qcUsb1Watts') || 0
+    const qcUsb2Watts = this.getQuotaValue(quota, 'pd.qcUsb2Watts') || 0
     
-    // Calculate total output (fallback to API total if granular data not available)
+    const usbOutputWatts = usb1Watts + usb2Watts + typec1Watts + typec2Watts + qcUsb1Watts + qcUsb2Watts
+    
+    // Total output (use API total or calculate from components)
     const totalOutput = this.getQuotaValue(quota, 'pd.wattsOutSum') || 
-                       this.getQuotaValue(quota, 'inv.outputWatts') || 
+                       this.getQuotaValue(quota, 'pd.outputWatts') || 
                        (acOutputWatts + dcOutputWatts + usbOutputWatts)
     
     return {

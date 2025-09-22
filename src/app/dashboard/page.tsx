@@ -8,7 +8,6 @@ import { DeviceStatusCard } from '@/components/controls';
 import { AppLayout } from '@/components/layout';
 import AuthWrapper from '@/components/AuthWrapper';
 import CronStatusWidget from '@/components/CronStatusWidget';
-import { useClientSideReadingCollection } from '@/hooks/useClientSideReadingCollection';
 import { cn } from '@/lib/utils';
 
 // Mock stats for demo purposes
@@ -76,15 +75,10 @@ const StatCard = ({ stat }: { stat: typeof stats[0] }) => (
 
 function Dashboard() {
   const { devices, fetchDevices, isLoading, error } = useDeviceStore();
-  const { startCollection } = useClientSideReadingCollection(5);
 
   useEffect(() => {
     fetchDevices();
-    
-    // Auto-start client-side reading collection when dashboard loads
-    console.log('🚀 Dashboard loaded - starting automatic reading collection');
-    startCollection();
-  }, [fetchDevices, startCollection]);
+  }, [fetchDevices]);
 
   return (
     <AppLayout>

@@ -35,7 +35,7 @@ export const useClientSideReadingCollection = (intervalMinutes: number = 5) => {
     }
 
     try {
-      console.log('📊 Client collecting device reading...')
+      console.log('📊 [GLOBAL] Client collecting device reading...')
       
       const response = await fetch('/api/devices/collect-readings', {
         method: 'POST',
@@ -46,7 +46,7 @@ export const useClientSideReadingCollection = (intervalMinutes: number = 5) => {
 
       if (response.ok) {
         const data = await response.json()
-        console.log('✅ Client reading collection successful:', data.summary)
+        console.log('✅ [GLOBAL] Client reading collection successful:', data.summary)
         
         setStatus(prev => ({
           ...prev,
@@ -78,7 +78,7 @@ export const useClientSideReadingCollection = (intervalMinutes: number = 5) => {
       clearInterval(intervalRef.current)
     }
 
-    console.log(`🚀 Starting client-side reading collection (every ${intervalMinutes} minutes)`)
+    console.log(`🚀 [GLOBAL] Starting client-side reading collection (every ${intervalMinutes} minutes)`)
     
     setStatus(prev => ({ 
       ...prev, 
