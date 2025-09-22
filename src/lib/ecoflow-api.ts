@@ -340,11 +340,36 @@ export class EcoFlowAPI {
 
     const quota = quotaData.quotaMap
     
+    // AC Output (from inverter)
+    const acOutputWatts = this.getQuotaValue(quota, 'inv.outputWatts') || 0
+    
+    // DC Output (car outlet and other DC sources)
+    const carWatts = this.getQuotaValue(quota, 'pd.carWatts') || 0
+    const dcOutputWatts = carWatts // 12V car outlet is the main DC output
+    
+    // USB Output (combine all USB sources)
+    const usb1Watts = this.getQuotaValue(quota, 'pd.usb1Watts') || 0
+    const usb2Watts = this.getQuotaValue(quota, 'pd.usb2Watts') || 0
+    const typec1Watts = this.getQuotaValue(quota, 'pd.typec1Watts') || 0
+    const typec2Watts = this.getQuotaValue(quota, 'pd.typec2Watts') || 0
+    const qcUsb1Watts = this.getQuotaValue(quota, 'pd.qcUsb1Watts') || 0
+    const qcUsb2Watts = this.getQuotaValue(quota, 'pd.qcUsb2Watts') || 0
+    
+    const usbOutputWatts = usb1Watts + usb2Watts + typec1Watts + typec2Watts + qcUsb1Watts + qcUsb2Watts
+    
+    // Total output (use API total or calculate from components)
+    const totalOutput = this.getQuotaValue(quota, 'pd.wattsOutSum') || 
+                       this.getQuotaValue(quota, 'pd.outputWatts') || 
+                       (acOutputWatts + dcOutputWatts + usbOutputWatts)
+    
     return {
       deviceId,
       batteryLevel: this.getQuotaValue(quota, 'bms_bmsStatus.soc'),
       inputWatts: this.getQuotaValue(quota, 'inv.inputWatts'),
-      outputWatts: this.getQuotaValue(quota, 'pd.wattsOutSum') || this.getQuotaValue(quota, 'inv.outputWatts'), // Total output (AC + DC)
+      outputWatts: totalOutput,
+      acOutputWatts: acOutputWatts,
+      dcOutputWatts: dcOutputWatts,
+      usbOutputWatts: usbOutputWatts,
       remainingTime: this.getQuotaValue(quota, 'bms_bmsStatus.remainTime'),
       temperature: this.getQuotaValue(quota, 'bms_bmsStatus.temp'),
       status: this.determineDeviceStatus(quota),

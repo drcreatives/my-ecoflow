@@ -23,6 +23,9 @@ export interface DeviceReading {
   batteryLevel?: number
   inputWatts?: number
   outputWatts?: number
+  acOutputWatts?: number
+  dcOutputWatts?: number
+  usbOutputWatts?: number
   remainingTime?: number
   temperature?: number
   status?: string

@@ -46,16 +46,19 @@ model Device {
 
 // Device data readings (real-time and historical data)
 model DeviceReading {
-  id            String   @id @default(uuid())
-  deviceId      String   @map("device_id")
-  batteryLevel  Int?     @map("battery_level")
-  inputWatts    Decimal? @map("input_watts") @db.Decimal(10, 2)
-  outputWatts   Decimal? @map("output_watts") @db.Decimal(10, 2)
-  remainingTime Int?     @map("remaining_time") // in minutes
-  temperature   Decimal? @db.Decimal(5, 2)
-  status        String?
-  rawData       Json?    @map("raw_data") // store full API response
-  recordedAt    DateTime @default(now()) @map("recorded_at")
+  id               String   @id @default(uuid())
+  deviceId         String   @map("device_id")
+  batteryLevel     Int?     @map("battery_level")
+  inputWatts       Decimal? @map("input_watts") @db.Decimal(10, 2)
+  outputWatts      Decimal? @map("output_watts") @db.Decimal(10, 2)
+  acOutputWatts    Decimal? @map("ac_output_watts") @db.Decimal(10, 2)
+  dcOutputWatts    Decimal? @map("dc_output_watts") @db.Decimal(10, 2)
+  usbOutputWatts   Decimal? @map("usb_output_watts") @db.Decimal(10, 2)
+  remainingTime    Int?     @map("remaining_time") // in minutes
+  temperature      Decimal? @db.Decimal(5, 2)
+  status           String?
+  rawData          Json?    @map("raw_data") // store full API response
+  recordedAt       DateTime @default(now()) @map("recorded_at")
   
   // Relations
   device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)

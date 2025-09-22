@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -26,10 +26,11 @@ import AuthWrapper from '@/components/AuthWrapper';
 import { DeviceData } from '@/lib/data-utils';
 
 interface DeviceSettingsPageProps {
-  params: { deviceId: string };
+  params: Promise<{ deviceId: string }>;
 }
 
 export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) {
+  const { deviceId } = use(params);
   const router = useRouter();
   const [device, setDevice] = useState<DeviceData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,13 +50,13 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
 
   useEffect(() => {
     fetchDeviceDetails();
-  }, [params.deviceId]);
+  }, [deviceId]);
 
   const handleBack = () => {
     if (window.history.length > 1) {
       router.back();
     } else {
-      router.push(`/device/${params.deviceId}`);
+      router.push(`/device/${deviceId}`);
     }
   };
 
@@ -68,7 +69,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
       }
       
       const data: { devices: DeviceData[], total: number } = await response.json();
-      const deviceData = data.devices.find(d => d.id === params.deviceId);
+      const deviceData = data.devices.find(d => d.id === deviceId);
       
       if (!deviceData) {
         throw new Error('Device not found');
@@ -97,7 +98,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
       setSaving(true);
       
       // Update device name
-      const response = await fetch(`/api/devices/${params.deviceId}`, {
+      const response = await fetch(`/api/devices/${deviceId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -131,7 +132,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
 
     try {
       setSaving(true);
-      const response = await fetch(`/api/devices/${params.deviceId}`, {
+      const response = await fetch(`/api/devices/${deviceId}`, {
         method: 'DELETE',
       });
 
