@@ -10,6 +10,9 @@ export async function GET() {
       batteryLevel: number
       inputWatts: number
       outputWatts: number
+      acOutputWatts: number
+      dcOutputWatts: number
+      usbOutputWatts: number
       recordedAt: Date
       deviceSn: string | null
       deviceName: string | null
@@ -20,6 +23,9 @@ export async function GET() {
         dr.battery_level as "batteryLevel",
         dr.input_watts as "inputWatts", 
         dr.output_watts as "outputWatts",
+        COALESCE(dr.ac_output_watts, 0) as "acOutputWatts",
+        COALESCE(dr.dc_output_watts, 0) as "dcOutputWatts",
+        COALESCE(dr.usb_output_watts, 0) as "usbOutputWatts",
         dr.recorded_at as "recordedAt",
         d.device_sn as "deviceSn",
         d.device_name as "deviceName"
@@ -59,6 +65,9 @@ export async function GET() {
         batteryLevel: reading.batteryLevel,
         inputWatts: reading.inputWatts,
         outputWatts: reading.outputWatts,
+        acOutputWatts: reading.acOutputWatts,
+        dcOutputWatts: reading.dcOutputWatts,
+        usbOutputWatts: reading.usbOutputWatts,
         recordedAt: reading.recordedAt
       })),
       deviceStats: readingStats.map(stat => ({

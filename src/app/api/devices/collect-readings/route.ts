@@ -74,7 +74,10 @@ export async function POST(_request: NextRequest) {
             device_id, 
             battery_level, 
             input_watts, 
-            output_watts, 
+            output_watts,
+            ac_output_watts,
+            dc_output_watts,
+            usb_output_watts,
             remaining_time, 
             temperature, 
             status, 
@@ -91,6 +94,9 @@ export async function POST(_request: NextRequest) {
             $6,
             $7,
             $8,
+            $9,
+            $10,
+            $11,
             NOW()
           )
           RETURNING id
@@ -99,6 +105,9 @@ export async function POST(_request: NextRequest) {
           reading.batteryLevel || 0,
           reading.inputWatts || 0,
           reading.outputWatts || 0,
+          reading.acOutputWatts || 0,
+          reading.dcOutputWatts || 0,
+          reading.usbOutputWatts || 0,
           reading.remainingTime,
           reading.temperature || 0,
           reading.status || 'unknown',
@@ -113,6 +122,9 @@ export async function POST(_request: NextRequest) {
           readingId: savedReading[0].id,
           batteryLevel: reading.batteryLevel,
           outputWatts: reading.outputWatts,
+          acOutputWatts: reading.acOutputWatts,
+          dcOutputWatts: reading.dcOutputWatts,
+          usbOutputWatts: reading.usbOutputWatts,
           status: reading.status
         })
         
