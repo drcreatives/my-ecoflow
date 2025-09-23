@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AppLayout } from "@/components/layout";
 import AuthWrapper from "@/components/AuthWrapper";
-import { useDeviceStore } from "@/stores/deviceStore";
-import { DeviceReading } from "@/lib/data-utils";
+import { useDevices } from "@/hooks/useDevices";
+import { useAnalyticsData } from "@/hooks/useAnalyticsData";
 import { CombinedChart, BatteryLevelChart, TemperatureChart, transformReadingsToChartData } from "@/components/charts/HistoryCharts";
 import { Loader2, Battery, Thermometer, BarChart3, ExternalLink, Filter, RefreshCw, ChevronDown } from "lucide-react";
 import Link from "next/link";
@@ -37,12 +37,7 @@ interface DeviceOption {
 }
 
 function AnalyticsPage() {
-	const { devices, fetchDevices, isLoading: devicesLoading } = useDeviceStore();
-	const [readings, setReadings] = useState<DeviceReading[]>([]);
-	const [summary, setSummary] = useState<HistorySummary | null>(null);
-	const [isLoading, setIsLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+	const { data: devices = [], isLoading: devicesLoading } = useDevices();
 
 	// Filter state
 	const [filters, setFilters] = useState<HistoryFilters>({
@@ -53,6 +48,19 @@ function AnalyticsPage() {
 
 	// UI state
 	const [showFilters, setShowFilters] = useState(false);
+
+	// Get analytics data using TanStack Query
+	const { 
+		data: analyticsData, 
+		isLoading, 
+		error, 
+		refetch,
+		dataUpdatedAt 
+	} = useAnalyticsData(filters);
+
+	const readings = analyticsData?.readings || [];
+	const summary = analyticsData?.summary || null;
+	const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
 
 	// Device options for dropdown
 	const deviceOptions: DeviceOption[] = [
@@ -66,53 +74,6 @@ function AnalyticsPage() {
 	];
 
 	const selectedDevice = deviceOptions.find(d => d.id === filters.deviceId);
-
-	useEffect(() => {
-		fetchDevices();
-	}, [fetchDevices]);
-
-	useEffect(() => {
-		if (devices.length > 0) {
-			fetchAnalyticsData();
-		}
-	}, [devices, filters]);
-
-	const fetchAnalyticsData = async () => {
-		try {
-			setIsLoading(true);
-			setError(null);
-			
-			// Build query parameters based on filters
-			const params = new URLSearchParams({
-				timeRange: filters.timeRange,
-				aggregation: filters.aggregation
-			});
-
-			if (filters.deviceId !== 'all') {
-				params.set('deviceId', filters.deviceId);
-			}
-
-			if (filters.timeRange === 'custom') {
-				if (filters.customStartDate) params.set('startDate', filters.customStartDate);
-				if (filters.customEndDate) params.set('endDate', filters.customEndDate);
-			}
-
-			const response = await fetch(`/api/history/readings?${params.toString()}`);
-			const data = await response.json();
-			if (!data.success) throw new Error(data.error || "Failed to fetch analytics data");
-			const apiReadings = data.data.readings.map((reading: any) => ({
-				...reading,
-				recordedAt: new Date(reading.recordedAt),
-			}));
-			setReadings(apiReadings);
-			setSummary(data.data.summary);
-			setLastUpdated(new Date());
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to load analytics data");
-		} finally {
-			setIsLoading(false);
-		}
-	};
 
 	const formatValue = (value: number | null | undefined, unit: string) => {
 		if (value === null || value === undefined || isNaN(value)) return "0" + unit;
@@ -157,7 +118,7 @@ function AnalyticsPage() {
 								Filters
 							</button>
 							<button
-								onClick={fetchAnalyticsData}
+								onClick={() => refetch()}
 								disabled={isLoading}
 								className="flex items-center gap-2 px-3 py-2 bg-accent-green hover:bg-accent-green/90 disabled:opacity-50 disabled:cursor-not-allowed text-black font-medium rounded-lg transition-colors"
 							>
@@ -269,7 +230,7 @@ function AnalyticsPage() {
 					{/* Error Display */}
 					{error && (
 						<div className="bg-red-900/20 border border-red-600 rounded-lg p-4">
-							<p className="text-red-300">{error}</p>
+							<p className="text-red-300">{error.message}</p>
 						</div>
 					)}
 

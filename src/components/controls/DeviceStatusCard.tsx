@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatRemainingTime } from '@/lib/data-utils'
-import { useState } from 'react'
+import { useRegisterDeviceForAnalytics, useUnregisterDeviceFromAnalytics } from '@/hooks/useDeviceAnalytics'
 
 interface DeviceData {
   id: string
@@ -43,8 +43,8 @@ interface DeviceStatusCardProps {
 }
 
 export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCardProps) => {
-  const [isRegistering, setIsRegistering] = useState(false)
-  const [isUnregistering, setIsUnregistering] = useState(false)
+  const registerMutation = useRegisterDeviceForAnalytics()
+  const unregisterMutation = useUnregisterDeviceFromAnalytics()
   
   const batteryLevel = device.currentReading?.batteryLevel ?? 0
   const inputWatts = device.currentReading?.inputWatts ?? 0
@@ -69,60 +69,18 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
     return { color: 'text-accent-green', bg: 'bg-accent-green/10', text: 'Standby' }
   }
 
-  const handleRegisterDevice = async () => {
-    setIsRegistering(true)
-    try {
-      const response = await fetch('/api/register-device', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          deviceSn: device.deviceSn,
-          userId: device.userId
-        })
-      })
-
-      if (response.ok) {
-        // Refresh the page or update state to show the device as registered
-        window.location.reload()
-      } else {
-        throw new Error('Failed to register device')
-      }
-    } catch (error) {
-      console.error('Registration error:', error)
-      alert('Failed to register device for analytics. Please try again.')
-    } finally {
-      setIsRegistering(false)
-    }
+  const handleRegisterDevice = () => {
+    registerMutation.mutate({
+      deviceSn: device.deviceSn,
+      userId: device.userId
+    })
   }
 
-  const handleUnregisterDevice = async () => {
-    setIsUnregistering(true)
-    try {
-      const response = await fetch('/api/unregister-device', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          deviceSn: device.deviceSn,
-          userId: device.userId
-        })
-      })
-
-      if (response.ok) {
-        // Refresh the page or update state to show the device as unregistered
-        window.location.reload()
-      } else {
-        throw new Error('Failed to unregister device')
-      }
-    } catch (error) {
-      console.error('Unregistration error:', error)
-      alert('Failed to unregister device. Please try again.')
-    } finally {
-      setIsUnregistering(false)
-    }
+  const handleUnregisterDevice = () => {
+    unregisterMutation.mutate({
+      deviceSn: device.deviceSn,
+      userId: device.userId
+    })
   }
 
   const statusInfo = getStatusInfo()
@@ -207,10 +165,10 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
             {isRegistered ? (
               <button
                 onClick={handleUnregisterDevice}
-                disabled={isUnregistering}
+                disabled={unregisterMutation.isPending}
                 className="flex items-center gap-1 px-2 py-1 text-xs border border-red-400 text-red-400 hover:bg-red-400 hover:text-white rounded transition-colors disabled:opacity-50"
               >
-                {isUnregistering ? (
+                {unregisterMutation.isPending ? (
                   <>
                     <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
                     <span>Removing...</span>
@@ -225,10 +183,10 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
             ) : (
               <button
                 onClick={handleRegisterDevice}
-                disabled={isRegistering}
+                disabled={registerMutation.isPending}
                 className="flex items-center gap-1 px-2 py-1 text-xs border border-accent-green text-accent-green hover:bg-accent-green hover:text-black rounded transition-colors disabled:opacity-50"
               >
-                {isRegistering ? (
+                {registerMutation.isPending ? (
                   <>
                     <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
                     <span>Enabling...</span>

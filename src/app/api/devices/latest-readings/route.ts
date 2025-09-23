@@ -19,7 +19,9 @@ export async function GET() {
         dr.device_id,
         dr.recorded_at,
         dr.battery_level,
+        dr.input_watts,
         dr.output_watts,
+        dr.temperature,
         d.device_name,
         d.device_sn
       FROM device_readings dr
@@ -33,7 +35,19 @@ export async function GET() {
       ORDER BY dr.recorded_at DESC
     `, [user.id]);
 
-    return NextResponse.json(latestReadings);
+    // Transform to camelCase for frontend consistency
+    const transformedReadings = latestReadings.map(reading => ({
+      deviceId: reading.device_id,
+      recordedAt: reading.recorded_at,
+      batteryLevel: reading.battery_level,
+      inputWatts: reading.input_watts,
+      outputWatts: reading.output_watts,
+      temperature: reading.temperature,
+      deviceName: reading.device_name,
+      deviceSn: reading.device_sn
+    }));
+
+    return NextResponse.json(transformedReadings);
 
   } catch (error) {
     console.error('Latest readings API error:', error);

@@ -53,13 +53,25 @@ export async function GET() {
 
       return NextResponse.json({
         success: true,
-        settings: defaultSettings
+        settings: {
+          ...defaultSettings,
+          sessionTimeout: defaultSettings.session_timeout_minutes,
+          autoLogoutEnabled: defaultSettings.auto_logout_enabled,
+          rememberMeDurationDays: defaultSettings.remember_me_duration_days,
+          forceLogoutOnNewDevice: defaultSettings.force_logout_on_new_device
+        }
       });
     }
 
     return NextResponse.json({
       success: true,
-      settings: settings[0]
+      settings: {
+        ...settings[0],
+        sessionTimeout: settings[0].session_timeout_minutes,
+        autoLogoutEnabled: settings[0].auto_logout_enabled,
+        rememberMeDurationDays: settings[0].remember_me_duration_days,
+        forceLogoutOnNewDevice: settings[0].force_logout_on_new_device
+      }
     });
 
   } catch (error) {
@@ -83,12 +95,12 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { 
-      sessionTimeoutMinutes, 
-      autoLogoutEnabled, 
-      rememberMeDurationDays,
-      forceLogoutOnNewDevice 
-    } = body;
+    
+    // Support both camelCase (from frontend) and snake_case (legacy) field names
+    const sessionTimeoutMinutes = body.sessionTimeout || body.sessionTimeoutMinutes;
+    const autoLogoutEnabled = body.autoLogoutEnabled !== undefined ? body.autoLogoutEnabled : body.auto_logout_enabled;
+    const rememberMeDurationDays = body.rememberMeDurationDays || body.remember_me_duration_days;
+    const forceLogoutOnNewDevice = body.forceLogoutOnNewDevice !== undefined ? body.forceLogoutOnNewDevice : body.force_logout_on_new_device;
 
     // Validate inputs
     if (typeof sessionTimeoutMinutes !== 'number' || sessionTimeoutMinutes < 5 || sessionTimeoutMinutes > 480) {

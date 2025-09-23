@@ -1,23 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Plus, 
   Search, 
   Filter, 
-  Battery, 
-  Zap, 
-  Thermometer, 
-  Clock,
   Power,
   Wifi,
   WifiOff,
-  ArrowRight,
-  Settings,
-  MoreVertical,
-  AlertTriangle,
   CheckCircle,
   XCircle,
   Loader2,
@@ -25,68 +17,29 @@ import {
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout';
 import AuthWrapper from '@/components/AuthWrapper';
+import { useDevices, useLatestReadings } from '@/hooks/useDevices';
+import { DeviceStatusCard } from '@/components/controls';
 import { cn } from '@/lib/utils';
 import { formatRemainingTime } from '@/lib/data-utils';
-
-interface DeviceData {
-  id: string;
-  deviceSn: string;
-  deviceName: string;
-  deviceType?: string;
-  isActive: boolean;
-  online: boolean;
-  status?: string;
-  userId: string;
-  currentReading?: {
-    batteryLevel?: number;
-    inputWatts?: number;
-    outputWatts?: number;
-    temperature?: number;
-    remainingTime?: number;
-    status?: string;
-  };
-}
+import { Device } from '@/types';
 
 const DevicesPage = () => {
   const router = useRouter();
-  const [devices, setDevices] = useState<DeviceData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: devices = [], isLoading: loading, error, refetch } = useDevices();
+  const { data: latestReadings = [] } = useLatestReadings();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'online' | 'offline'>('all');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  useEffect(() => {
-    fetchDevices();
-  }, []);
-
-  const fetchDevices = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await fetch('/api/devices');
-      if (!response.ok) {
-        if (response.status === 401) {
-          router.push('/login');
-          return;
-        }
-        throw new Error('Failed to fetch devices');
-      }
-      
-      const data: { devices: DeviceData[], total: number } = await response.json();
-      setDevices(data.devices || []);
-    } catch (err) {
-      console.error('Error fetching devices:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load devices');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Create a map for quick lookup of latest readings by device ID
+  const readingsMap = latestReadings.reduce((acc, reading) => {
+    acc[reading.deviceId] = reading;
+    return acc;
+  }, {} as Record<string, any>);
 
   // Filter devices based on search and status
   const filteredDevices = devices.filter(device => {
-    const matchesSearch = device.deviceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = device.deviceName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          device.deviceSn.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = filterStatus === 'all' || 
@@ -95,146 +48,6 @@ const DevicesPage = () => {
     
     return matchesSearch && matchesStatus;
   });
-
-  const getStatusColor = (online: boolean, batteryLevel?: number) => {
-    if (!online) return 'text-red-400';
-    if (batteryLevel && batteryLevel < 20) return 'text-yellow-400';
-    return 'text-accent-green';
-  };
-
-  const getStatusIcon = (online: boolean, batteryLevel?: number) => {
-    if (!online) return <WifiOff size={16} className="text-red-400" />;
-    if (batteryLevel && batteryLevel < 20) return <AlertTriangle size={16} className="text-yellow-400" />;
-    return <Wifi size={16} className="text-accent-green" />;
-  };
-
-  const getStatusText = (online: boolean, batteryLevel?: number, status?: string) => {
-    if (!online) return 'Offline';
-    if (batteryLevel && batteryLevel < 20) return 'Low Battery';
-    return status || 'Online';
-  };
-
-  const DeviceCard = ({ device }: { device: DeviceData }) => {
-    const batteryLevel = device.currentReading?.batteryLevel ?? 0;
-    const inputWatts = device.currentReading?.inputWatts ?? 0;
-    const outputWatts = device.currentReading?.outputWatts ?? 0;
-    const temperature = device.currentReading?.temperature ?? 0;
-    const remainingTime = device.currentReading?.remainingTime;
-
-    return (
-      <div className="bg-primary-dark rounded-lg border border-gray-800 hover:border-accent-green transition-all duration-200 group">
-        <div className="p-6">
-          {/* Header */}
-          <div className="flex justify-between items-start mb-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <h3 className="text-lg font-semibold text-accent-gray group-hover:text-white transition-colors">
-                  {device.deviceName}
-                </h3>
-                {getStatusIcon(device.online, batteryLevel)}
-              </div>
-              <p className="text-sm text-gray-400">
-                {device.deviceSn} • {device.deviceType || 'DELTA 2'}
-              </p>
-              <p className={cn(
-                "text-xs font-medium mt-1",
-                getStatusColor(device.online, batteryLevel)
-              )}>
-                {getStatusText(device.online, batteryLevel, device.status)}
-              </p>
-            </div>
-            <button className="p-2 hover:bg-gray-800 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
-              <MoreVertical size={16} className="text-gray-400" />
-            </button>
-          </div>
-
-          {/* Metrics Grid */}
-          {device.online && device.currentReading && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-              {/* Battery */}
-              <div className="flex items-center gap-2">
-                <Battery 
-                  size={16} 
-                  className={cn(
-                    batteryLevel > 20 ? "text-accent-green" : "text-yellow-400"
-                  )} 
-                />
-                <div>
-                  <p className="text-xs text-gray-400">Battery</p>
-                  <p className="text-sm font-semibold text-white">{batteryLevel}%</p>
-                </div>
-              </div>
-
-              {/* Input Power */}
-              <div className="flex items-center gap-2">
-                <Zap size={16} className="text-blue-400" />
-                <div>
-                  <p className="text-xs text-gray-400">Input</p>
-                  <p className="text-sm font-semibold text-white">{inputWatts}W</p>
-                </div>
-              </div>
-
-              {/* Output Power */}
-              <div className="flex items-center gap-2">
-                <Power size={16} className="text-accent-green" />
-                <div>
-                  <p className="text-xs text-gray-400">Output</p>
-                  <p className="text-sm font-semibold text-white">{outputWatts}W</p>
-                </div>
-              </div>
-
-              {/* Temperature */}
-              <div className="flex items-center gap-2">
-                <Thermometer size={16} className="text-orange-400" />
-                <div>
-                  <p className="text-xs text-gray-400">Temp</p>
-                  <p className="text-sm font-semibold text-white">{temperature}°C</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Runtime */}
-          {device.online && remainingTime && (
-            <div className="flex items-center gap-2 mb-4 p-3 bg-gray-900 rounded-md">
-              <Clock size={16} className="text-accent-green" />
-              <div>
-                <p className="text-xs text-gray-400">Estimated Runtime</p>
-                <p className="text-sm font-semibold text-white">
-                  {formatRemainingTime(remainingTime)}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Offline State */}
-          {!device.online && (
-            <div className="flex items-center gap-2 mb-4 p-3 bg-red-900/20 border border-red-900/30 rounded-md">
-              <WifiOff size={16} className="text-red-400" />
-              <div>
-                <p className="text-sm text-red-400">Device is offline</p>
-                <p className="text-xs text-gray-400">Last seen: Unknown</p>
-              </div>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex gap-3">
-            <Link 
-              href={`/device/${device.id}`}
-              className="flex-1 bg-accent-green hover:bg-accent-green/90 text-black font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 group"
-            >
-              View Details
-              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <button className="p-2 border border-gray-700 hover:border-gray-600 rounded-lg transition-colors">
-              <Settings size={16} className="text-gray-400" />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   if (loading) {
     return (
@@ -413,9 +226,9 @@ const DevicesPage = () => {
                   <XCircle size={20} className="text-red-400" />
                   <p className="text-red-400 font-medium">Error loading devices</p>
                 </div>
-                <p className="text-gray-400 text-sm mt-1">{error}</p>
+                <p className="text-gray-400 text-sm mt-1">{error?.message || 'Unknown error'}</p>
                 <button
-                  onClick={fetchDevices}
+                  onClick={() => refetch()}
                   className="mt-3 text-accent-green hover:text-accent-green/80 text-sm font-medium transition-colors"
                 >
                   Try again
@@ -429,7 +242,24 @@ const DevicesPage = () => {
                 {filteredDevices.length > 0 ? (
                   <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                     {filteredDevices.map((device) => (
-                      <DeviceCard key={device.id} device={device} />
+                      <Link key={device.id} href={`/device/${device.id}`}>
+                        <div className="cursor-pointer transition-transform duration-200 hover:-translate-y-1">
+                          <DeviceStatusCard 
+                            device={{
+                              ...device,
+                              online: device.online, // Use the correct online field
+                              currentReading: device.currentReading || {
+                                batteryLevel: 0,
+                                inputWatts: 0,
+                                outputWatts: 0,
+                                temperature: 20,
+                                remainingTime: null,
+                                status: 'offline'
+                              }
+                            }} 
+                          />
+                        </div>
+                      </Link>
                     ))}
                     
                     {/* Add Device Card */}

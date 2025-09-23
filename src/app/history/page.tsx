@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -24,7 +24,8 @@ import {
 } from 'lucide-react'
 import { AppLayout } from '@/components/layout'
 import AuthWrapper from '@/components/AuthWrapper'
-import { useDeviceStore } from '@/stores/deviceStore'
+import { useDevices } from '@/hooks/useDevices'
+import { useAnalyticsData } from '@/hooks/useAnalyticsData'
 import { DeviceReading } from '@/lib/data-utils'
 import { cn } from '@/lib/utils'
 
@@ -56,12 +57,7 @@ interface DeviceOption {
 }
 
 function HistoryPage() {
-  const { devices, fetchDevices, isLoading: devicesLoading } = useDeviceStore()
-  const [readings, setReadings] = useState<DeviceReading[]>([])
-  const [summary, setSummary] = useState<HistorySummary | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const { data: devices = [], isLoading: devicesLoading } = useDevices();
 
   // Filter state
   const [filters, setFilters] = useState<HistoryFilters>({
@@ -69,6 +65,19 @@ function HistoryPage() {
     timeRange: '24h',
     aggregation: '1h'
   })
+
+  // Get history data using TanStack Query
+  const { 
+    data: historyData, 
+    isLoading, 
+    error, 
+    refetch,
+    dataUpdatedAt 
+  } = useAnalyticsData(filters);
+
+  const readings = historyData?.readings || [];
+  const summary = historyData?.summary || null;
+  const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
 
   // UI state
   const [showFilters, setShowFilters] = useState(false)
@@ -97,80 +106,10 @@ function HistoryPage() {
   const endIndex = startIndex + itemsPerPage
   const paginatedReadings = readings.slice(startIndex, endIndex)
 
-  // Reset to first page when filters change
-  useEffect(() => {
+  // Reset to first page when filters change (using useEffect-like behavior)
+  React.useEffect(() => {
     setCurrentPage(1)
   }, [filters])
-
-  // Fetch devices on mount
-  useEffect(() => {
-    fetchDevices()
-  }, [fetchDevices])
-
-  // Fetch history data when filters change
-  useEffect(() => {
-    if (devices.length > 0) {
-      fetchHistoryData()
-    }
-  }, [filters, devices])
-
-  const fetchHistoryData = async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        timeRange: filters.timeRange,
-        aggregation: filters.aggregation
-      })
-
-      if (filters.deviceId !== 'all') {
-        params.append('deviceId', filters.deviceId)
-      }
-
-      if (filters.customStartDate) {
-        params.append('startDate', filters.customStartDate)
-      }
-
-      if (filters.customEndDate) {
-        params.append('endDate', filters.customEndDate)
-      }
-
-      // Fetch data from API
-      const response = await fetch(`/api/history/readings?${params.toString()}`, {
-        credentials: 'include'
-      })
-      const data = await response.json()
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch history data')
-      }
-
-      // Transform API response to local format
-      const apiReadings = data.data.readings.map((reading: any) => ({
-        ...reading,
-        recordedAt: new Date(reading.recordedAt)
-      }))
-
-      setReadings(apiReadings)
-      setSummary(data.data.summary)
-      setLastUpdated(new Date())
-    } catch (err) {
-      console.error('Error fetching history data:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load historical data')
-      
-      // For debugging: Log the exact error details
-      console.log('API Response Error Details:', {
-        error: err,
-        deviceId: filters.deviceId,
-        timeRange: filters.timeRange,
-        aggregation: filters.aggregation
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   // Mock data generator (will be replaced with API call)
   const generateMockHistoryData = (): DeviceReading[] => {
@@ -287,7 +226,6 @@ function HistoryPage() {
       window.URL.revokeObjectURL(url)
     } catch (err) {
       console.error('Export failed:', err)
-      setError('Failed to export data')
       
         // Fallback to client-side export for development
         console.log('Falling back to client-side export')
@@ -412,7 +350,7 @@ function HistoryPage() {
               </button>
 
               <button
-                onClick={fetchHistoryData}
+                onClick={() => refetch()}
                 disabled={isLoading}
                 className="flex items-center gap-2 px-4 py-2 bg-primary-dark border border-gray-600 hover:border-gray-500 text-gray-300 rounded-lg transition-colors"
               >
@@ -528,7 +466,7 @@ function HistoryPage() {
                 <AlertTriangle size={16} />
                 <span className="font-medium">Error</span>
               </div>
-              <p className="text-red-300 mt-1">{error}</p>
+              <p className="text-red-300 mt-1">{error?.message}</p>
             </div>
           )}
 

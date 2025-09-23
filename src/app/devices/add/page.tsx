@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout';
 import AuthWrapper from '@/components/AuthWrapper';
+import { useDeviceDiscovery, useRegisterDevice } from '@/hooks/useDevices';
 import { cn } from '@/lib/utils';
 
 interface EcoFlowDevice {
@@ -29,81 +30,31 @@ interface EcoFlowDevice {
 
 const AddDevicePage = () => {
   const router = useRouter();
-  const [devices, setDevices] = useState<EcoFlowDevice[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [registering, setRegistering] = useState<string | null>(null);
+  const { data: discoveredDevices = [], isLoading: loading, error, refetch } = useDeviceDiscovery();
+  const registerDeviceMutation = useRegisterDevice();
   const [searchPerformed, setSearchPerformed] = useState(false);
 
   const searchDevices = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      setSearchPerformed(true);
-      
-      const response = await fetch('/api/devices');
-      if (!response.ok) {
-        if (response.status === 401) {
-          router.push('/login');
-          return;
-        }
-        throw new Error('Failed to fetch devices');
-      }
-      
-      const data: { devices: EcoFlowDevice[], total: number } = await response.json();
-      setDevices(data.devices || []);
-    } catch (err) {
-      console.error('Error fetching devices:', err);
-      setError(err instanceof Error ? err.message : 'Failed to search devices');
-    } finally {
-      setLoading(false);
-    }
+    setSearchPerformed(true);
+    refetch();
   };
 
-  const registerDevice = async (deviceSn: string, deviceName: string) => {
+  const registerDevice = async (device: EcoFlowDevice) => {
     try {
-      setRegistering(deviceSn);
-      
-      const response = await fetch('/api/devices', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          deviceSn,
-          deviceName,
-          deviceType: 'DELTA_2'
-        }),
+      await registerDeviceMutation.mutateAsync({
+        deviceSn: device.sn,
+        deviceName: device.deviceName,
+        deviceType: device.deviceType || 'DELTA 2'
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to register device');
-      }
-
-      // Update the device list to show it's now registered
-      setDevices(prev => prev.map(device => 
-        device.sn === deviceSn 
-          ? { ...device, isRegistered: true }
-          : device
-      ));
-
-      // Redirect to devices page after successful registration
-      setTimeout(() => {
-        router.push('/devices');
-      }, 1500);
-      
-    } catch (err) {
-      console.error('Error registering device:', err);
-      alert(err instanceof Error ? err.message : 'Failed to register device');
-    } finally {
-      setRegistering(null);
+      router.push('/devices');
+    } catch (error) {
+      // Error is handled by the mutation hook
     }
   };
 
   const DeviceDiscoveryCard = ({ device }: { device: EcoFlowDevice }) => {
     const isOnline = device.online === 1;
-    const isRegistering = registering === device.sn;
+    const isRegistering = registerDeviceMutation.isPending;
     const isRegistered = device.isRegistered;
 
     return (
@@ -164,7 +115,7 @@ const AddDevicePage = () => {
             </Link>
           ) : (
             <button
-              onClick={() => registerDevice(device.sn, device.deviceName)}
+              onClick={() => registerDevice(device)}
               disabled={isRegistering}
               className="flex-1 bg-accent-green hover:bg-accent-green/90 disabled:bg-gray-700 disabled:text-gray-400 text-black font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
@@ -256,7 +207,7 @@ const AddDevicePage = () => {
                   <AlertTriangle size={20} className="text-red-400" />
                   <p className="text-red-400 font-medium">Error discovering devices</p>
                 </div>
-                <p className="text-gray-400 text-sm mt-1">{error}</p>
+                <p className="text-gray-400 text-sm mt-1">{error?.message || 'Unknown error'}</p>
                 <button
                   onClick={searchDevices}
                   className="mt-3 text-accent-green hover:text-accent-green/80 text-sm font-medium transition-colors"
@@ -270,12 +221,12 @@ const AddDevicePage = () => {
             {searchPerformed && !loading && !error && (
               <div>
                 <h2 className="text-xl font-semibold text-white mb-6">
-                  Discovered Devices ({devices.length})
+                  Discovered Devices ({discoveredDevices.length})
                 </h2>
                 
-                {devices.length > 0 ? (
+                {discoveredDevices.length > 0 ? (
                   <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {devices.map((device) => (
+                    {discoveredDevices.map((device) => (
                       <DeviceDiscoveryCard key={device.sn} device={device} />
                     ))}
                   </div>
@@ -297,7 +248,7 @@ const AddDevicePage = () => {
             )}
 
             {/* Manual Entry Option */}
-            {searchPerformed && devices.length === 0 && !loading && (
+            {searchPerformed && discoveredDevices.length === 0 && !loading && (
               <div className="mt-8 bg-primary-dark rounded-lg border border-gray-800 p-6">
                 <h3 className="text-lg font-semibold text-white mb-3">Manual Device Entry</h3>
                 <p className="text-gray-400 mb-4">

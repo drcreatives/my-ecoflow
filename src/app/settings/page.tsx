@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { 
-  Settings,
+  SettingsIcon,
   User,
   Bell,
   BellOff,
@@ -29,78 +29,52 @@ import { AppLayout } from '@/components/layout'
 import AuthWrapper from '@/components/AuthWrapper'
 import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
+import { 
+  useProfile, 
+  useNotificationSettings, 
+  useDataRetentionSettings, 
+  useSessionSettings,
+  useUpdateProfile,
+  useChangePassword,
+  useUpdateNotificationSettings,
+  useUpdateDataRetentionSettings,
+  useUpdateSessionSettings,
+  useExportData
+} from '@/hooks/useProfile'
+import { useTestEmail } from '@/hooks/useSystem'
 import { cn } from '@/lib/utils'
-
-interface UserProfile {
-  email: string
-  firstName?: string
-  lastName?: string
-  createdAt: string
-}
-
-interface NotificationSettings {
-  deviceAlerts: boolean
-  lowBattery: boolean
-  powerThreshold: boolean
-  systemUpdates: boolean
-  weeklyReports: boolean
-  emailNotifications: boolean
-  pushNotifications: boolean
-}
-
-interface DataSettings {
-  retentionPeriod: number // days
-  autoBackup: boolean
-  exportFormat: 'json' | 'csv'
-  collectInterval: number // minutes
-}
-
-interface SecuritySettings {
-  twoFactorEnabled: boolean
-  sessionTimeout: number // minutes
-  passwordLastChanged: string
-}
 
 function SettingsPage() {
   const { user, logout } = useAuthStore()
   const { notifications, clearAllNotifications } = useUIStore()
   const router = useRouter()
   
-  // State management
+  // TanStack Query hooks for data management
+  const profileQuery = useProfile()
+  const notificationSettingsQuery = useNotificationSettings()
+  const dataSettingsQuery = useDataRetentionSettings()
+  const securitySettingsQuery = useSessionSettings()
+  
+  // Mutations
+  const updateProfile = useUpdateProfile()
+  const updateNotificationSettings = useUpdateNotificationSettings()
+  const updateDataSettings = useUpdateDataRetentionSettings()
+  const updateSecuritySettings = useUpdateSessionSettings()
+  const changePassword = useChangePassword()
+  const exportData = useExportData()
+  const testEmail = useTestEmail()
+  
+  // Data destructuring
+  const profile = profileQuery.data
+  const notificationSettings = notificationSettingsQuery.data
+  const dataSettings = dataSettingsQuery.data
+  const securitySettings = securitySettingsQuery.data
+  const loading = profileQuery.isLoading || notificationSettingsQuery.isLoading || 
+                  dataSettingsQuery.isLoading || securitySettingsQuery.isLoading
+  
+  // Local UI state
   const [activeTab, setActiveTab] = useState('profile')
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  
-  // Settings state
-  const [userProfile, setUserProfile] = useState<UserProfile>({
-    email: user?.email || '',
-    firstName: '',
-    lastName: '',
-    createdAt: ''
-  })
-  
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
-    deviceAlerts: true,
-    lowBattery: true,
-    powerThreshold: true,
-    systemUpdates: true,
-    weeklyReports: false,
-    emailNotifications: true,
-    pushNotifications: false
-  })
-  
-  const [dataSettings, setDataSettings] = useState<DataSettings>({
-    retentionPeriod: 90,
-    autoBackup: true,
-    exportFormat: 'json',
-    collectInterval: 5
-  })
-  
-  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
-    twoFactorEnabled: false,
-    sessionTimeout: 30,
-    passwordLastChanged: '2025-09-01'
-  })
 
   // Password change state
   const [showPasswordForm, setShowPasswordForm] = useState(false)
@@ -115,419 +89,98 @@ function SettingsPage() {
     confirm: false
   })
 
-  // Test email state
-  const [testingEmail, setTestingEmail] = useState(false)
-
-  useEffect(() => {
-    loadUserSettings()
-  }, [])
-
-  const loadUserSettings = async () => {
-    setLoading(true)
+  // Handle profile form submission
+  const handleProfileSave = async () => {
+    if (!profile?.firstName?.trim()) {
+      toast.error('First name is required')
+      return
+    }
+    if (!profile?.lastName?.trim()) {
+      toast.error('Last name is required')
+      return
+    }
+    
     try {
-      // Load user profile from API
-      const profileResponse = await fetch('/api/user/profile')
-      if (profileResponse.ok) {
-        const { profile } = await profileResponse.json()
-        setUserProfile({
-          email: profile.email,
-          firstName: profile.firstName || '',
-          lastName: profile.lastName || '',
-          createdAt: profile.createdAt
-        })
-      } else {
-        console.error('Failed to load profile:', await profileResponse.text())
-      }
-      
-      // Load notification settings from API
-      try {
-        const notificationResponse = await fetch('/api/user/notifications')
-        if (notificationResponse.ok) {
-          const { settings } = await notificationResponse.json()
-          setNotificationSettings({
-            deviceAlerts: settings.deviceAlerts,
-            lowBattery: settings.lowBattery,
-            powerThreshold: settings.powerThreshold,
-            systemUpdates: settings.systemUpdates,
-            weeklyReports: settings.weeklyReports,
-            emailNotifications: settings.emailNotifications,
-            pushNotifications: settings.pushNotifications
-          })
-        } else {
-          // Fallback to localStorage if API fails
-          const savedNotifications = localStorage.getItem('notificationSettings')
-          if (savedNotifications) {
-            setNotificationSettings(JSON.parse(savedNotifications))
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load notification settings:', error)
-        // Fallback to localStorage
-        const savedNotifications = localStorage.getItem('notificationSettings')
-        if (savedNotifications) {
-          setNotificationSettings(JSON.parse(savedNotifications))
-        }
-      }
-      
-      const savedDataSettings = localStorage.getItem('dataSettings')
-      if (savedDataSettings) {
-        setDataSettings(JSON.parse(savedDataSettings))
-      }
-      
-      const savedSecuritySettings = localStorage.getItem('securitySettings')
-      if (savedSecuritySettings) {
-        setSecuritySettings(JSON.parse(savedSecuritySettings))
-      }
-      
+      await updateProfile.mutateAsync(profile)
+      toast.success('Profile updated successfully')
     } catch (error) {
-      console.error('Failed to load settings:', error)
-      toast.error('Failed to load settings')
-    } finally {
-      setLoading(false)
+      toast.error('Failed to update profile')
     }
   }
 
-  const saveSettings = async (settingsType: string, settings: any) => {
-    setSaving(true)
+  // Handle notification settings toggle
+  const handleNotificationToggle = async (key: keyof typeof notificationSettings) => {
+    if (!notificationSettings) return
+    
+    const newSettings = {
+      ...notificationSettings,
+      [key]: !notificationSettings[key]
+    }
+    
     try {
-      if (settingsType === 'userProfile') {
-        // Validate profile data
-        if (!settings.firstName || !settings.firstName.trim()) {
-          toast.error('First name is required')
-          return
-        }
-
-        if (!settings.lastName || !settings.lastName.trim()) {
-          toast.error('Last name is required')
-          return
-        }
-
-        if (settings.firstName.length > 50) {
-          toast.error('First name must be less than 50 characters')
-          return
-        }
-
-        if (settings.lastName.length > 50) {
-          toast.error('Last name must be less than 50 characters')
-          return
-        }
-
-        // Check for valid characters (letters, spaces, hyphens, apostrophes)
-        const namePattern = /^[a-zA-Z\s\-']+$/
-        if (!namePattern.test(settings.firstName)) {
-          toast.error('First name contains invalid characters')
-          return
-        }
-
-        if (!namePattern.test(settings.lastName)) {
-          toast.error('Last name contains invalid characters')
-          return
-        }
-
-        // Save user profile via API
-        const response = await fetch('/api/user/profile', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            firstName: settings.firstName.trim(),
-            lastName: settings.lastName.trim()
-          })
-        })
-        
-        if (response.ok) {
-          const { profile } = await response.json()
-          setUserProfile(profile)
-          toast.success('Profile updated successfully')
-        } else {
-          const error = await response.json()
-          toast.error(error.error || 'Failed to update profile')
-        }
-      } else if (settingsType === 'notificationSettings') {
-        // Save notification settings via API
-        const response = await fetch('/api/user/notifications', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(settings)
-        })
-        
-        if (response.ok) {
-          const { settings: updatedSettings } = await response.json()
-          setNotificationSettings({
-            deviceAlerts: updatedSettings.deviceAlerts,
-            lowBattery: updatedSettings.lowBattery,
-            powerThreshold: updatedSettings.powerThreshold,
-            systemUpdates: updatedSettings.systemUpdates,
-            weeklyReports: updatedSettings.weeklyReports,
-            emailNotifications: updatedSettings.emailNotifications,
-            pushNotifications: updatedSettings.pushNotifications
-          })
-          toast.success('Notification settings updated successfully')
-        } else {
-          const error = await response.json()
-          toast.error(error.error || 'Failed to update notification settings')
-        }
-      } else if (settingsType === 'dataSettings') {
-        // Validate data settings before saving
-        if (settings.retentionPeriod < 1 || settings.retentionPeriod > 365) {
-          toast.error('Retention period must be between 1 and 365 days')
-          return
-        }
-
-        if (settings.collectInterval < 1 || settings.collectInterval > 1440) {
-          toast.error('Collection interval must be between 1 and 1440 minutes')
-          return
-        }
-
-        // Save data retention settings via API
-        const response = await fetch('/api/user/data-retention', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            retentionPeriodDays: settings.retentionPeriod,
-            autoCleanupEnabled: true, // Default to enabled for automatic cleanup
-            backupEnabled: settings.autoBackup,
-            collectionIntervalMinutes: settings.collectInterval
-          })
-        })
-        
-        if (response.ok) {
-          const { settings: updatedSettings } = await response.json()
-          setDataSettings({
-            retentionPeriod: updatedSettings.retention_period_days,
-            autoBackup: updatedSettings.backup_enabled,
-            exportFormat: dataSettings.exportFormat, // Keep current format preference
-            collectInterval: updatedSettings.collection_interval_minutes
-          })
-          toast.success('Data settings updated successfully')
-        } else {
-          const error = await response.json()
-          toast.error(error.error || 'Failed to update data settings')
-        }
-      } else {
-        // Save other settings to localStorage for now (will be API later)
-        localStorage.setItem(settingsType, JSON.stringify(settings))
-        toast.success('Settings saved successfully')
-      }
+      await updateNotificationSettings.mutateAsync(newSettings)
+      toast.success('Notification settings updated')
     } catch (error) {
-      console.error('Failed to save settings:', error)
-      
-      // Enhanced error handling with specific error types
-      let errorMessage = 'Failed to save settings'
-      
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        errorMessage = 'Network error: Please check your internet connection'
-      } else if (error instanceof Error) {
-        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-          errorMessage = 'Session expired. Please log in again.'
-          // Optionally redirect to login
-          // window.location.href = '/login'
-        } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
-          errorMessage = 'You do not have permission to perform this action'
-        } else if (error.message.includes('500')) {
-          errorMessage = 'Server error. Please try again later.'
-        } else if (error.message.includes('400')) {
-          errorMessage = 'Invalid data provided. Please check your inputs.'
-        } else {
-          errorMessage = error.message
-        }
-      }
-      
-      toast.error(errorMessage)
-    } finally {
-      setSaving(false)
+      toast.error('Failed to update notification settings')
     }
   }
 
+  // Handle password change
   const handlePasswordChange = async () => {
-    // Comprehensive validation
-    if (!passwordForm.currentPassword.trim()) {
+    if (!passwordForm.currentPassword) {
       toast.error('Current password is required')
       return
     }
-
-    if (!passwordForm.newPassword.trim()) {
+    if (!passwordForm.newPassword) {
       toast.error('New password is required')
       return
     }
-
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast.error('New passwords do not match')
+      toast.error('Passwords do not match')
+      return
+    }
+    if (passwordForm.newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters')
       return
     }
     
-    // Enhanced password strength validation
-    if (passwordForm.newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters long')
-      return
-    }
-
-    // Check for common password requirements
-    const hasUppercase = /[A-Z]/.test(passwordForm.newPassword)
-    const hasLowercase = /[a-z]/.test(passwordForm.newPassword)
-    const hasNumbers = /\d/.test(passwordForm.newPassword)
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(passwordForm.newPassword)
-
-    if (!hasUppercase || !hasLowercase || !hasNumbers) {
-      toast.error('Password must contain uppercase, lowercase, and numbers')
-      return
-    }
-
-    if (passwordForm.currentPassword === passwordForm.newPassword) {
-      toast.error('New password must be different from current password')
-      return
-    }
-    
-    setSaving(true)
     try {
-      // Call the actual password change API
-      const response = await fetch('/api/user/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          currentPassword: passwordForm.currentPassword,
-          newPassword: passwordForm.newPassword
-        })
+      await changePassword.mutateAsync({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
       })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to change password')
-      }
-      
-      setSecuritySettings(prev => ({
-        ...prev,
-        passwordLastChanged: new Date().toISOString().split('T')[0]
-      }))
-      
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      toast.success('Password updated successfully')
       setShowPasswordForm(false)
-      toast.success('Password changed successfully. Please sign in again with your new password.')
-      
-      // Optionally redirect to login after password change
-      // window.location.href = '/login'
-      
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
     } catch (error) {
-      console.error('Password change error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to change password'
-      toast.error(errorMessage)
-    } finally {
-      setSaving(false)
+      toast.error('Failed to update password')
     }
   }
 
+  // Handle test email
   const handleTestEmail = async () => {
-    setTestingEmail(true)
     try {
-      const response = await fetch('/api/email/test', {
-        method: 'GET'
-      })
-      
-      if (response.ok) {
-        const result = await response.json()
-        toast.success('Test email sent successfully! Check your inbox.')
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to send test email')
-      }
+      await testEmail.mutateAsync()
     } catch (error) {
-      console.error('Test email error:', error)
-      toast.error('Failed to send test email')
-    } finally {
-      setTestingEmail(false)
+      // Error handling is done by the mutation hook
     }
   }
 
-  const exportData = async (format: string = 'json') => {
-    // Validate format
-    if (!['json', 'csv'].includes(format)) {
-      toast.error('Invalid export format. Only JSON and CSV are supported.')
-      return
-    }
-
-    setSaving(true)
+  // Handle data export
+  const handleExportData = async (format: 'json' | 'csv') => {
     try {
-      // Call our data export API with backup endpoint
-      const response = await fetch(`/api/user/backup?format=${format}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to export data' }))
-        throw new Error(errorData.error || `HTTP ${response.status}: Failed to export data`)
-      }
-
-      // Check if response is actually file data
-      const contentType = response.headers.get('content-type')
-      if (!contentType || (!contentType.includes('application/json') && !contentType.includes('text/csv') && !contentType.includes('application/octet-stream'))) {
-        throw new Error('Invalid response format from server')
-      }
-
-      // Get the filename from the response headers
-      const contentDisposition = response.headers.get('content-disposition')
-      let filename = `ecoflow-export-${new Date().toISOString().split('T')[0]}.${format}`
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="([^"]+)"/)
-        if (filenameMatch) {
-          filename = filenameMatch[1]
-        }
-      }
-
-      // Create download
-      const blob = await response.blob()
-      
-      // Validate blob size
-      if (blob.size === 0) {
-        throw new Error('Export file is empty')
-      }
-
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      a.style.display = 'none'
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-      
-      toast.success(`Data exported successfully as ${format.toUpperCase()} (${(blob.size / 1024).toFixed(1)} KB)`)
+      await exportData.mutateAsync({ format })
+      toast.success('Data exported successfully')
     } catch (error) {
-      console.error('Export error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to export data'
-      toast.error(`Export failed: ${errorMessage}`)
-    } finally {
-      setSaving(false)
+      toast.error('Failed to export data')
     }
   }
-
-  const tabs = [
-    { id: 'profile', label: 'Profile', icon: User },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'data', label: 'Data & Privacy', icon: Database },
-    { id: 'security', label: 'Security', icon: Shield },
-  ]
 
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="w-8 h-8 text-accent-green animate-spin mx-auto mb-4" />
-            <p className="text-gray-400">Loading settings...</p>
-          </div>
+        <div className="flex justify-center items-center min-h-[50vh]">
+          <Loader2 size={48} className="text-accent-green animate-spin" />
         </div>
       </AppLayout>
     )
@@ -535,530 +188,467 @@ function SettingsPage() {
 
   return (
     <AppLayout>
-      <div className="p-4 sm:p-6">
-        <div className="max-w-6xl mx-auto">
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-8">
-            <Settings size={28} className="text-accent-green" />
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">Settings</h1>
-              <p className="text-gray-400">Manage your account and app preferences</p>
-            </div>
-          </div>
+      <div className="p-4 sm:p-6 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-accent-gray">Settings</h1>
+          <p className="text-accent-gray opacity-70">
+            Manage your account, preferences, and application settings
+          </p>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Sidebar Navigation */}
-            <div className="lg:col-span-1">
-              <div className="bg-primary-dark border border-gray-700 rounded-lg p-1">
-                {tabs.map((tab) => {
-                  const Icon = tab.icon
-                  return (
+        {/* Tabs */}
+        <div className="bg-primary-dark rounded-lg border border-gray-700">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-0">
+            {[
+              { id: 'profile', label: 'Profile', icon: User },
+              { id: 'notifications', label: 'Notifications', icon: Bell },
+              { id: 'data', label: 'Data & Storage', icon: Database },
+              { id: 'security', label: 'Security', icon: Shield }
+            ].map((tab, index) => {
+              const Icon = tab.icon
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "p-4 flex flex-col sm:flex-row items-center gap-2 transition-all",
+                    "border-gray-700 text-center sm:text-left",
+                    index < 3 && "border-r",
+                    activeTab === tab.id 
+                      ? "bg-accent-green text-black" 
+                      : "text-accent-gray hover:bg-gray-800"
+                  )}
+                >
+                  <Icon size={20} />
+                  <span className="text-sm font-medium">{tab.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        <div className="bg-primary-dark rounded-lg border border-gray-700 p-6">
+          {activeTab === 'profile' && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3 mb-6">
+                <User className="text-accent-green" size={24} />
+                <h2 className="text-xl font-bold text-accent-gray">Profile Information</h2>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-accent-gray mb-2">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={profile?.email || ''}
+                    readOnly
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-accent-gray opacity-50 cursor-not-allowed"
+                  />
+                  <p className="text-xs text-accent-gray opacity-70 mt-1">
+                    Email cannot be changed
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-accent-gray mb-2">
+                    Member Since
+                  </label>
+                  <input
+                    type="text"
+                    value={profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : ''}
+                    readOnly
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-accent-gray opacity-50 cursor-not-allowed"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-accent-gray mb-2">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    value={profile?.firstName || ''}
+                    onChange={(e) => {
+                      // For optimistic updates, we'll just update locally and save on blur/submit
+                      // updateProfile.mutate({ ...profile, firstName: e.target.value })
+                    }}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-accent-gray focus:ring-2 focus:ring-accent-green focus:border-transparent"
+                    placeholder="Enter your first name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-accent-gray mb-2">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={profile?.lastName || ''}
+                    onChange={(e) => {
+                      // For optimistic updates, we'll just update locally and save on blur/submit
+                      // updateProfile.mutate({ ...profile, lastName: e.target.value })
+                    }}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-accent-gray focus:ring-2 focus:ring-accent-green focus:border-transparent"
+                    placeholder="Enter your last name"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={handleProfileSave}
+                  disabled={updateProfile.isPending}
+                  className="bg-accent-green hover:bg-accent-green-secondary text-black font-medium px-6 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+                >
+                  {updateProfile.isPending ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Save size={16} />
+                  )}
+                  Save Profile
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3 mb-6">
+                <Bell className="text-accent-green" size={24} />
+                <h2 className="text-xl font-bold text-accent-gray">Notification Settings</h2>
+              </div>
+
+              <div className="space-y-4">
+                {[
+                  { key: 'deviceAlerts', label: 'Device Alerts', desc: 'Get notified about device status changes' },
+                  { key: 'lowBattery', label: 'Low Battery Warnings', desc: 'Alert when battery levels are critically low' },
+                  { key: 'powerThreshold', label: 'Power Threshold Alerts', desc: 'Notify when power usage exceeds thresholds' },
+                  { key: 'systemUpdates', label: 'System Updates', desc: 'Get notified about app and firmware updates' },
+                  { key: 'weeklyReports', label: 'Weekly Reports', desc: 'Receive weekly energy usage summaries' },
+                  { key: 'emailNotifications', label: 'Email Notifications', desc: 'Send notifications to your email' },
+                  { key: 'pushNotifications', label: 'Push Notifications', desc: 'Show notifications in your browser' }
+                ].map(({ key, label, desc }) => (
+                  <div key={key} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-accent-gray">{label}</h3>
+                      <p className="text-sm text-accent-gray opacity-70">{desc}</p>
+                    </div>
                     <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
+                      onClick={() => handleNotificationToggle(key as keyof typeof notificationSettings)}
+                      disabled={updateNotificationSettings.isPending}
                       className={cn(
-                        "w-full flex items-center gap-3 p-3 rounded-md text-left transition-colors",
-                        activeTab === tab.id
-                          ? "bg-accent-green text-black font-medium"
-                          : "text-gray-400 hover:text-white hover:bg-gray-700"
+                        "relative w-12 h-6 rounded-full transition-colors duration-200",
+                        notificationSettings?.[key as keyof typeof notificationSettings] 
+                          ? "bg-accent-green" 
+                          : "bg-gray-600"
                       )}
                     >
-                      <Icon size={20} />
-                      <span className="hidden sm:block">{tab.label}</span>
-                      <ChevronRight size={16} className={cn(
-                        "ml-auto transition-transform",
-                        activeTab === tab.id ? "rotate-90" : ""
-                      )} />
+                      <div
+                        className={cn(
+                          "absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform duration-200",
+                          notificationSettings?.[key as keyof typeof notificationSettings] 
+                            ? "translate-x-6" 
+                            : "translate-x-0.5"
+                        )}
+                      />
                     </button>
-                  )
-                })}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={handleTestEmail}
+                  disabled={testEmail.isPending}
+                  className="border border-accent-green text-accent-green hover:bg-accent-green hover:text-black font-medium px-6 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+                >
+                  {testEmail.isPending ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Mail size={16} />
+                  )}
+                  Send Test Email
+                </button>
               </div>
             </div>
+          )}
 
-            {/* Main Content */}
-            <div className="lg:col-span-3">
-              <div className="bg-primary-dark border border-gray-700 rounded-lg p-6">
-                
-                {/* Profile Tab */}
-                {activeTab === 'profile' && (
-                  <div className="space-y-6">
+          {activeTab === 'data' && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3 mb-6">
+                <Database className="text-accent-green" size={24} />
+                <h2 className="text-xl font-bold text-accent-gray">Data & Storage Settings</h2>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-accent-gray mb-2">
+                    Data Retention Period (days)
+                  </label>
+                  <select
+                    value={dataSettings?.retentionPeriod || 90}
+                    onChange={(e) => updateDataSettings.mutate({ 
+                      ...dataSettings, 
+                      retentionPeriod: parseInt(e.target.value) 
+                    })}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-accent-gray focus:ring-2 focus:ring-accent-green focus:border-transparent"
+                  >
+                    <option value={30}>30 days</option>
+                    <option value={90}>90 days</option>
+                    <option value={180}>180 days</option>
+                    <option value={365}>1 year</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-accent-gray mb-2">
+                    Data Collection Interval (minutes)
+                  </label>
+                  <select
+                    value={dataSettings?.collectInterval || 5}
+                    onChange={(e) => updateDataSettings.mutate({ 
+                      ...dataSettings, 
+                      collectInterval: parseInt(e.target.value) 
+                    })}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-accent-gray focus:ring-2 focus:ring-accent-green focus:border-transparent"
+                  >
+                    <option value={1}>1 minute</option>
+                    <option value={5}>5 minutes</option>
+                    <option value={15}>15 minutes</option>
+                    <option value={30}>30 minutes</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                  <div>
+                    <h3 className="font-medium text-accent-gray">Automatic Backup</h3>
+                    <p className="text-sm text-accent-gray opacity-70">
+                      Automatically backup your data to cloud storage
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => updateDataSettings.mutate({ 
+                      ...dataSettings, 
+                      autoBackup: !dataSettings?.autoBackup 
+                    })}
+                    className={cn(
+                      "relative w-12 h-6 rounded-full transition-colors duration-200",
+                      dataSettings?.autoBackup ? "bg-accent-green" : "bg-gray-600"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform duration-200",
+                        dataSettings?.autoBackup ? "translate-x-6" : "translate-x-0.5"
+                      )}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-medium text-accent-gray">Export Data</h3>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleExportData('json')}
+                    disabled={exportData.isPending}
+                    className="border border-accent-green text-accent-green hover:bg-accent-green hover:text-black font-medium px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+                  >
+                    <Download size={16} />
+                    Export JSON
+                  </button>
+                  <button
+                    onClick={() => handleExportData('csv')}
+                    disabled={exportData.isPending}
+                    className="border border-accent-green text-accent-green hover:bg-accent-green hover:text-black font-medium px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+                  >
+                    <Download size={16} />
+                    Export CSV
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'security' && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3 mb-6">
+                <Shield className="text-accent-green" size={24} />
+                <h2 className="text-xl font-bold text-accent-gray">Security Settings</h2>
+              </div>
+
+              {/* Password Change Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium text-accent-gray">Change Password</h3>
+                    <p className="text-sm text-accent-gray opacity-70">
+                      Last changed: {securitySettings?.passwordLastChanged || 'Never'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowPasswordForm(!showPasswordForm)}
+                    className="border border-accent-green text-accent-green hover:bg-accent-green hover:text-black font-medium px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Change Password
+                  </button>
+                </div>
+
+                {showPasswordForm && (
+                  <div className="space-y-4 p-4 bg-gray-800 rounded-lg">
                     <div>
-                      <h2 className="text-xl font-semibold text-white mb-4">Profile Information</h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Email Address
-                          </label>
-                          <input
-                            type="email"
-                            value={userProfile.email}
-                            disabled
-                            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green disabled:opacity-60"
-                          />
-                          <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Member Since
-                          </label>
-                          <input
-                            type="text"
-                            value={new Date(userProfile.createdAt).toLocaleDateString()}
-                            disabled
-                            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green disabled:opacity-60"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            First Name
-                          </label>
-                          <input
-                            type="text"
-                            value={userProfile.firstName}
-                            onChange={(e) => setUserProfile(prev => ({ ...prev, firstName: e.target.value }))}
-                            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green"
-                            placeholder="Enter first name"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Last Name
-                          </label>
-                          <input
-                            type="text"
-                            value={userProfile.lastName}
-                            onChange={(e) => setUserProfile(prev => ({ ...prev, lastName: e.target.value }))}
-                            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green"
-                            placeholder="Enter last name"
-                          />
-                        </div>
+                      <label className="block text-sm font-medium text-accent-gray mb-2">
+                        Current Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPasswords.current ? 'text' : 'password'}
+                          value={passwordForm.currentPassword}
+                          onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                          className="w-full px-3 py-2 pr-10 bg-gray-700 border border-gray-600 rounded-lg text-accent-gray focus:ring-2 focus:ring-accent-green focus:border-transparent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-accent-gray hover:text-white"
+                        >
+                          {showPasswords.current ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-accent-gray mb-2">
+                        New Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPasswords.new ? 'text' : 'password'}
+                          value={passwordForm.newPassword}
+                          onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                          className="w-full px-3 py-2 pr-10 bg-gray-700 border border-gray-600 rounded-lg text-accent-gray focus:ring-2 focus:ring-accent-green focus:border-transparent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-accent-gray hover:text-white"
+                        >
+                          {showPasswords.new ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-accent-gray mb-2">
+                        Confirm New Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPasswords.confirm ? 'text' : 'password'}
+                          value={passwordForm.confirmPassword}
+                          onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                          className="w-full px-3 py-2 pr-10 bg-gray-700 border border-gray-600 rounded-lg text-accent-gray focus:ring-2 focus:ring-accent-green focus:border-transparent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-accent-gray hover:text-white"
+                        >
+                          {showPasswords.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
                       <button
-                        onClick={() => saveSettings('userProfile', userProfile)}
-                        disabled={saving}
-                        className="mt-4 flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 disabled:opacity-50 text-black font-medium px-4 py-2 rounded-lg transition-colors"
+                        onClick={handlePasswordChange}
+                        disabled={changePassword.isPending}
+                        className="bg-accent-green hover:bg-accent-green-secondary text-black font-medium px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
                       >
-                        {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                        Save Profile
-                      </button>
-                    </div>
-
-                    {/* Account Actions */}
-                    <div className="border-t border-gray-700 pt-6">
-                      <h3 className="text-lg font-semibold text-white mb-4">Account Actions</h3>
-                      <div className="space-y-3">
-                        <button
-                          onClick={() => exportData('json')}
-                          disabled={saving}
-                          className="flex items-center gap-2 text-accent-green hover:text-accent-green/80 transition-colors"
-                        >
-                          <Download size={16} />
-                          Export Account Data
-                        </button>
-                        <button
-                          onClick={() => logout()}
-                          className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors"
-                        >
-                          <RefreshCw size={16} />
-                          Sign Out of All Devices
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Notifications Tab */}
-                {activeTab === 'notifications' && (
-                  <div className="space-y-6">
-                    <div>
-                      <h2 className="text-xl font-semibold text-white mb-4">Notification Preferences</h2>
-                      
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <AlertTriangle className="text-red-400" size={20} />
-                            <div>
-                              <div className="font-medium text-white">Device Alerts</div>
-                              <div className="text-sm text-gray-400">Critical device status notifications</div>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => setNotificationSettings(prev => ({ ...prev, deviceAlerts: !prev.deviceAlerts }))}
-                            className={cn(
-                              "w-12 h-6 rounded-full transition-colors",
-                              notificationSettings.deviceAlerts ? "bg-accent-green" : "bg-gray-600"
-                            )}
-                          >
-                            <div className={cn(
-                              "w-5 h-5 bg-white rounded-full transition-transform",
-                              notificationSettings.deviceAlerts ? "translate-x-6" : "translate-x-0.5"
-                            )} />
-                          </button>
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <Zap className="text-yellow-400" size={20} />
-                            <div>
-                              <div className="font-medium text-white">Low Battery Alerts</div>
-                              <div className="text-sm text-gray-400">When battery level drops below 20%</div>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => setNotificationSettings(prev => ({ ...prev, lowBattery: !prev.lowBattery }))}
-                            className={cn(
-                              "w-12 h-6 rounded-full transition-colors",
-                              notificationSettings.lowBattery ? "bg-accent-green" : "bg-gray-600"
-                            )}
-                          >
-                            <div className={cn(
-                              "w-5 h-5 bg-white rounded-full transition-transform",
-                              notificationSettings.lowBattery ? "translate-x-6" : "translate-x-0.5"
-                            )} />
-                          </button>
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <Bell className="text-blue-400" size={20} />
-                            <div>
-                              <div className="font-medium text-white">Power Threshold Alerts</div>
-                              <div className="text-sm text-gray-400">High power consumption warnings</div>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => setNotificationSettings(prev => ({ ...prev, powerThreshold: !prev.powerThreshold }))}
-                            className={cn(
-                              "w-12 h-6 rounded-full transition-colors",
-                              notificationSettings.powerThreshold ? "bg-accent-green" : "bg-gray-600"
-                            )}
-                          >
-                            <div className={cn(
-                              "w-5 h-5 bg-white rounded-full transition-transform",
-                              notificationSettings.powerThreshold ? "translate-x-6" : "translate-x-0.5"
-                            )} />
-                          </button>
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <Mail className="text-green-400" size={20} />
-                            <div>
-                              <div className="font-medium text-white">Email Notifications</div>
-                              <div className="text-sm text-gray-400">Receive notifications via email</div>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => setNotificationSettings(prev => ({ ...prev, emailNotifications: !prev.emailNotifications }))}
-                            className={cn(
-                              "w-12 h-6 rounded-full transition-colors",
-                              notificationSettings.emailNotifications ? "bg-accent-green" : "bg-gray-600"
-                            )}
-                          >
-                            <div className={cn(
-                              "w-5 h-5 bg-white rounded-full transition-transform",
-                              notificationSettings.emailNotifications ? "translate-x-6" : "translate-x-0.5"
-                            )} />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-3 mt-6">
-                        <button
-                          onClick={() => saveSettings('notificationSettings', notificationSettings)}
-                          disabled={saving}
-                          className="flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 disabled:opacity-50 text-black font-medium px-4 py-2 rounded-lg transition-colors"
-                        >
-                          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                          Save Preferences
-                        </button>
-                        
-                        {notificationSettings.emailNotifications && (
-                          <button
-                            onClick={handleTestEmail}
-                            disabled={testingEmail || saving}
-                            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
-                          >
-                            {testingEmail ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
-                            Test Email
-                          </button>
+                        {changePassword.isPending ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Save size={16} />
                         )}
-                      </div>
-                    </div>
-
-                    {/* Clear Notifications */}
-                    <div className="border-t border-gray-700 pt-6">
-                      <h3 className="text-lg font-semibold text-white mb-4">Notification History</h3>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-white">Current notifications: {notifications.length}</div>
-                          <div className="text-sm text-gray-400">Clear notification history</div>
-                        </div>
-                        <button
-                          onClick={clearAllNotifications}
-                          className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors"
-                        >
-                          <Trash2 size={16} />
-                          Clear All
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Data & Privacy Tab */}
-                {activeTab === 'data' && (
-                  <div className="space-y-6">
-                    <div>
-                      <h2 className="text-xl font-semibold text-white mb-4">Data Management</h2>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Data Retention Period
-                          </label>
-                          <select
-                            value={dataSettings.retentionPeriod}
-                            onChange={(e) => setDataSettings(prev => ({ ...prev, retentionPeriod: parseInt(e.target.value) }))}
-                            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green"
-                          >
-                            <option value={30}>30 days</option>
-                            <option value={90}>90 days</option>
-                            <option value={180}>6 months</option>
-                            <option value={365}>1 year</option>
-                            <option value={730}>2 years</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Data Collection Interval
-                          </label>
-                          <select
-                            value={dataSettings.collectInterval}
-                            onChange={(e) => setDataSettings(prev => ({ ...prev, collectInterval: parseInt(e.target.value) }))}
-                            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green"
-                          >
-                            <option value={1}>1 minute</option>
-                            <option value={5}>5 minutes</option>
-                            <option value={15}>15 minutes</option>
-                            <option value={30}>30 minutes</option>
-                            <option value={60}>1 hour</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                          <div>
-                            <div className="font-medium text-white">Automatic Backup</div>
-                            <div className="text-sm text-gray-400">Daily backup of device readings and settings</div>
-                          </div>
-                          <button
-                            onClick={() => setDataSettings(prev => ({ ...prev, autoBackup: !prev.autoBackup }))}
-                            className={cn(
-                              "w-12 h-6 rounded-full transition-colors",
-                              dataSettings.autoBackup ? "bg-accent-green" : "bg-gray-600"
-                            )}
-                          >
-                            <div className={cn(
-                              "w-5 h-5 bg-white rounded-full transition-transform",
-                              dataSettings.autoBackup ? "translate-x-6" : "translate-x-0.5"
-                            )} />
-                          </button>
-                        </div>
-                      </div>
-
+                        Update Password
+                      </button>
                       <button
-                        onClick={() => saveSettings('dataSettings', dataSettings)}
-                        disabled={saving}
-                        className="mt-4 flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 disabled:opacity-50 text-black font-medium px-4 py-2 rounded-lg transition-colors"
+                        onClick={() => {
+                          setShowPasswordForm(false)
+                          setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+                        }}
+                        className="border border-gray-600 text-accent-gray hover:bg-gray-700 font-medium px-4 py-2 rounded-lg transition-colors"
                       >
-                        {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                        Save Data Settings
+                        Cancel
                       </button>
-                    </div>
-
-                    {/* Data Export */}
-                    <div className="border-t border-gray-700 pt-6">
-                      <h3 className="text-lg font-semibold text-white mb-4">Data Export</h3>
-                      <div className="space-y-3">
-                        <button
-                          onClick={() => exportData('json')}
-                          disabled={saving}
-                          className="flex items-center gap-2 text-accent-green hover:text-accent-green/80 transition-colors"
-                        >
-                          <Download size={16} />
-                          Export All Data (JSON)
-                        </button>
-                        <button
-                          onClick={() => exportData('csv')}
-                          disabled={saving}
-                          className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors"
-                        >
-                          <Download size={16} />
-                          Export Readings (CSV)
-                        </button>
-                        <div className="text-sm text-gray-400">
-                          Download a complete copy of your data including device readings, settings, and profile information.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Security Tab */}
-                {activeTab === 'security' && (
-                  <div className="space-y-6">
-                    <div>
-                      <h2 className="text-xl font-semibold text-white mb-4">Security Settings</h2>
-                      
-                      {/* Password Section */}
-                      <div className="p-4 bg-gray-800 rounded-lg mb-6">
-                        <div className="flex items-center justify-between mb-4">
-                          <div>
-                            <div className="font-medium text-white">Password</div>
-                            <div className="text-sm text-gray-400">
-                              Last changed: {new Date(securitySettings.passwordLastChanged).toLocaleDateString()}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => setShowPasswordForm(!showPasswordForm)}
-                            className="text-accent-green hover:text-accent-green/80 transition-colors"
-                          >
-                            Change Password
-                          </button>
-                        </div>
-
-                        {showPasswordForm && (
-                          <div className="space-y-4 border-t border-gray-700 pt-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-300 mb-2">
-                                Current Password
-                              </label>
-                              <div className="relative">
-                                <input
-                                  type={showPasswords.current ? "text" : "password"}
-                                  value={passwordForm.currentPassword}
-                                  onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
-                                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 pr-10 text-white focus:outline-none focus:border-accent-green"
-                                  placeholder="Enter current password"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
-                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
-                                >
-                                  {showPasswords.current ? <EyeOff size={16} /> : <Eye size={16} />}
-                                </button>
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-300 mb-2">
-                                New Password
-                              </label>
-                              <div className="relative">
-                                <input
-                                  type={showPasswords.new ? "text" : "password"}
-                                  value={passwordForm.newPassword}
-                                  onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
-                                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 pr-10 text-white focus:outline-none focus:border-accent-green"
-                                  placeholder="Enter new password"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
-                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
-                                >
-                                  {showPasswords.new ? <EyeOff size={16} /> : <Eye size={16} />}
-                                </button>
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-300 mb-2">
-                                Confirm New Password
-                              </label>
-                              <div className="relative">
-                                <input
-                                  type={showPasswords.confirm ? "text" : "password"}
-                                  value={passwordForm.confirmPassword}
-                                  onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 pr-10 text-white focus:outline-none focus:border-accent-green"
-                                  placeholder="Confirm new password"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
-                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
-                                >
-                                  {showPasswords.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                                </button>
-                              </div>
-                            </div>
-                            <div className="flex gap-3">
-                              <button
-                                onClick={handlePasswordChange}
-                                disabled={saving || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
-                                className="flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 disabled:opacity-50 text-black font-medium px-4 py-2 rounded-lg transition-colors"
-                              >
-                                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                Update Password
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setShowPasswordForm(false)
-                                  setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-                                }}
-                                className="px-4 py-2 border border-gray-600 text-gray-400 hover:text-white hover:border-gray-500 rounded-lg transition-colors"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Session Settings */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Session Timeout
-                          </label>
-                          <select
-                            value={securitySettings.sessionTimeout}
-                            onChange={(e) => setSecuritySettings(prev => ({ ...prev, sessionTimeout: parseInt(e.target.value) }))}
-                            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green"
-                          >
-                            <option value={15}>15 minutes</option>
-                            <option value={30}>30 minutes</option>
-                            <option value={60}>1 hour</option>
-                            <option value={120}>2 hours</option>
-                            <option value={480}>8 hours</option>
-                          </select>
-                        </div>
-                        <div className="flex items-end">
-                          <button
-                            onClick={() => saveSettings('securitySettings', securitySettings)}
-                            disabled={saving}
-                            className="flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 disabled:opacity-50 text-black font-medium px-4 py-2 rounded-lg transition-colors"
-                          >
-                            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                            Save Security Settings
-                          </button>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 )}
               </div>
+
+              {/* Two-Factor Authentication */}
+              <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                <div>
+                  <h3 className="font-medium text-accent-gray">Two-Factor Authentication</h3>
+                  <p className="text-sm text-accent-gray opacity-70">
+                    Add an extra layer of security to your account
+                  </p>
+                </div>
+                <button
+                  onClick={() => updateSecuritySettings.mutate({ 
+                    ...securitySettings, 
+                    twoFactorEnabled: !securitySettings?.twoFactorEnabled 
+                  })}
+                  className={cn(
+                    "relative w-12 h-6 rounded-full transition-colors duration-200",
+                    securitySettings?.twoFactorEnabled ? "bg-accent-green" : "bg-gray-600"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform duration-200",
+                      securitySettings?.twoFactorEnabled ? "translate-x-6" : "translate-x-0.5"
+                    )}
+                  />
+                </button>
+              </div>
+
+              {/* Session Timeout */}
+              <div>
+                <label className="block text-sm font-medium text-accent-gray mb-2">
+                  Session Timeout (minutes)
+                </label>
+                <select
+                  value={securitySettings?.sessionTimeout || 30}
+                  onChange={(e) => updateSecuritySettings.mutate({ 
+                    ...securitySettings, 
+                    sessionTimeout: parseInt(e.target.value) 
+                  })}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-accent-gray focus:ring-2 focus:ring-accent-green focus:border-transparent"
+                >
+                  <option value={15}>15 minutes</option>
+                  <option value={30}>30 minutes</option>
+                  <option value={60}>1 hour</option>
+                  <option value={120}>2 hours</option>
+                  <option value={480}>8 hours</option>
+                </select>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </AppLayout>
   )
 }
 
-export default function SettingsPageWrapper() {
+// Wrap with authentication
+export default function Settings() {
   return (
     <AuthWrapper>
       <SettingsPage />

@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 import { Loader2 } from 'lucide-react'
 import { useClientSideReadingCollection } from '@/hooks/useClientSideReadingCollection'
-import { useDeviceStore } from '@/stores/deviceStore'
+import { useDevices } from '@/hooks/useDevices'
 
 interface AuthWrapperProps {
   children: React.ReactNode
@@ -18,7 +18,7 @@ export default function AuthWrapper({ children, redirectTo = '/login' }: AuthWra
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const supabase = createClient()
-  const { fetchDevices } = useDeviceStore()
+  const { refetch: refetchDevices } = useDevices()
   
   // Start automatic reading collection for authenticated users (every 5 minutes)
   const { startCollection } = useClientSideReadingCollection(5)
@@ -32,7 +32,7 @@ export default function AuthWrapper({ children, redirectTo = '/login' }: AuthWra
           setUser(session.user)
           // Start background reading collection for authenticated users
           console.log('🔄 User already authenticated - starting background reading collection')
-          await fetchDevices()
+          refetchDevices()
           startCollection()
         } else {
           router.push(redirectTo)
@@ -56,7 +56,7 @@ export default function AuthWrapper({ children, redirectTo = '/login' }: AuthWra
           setUser(session.user)
           // Start background reading collection when user signs in
           console.log('🔄 User authenticated - starting background reading collection')
-          await fetchDevices()
+          refetchDevices()
           startCollection()
         } else if (event === 'SIGNED_OUT') {
           setUser(null)
@@ -67,7 +67,7 @@ export default function AuthWrapper({ children, redirectTo = '/login' }: AuthWra
     )
 
     return () => subscription.unsubscribe()
-  }, [router, redirectTo, supabase.auth, fetchDevices, startCollection])
+  }, [router, redirectTo, supabase.auth, refetchDevices, startCollection])
 
   if (loading) {
     return (

@@ -2,47 +2,16 @@
 
 import { Clock, Smartphone, Database, Play, Pause } from 'lucide-react'
 import { useClientSideReadingCollection } from '@/hooks/useClientSideReadingCollection'
-import { useState, useEffect } from 'react'
-
-interface MonitoringData {
-  summary?: {
-    totalReadings: number
-    totalDevices: number
-  }
-  recentReadings?: Array<{
-    recordedAt: string
-  }>
-}
+import { useMonitoringData } from '@/hooks/useMonitoringData'
 
 export default function CronStatusWidget() {
-  const [monitoringData, setMonitoringData] = useState<MonitoringData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data: monitoringData, isLoading: loading } = useMonitoringData()
 
   const {
     status: clientStatus,
     startCollection,
     stopCollection
   } = useClientSideReadingCollection(5) // 5-minute intervals
-
-  const fetchMonitoringData = async () => {
-    try {
-      const response = await fetch('/api/monitor-readings')
-      if (response.ok) {
-        const data = await response.json()
-        setMonitoringData(data)
-      }
-    } catch (error) {
-      console.error('Error fetching monitoring data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchMonitoringData()
-    const interval = setInterval(fetchMonitoringData, 30000) // Every 30 seconds
-    return () => clearInterval(interval)
-  }, [])
 
   if (loading) {
     return (
