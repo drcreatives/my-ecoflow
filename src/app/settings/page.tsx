@@ -115,6 +115,9 @@ function SettingsPage() {
     confirm: false
   })
 
+  // Test email state
+  const [testingEmail, setTestingEmail] = useState(false)
+
   useEffect(() => {
     loadUserSettings()
   }, [])
@@ -275,6 +278,28 @@ function SettingsPage() {
       toast.error('Failed to change password')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleTestEmail = async () => {
+    setTestingEmail(true)
+    try {
+      const response = await fetch('/api/email/test', {
+        method: 'GET'
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        toast.success('Test email sent successfully! Check your inbox.')
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Failed to send test email')
+      }
+    } catch (error) {
+      console.error('Test email error:', error)
+      toast.error('Failed to send test email')
+    } finally {
+      setTestingEmail(false)
     }
   }
 
@@ -567,14 +592,27 @@ function SettingsPage() {
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => saveSettings('notificationSettings', notificationSettings)}
-                        disabled={saving}
-                        className="mt-6 flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 disabled:opacity-50 text-black font-medium px-4 py-2 rounded-lg transition-colors"
-                      >
-                        {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                        Save Preferences
-                      </button>
+                      <div className="flex gap-3 mt-6">
+                        <button
+                          onClick={() => saveSettings('notificationSettings', notificationSettings)}
+                          disabled={saving}
+                          className="flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 disabled:opacity-50 text-black font-medium px-4 py-2 rounded-lg transition-colors"
+                        >
+                          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                          Save Preferences
+                        </button>
+                        
+                        {notificationSettings.emailNotifications && (
+                          <button
+                            onClick={handleTestEmail}
+                            disabled={testingEmail || saving}
+                            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+                          >
+                            {testingEmail ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
+                            Test Email
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Clear Notifications */}
