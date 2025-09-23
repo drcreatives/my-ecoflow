@@ -69,7 +69,7 @@ const SidebarContent = ({ onClose }: SidebarProps) => {
   }
 
   return (
-    <div className="h-full bg-primary-dark border-r border-gray-700 w-full flex flex-col">
+    <div className="h-full flex flex-col">
       {/* Navigation */}
       <nav className="flex-1 mt-4 px-3 space-y-1 overflow-y-auto">
         {navigationItems.map((item) => {
@@ -150,6 +150,79 @@ const SidebarContent = ({ onClose }: SidebarProps) => {
   )
 }
 
+// Collapsed sidebar content component for desktop
+const CollapsedSidebar = () => {
+  const pathname = usePathname()
+  const { user, logout } = useAuthStore()
+  const { toggleSidebar } = useUIStore()
+  
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch (error) {
+      console.error('Logout failed:', error)
+    }
+  }
+
+  return (
+    <div className="w-20 h-full bg-primary-dark border-r border-gray-700 flex flex-col">
+      {/* Logo and toggle */}
+      <div className="flex flex-col items-center gap-4 pt-4 pb-4 border-b border-gray-700">
+        <div className="w-8 h-8 bg-accent-green rounded-md flex items-center justify-center">
+          <Zap size={20} className="text-white" />
+        </div>
+        <button
+          onClick={toggleSidebar}
+          className="p-2 text-accent-gray hover:text-white transition-colors"
+          title="Expand sidebar"
+        >
+          <Menu size={20} />
+        </button>
+      </div>
+
+      {/* Navigation icons */}
+      <nav className="flex-1 flex flex-col items-center gap-2 pt-4">
+        {navigationItems.map((item) => {
+          const Icon = item.icon
+          const isActive = pathname === item.href
+          
+          return (
+            <Link key={item.href} href={item.href} title={item.label}>
+              <button
+                className={cn(
+                  'p-3 rounded-md transition-colors w-12 h-12 flex items-center justify-center',
+                  'hover:scale-105 active:scale-95 transform transition-transform',
+                  isActive 
+                    ? 'bg-accent-green text-white shadow-lg' 
+                    : 'text-accent-gray hover:bg-gray-700 hover:text-white'
+                )}
+              >
+                <Icon size={20} />
+              </button>
+            </Link>
+          )
+        })}
+      </nav>
+
+      {/* User profile collapsed */}
+      <div className="p-4 border-t border-gray-700 flex flex-col items-center gap-2">
+        {user && (
+          <div className="w-8 h-8 bg-accent-green rounded-full flex items-center justify-center font-bold text-white text-sm" title={user.email}>
+            {user.email?.[0]?.toUpperCase()}
+          </div>
+        )}
+        <button
+          onClick={handleLogout}
+          className="p-2 text-gray-400 hover:text-accent-gray hover:bg-gray-700 rounded-md transition-colors"
+          title="Sign out"
+        >
+          <LogOut size={18} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export const Sidebar = () => {
   const pathname = usePathname()
   const { sidebarOpen, toggleSidebar } = useUIStore()
@@ -202,41 +275,35 @@ export const Sidebar = () => {
     <div
       className={cn(
         "transition-all duration-300 ease-in-out relative",
-        sidebarOpen ? "w-70" : "w-20"
+        sidebarOpen ? "w-80" : "w-20"
       )}
     >
       {sidebarOpen ? (
-        <SidebarContent />
-      ) : (
-        <div className="w-20 h-full bg-primary-dark border-r border-gray-700">
-          <div className="flex flex-col items-center gap-4 pt-4">
+        <div className="w-80 h-full bg-primary-dark border-r border-gray-700 flex flex-col">
+          {/* Desktop Header */}
+          <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-accent-green rounded-md flex items-center justify-center">
+                <Zap size={20} className="text-white" />
+              </div>
+              <span className="text-lg font-bold text-accent-gray">
+                EcoFlow
+              </span>
+            </div>
             <button
               onClick={toggleSidebar}
-              className="p-2 text-accent-gray hover:text-white transition-colors"
+              className="p-2 text-accent-gray hover:bg-gray-700 rounded-md transition-colors"
+              aria-label="Collapse navigation menu"
+              title="Collapse sidebar"
             >
               <Menu size={20} />
             </button>
-            {navigationItems.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href
-              
-              return (
-                <Link key={item.href} href={item.href}>
-                  <button
-                    className={cn(
-                      'p-2 rounded-md transition-colors',
-                      isActive 
-                        ? 'bg-accent-green text-white' 
-                        : 'text-accent-gray hover:bg-gray-700'
-                    )}
-                  >
-                    <Icon size={20} />
-                  </button>
-                </Link>
-              )
-            })}
           </div>
+          
+          <SidebarContent />
         </div>
+      ) : (
+        <CollapsedSidebar />
       )}
     </div>
   )
