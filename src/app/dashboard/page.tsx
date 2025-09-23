@@ -15,7 +15,8 @@ import { Device } from '@/types';
 // Calculate dynamic stats from device data and readings
 const calculateStats = (devices: Device[], latestReadings: any[] = []) => {
   const totalDevices = devices.length;
-  const activeDevicesList = devices.filter(d => d.isActive);
+  // Use online status instead of isActive for real-time accuracy
+  const activeDevicesList = devices.filter((d: any) => d.online === true || d.online === 1);
   const activeDevices = activeDevicesList.length;
   
   // Create a map for quick lookup of latest readings by device ID
