@@ -191,6 +191,39 @@ function SettingsPage() {
     setSaving(true)
     try {
       if (settingsType === 'userProfile') {
+        // Validate profile data
+        if (!settings.firstName || !settings.firstName.trim()) {
+          toast.error('First name is required')
+          return
+        }
+
+        if (!settings.lastName || !settings.lastName.trim()) {
+          toast.error('Last name is required')
+          return
+        }
+
+        if (settings.firstName.length > 50) {
+          toast.error('First name must be less than 50 characters')
+          return
+        }
+
+        if (settings.lastName.length > 50) {
+          toast.error('Last name must be less than 50 characters')
+          return
+        }
+
+        // Check for valid characters (letters, spaces, hyphens, apostrophes)
+        const namePattern = /^[a-zA-Z\s\-']+$/
+        if (!namePattern.test(settings.firstName)) {
+          toast.error('First name contains invalid characters')
+          return
+        }
+
+        if (!namePattern.test(settings.lastName)) {
+          toast.error('Last name contains invalid characters')
+          return
+        }
+
         // Save user profile via API
         const response = await fetch('/api/user/profile', {
           method: 'PUT',
@@ -198,8 +231,8 @@ function SettingsPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            firstName: settings.firstName,
-            lastName: settings.lastName
+            firstName: settings.firstName.trim(),
+            lastName: settings.lastName.trim()
           })
         })
         
@@ -237,6 +270,45 @@ function SettingsPage() {
           const error = await response.json()
           toast.error(error.error || 'Failed to update notification settings')
         }
+      } else if (settingsType === 'dataSettings') {
+        // Validate data settings before saving
+        if (settings.retentionPeriod < 1 || settings.retentionPeriod > 365) {
+          toast.error('Retention period must be between 1 and 365 days')
+          return
+        }
+
+        if (settings.collectInterval < 1 || settings.collectInterval > 1440) {
+          toast.error('Collection interval must be between 1 and 1440 minutes')
+          return
+        }
+
+        // Save data retention settings via API
+        const response = await fetch('/api/user/data-retention', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            retentionPeriodDays: settings.retentionPeriod,
+            autoCleanupEnabled: true, // Default to enabled for automatic cleanup
+            backupEnabled: settings.autoBackup,
+            collectionIntervalMinutes: settings.collectInterval
+          })
+        })
+        
+        if (response.ok) {
+          const { settings: updatedSettings } = await response.json()
+          setDataSettings({
+            retentionPeriod: updatedSettings.retention_period_days,
+            autoBackup: updatedSettings.backup_enabled,
+            exportFormat: dataSettings.exportFormat, // Keep current format preference
+            collectInterval: updatedSettings.collection_interval_minutes
+          })
+          toast.success('Data settings updated successfully')
+        } else {
+          const error = await response.json()
+          toast.error(error.error || 'Failed to update data settings')
+        }
       } else {
         // Save other settings to localStorage for now (will be API later)
         localStorage.setItem(settingsType, JSON.stringify(settings))
@@ -244,27 +316,92 @@ function SettingsPage() {
       }
     } catch (error) {
       console.error('Failed to save settings:', error)
-      toast.error('Failed to save settings')
+      
+      // Enhanced error handling with specific error types
+      let errorMessage = 'Failed to save settings'
+      
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        errorMessage = 'Network error: Please check your internet connection'
+      } else if (error instanceof Error) {
+        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+          errorMessage = 'Session expired. Please log in again.'
+          // Optionally redirect to login
+          // window.location.href = '/login'
+        } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
+          errorMessage = 'You do not have permission to perform this action'
+        } else if (error.message.includes('500')) {
+          errorMessage = 'Server error. Please try again later.'
+        } else if (error.message.includes('400')) {
+          errorMessage = 'Invalid data provided. Please check your inputs.'
+        } else {
+          errorMessage = error.message
+        }
+      }
+      
+      toast.error(errorMessage)
     } finally {
       setSaving(false)
     }
   }
 
   const handlePasswordChange = async () => {
+    // Comprehensive validation
+    if (!passwordForm.currentPassword.trim()) {
+      toast.error('Current password is required')
+      return
+    }
+
+    if (!passwordForm.newPassword.trim()) {
+      toast.error('New password is required')
+      return
+    }
+
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast.error('New passwords do not match')
       return
     }
     
+    // Enhanced password strength validation
     if (passwordForm.newPassword.length < 8) {
       toast.error('Password must be at least 8 characters long')
+      return
+    }
+
+    // Check for common password requirements
+    const hasUppercase = /[A-Z]/.test(passwordForm.newPassword)
+    const hasLowercase = /[a-z]/.test(passwordForm.newPassword)
+    const hasNumbers = /\d/.test(passwordForm.newPassword)
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(passwordForm.newPassword)
+
+    if (!hasUppercase || !hasLowercase || !hasNumbers) {
+      toast.error('Password must contain uppercase, lowercase, and numbers')
+      return
+    }
+
+    if (passwordForm.currentPassword === passwordForm.newPassword) {
+      toast.error('New password must be different from current password')
       return
     }
     
     setSaving(true)
     try {
-      // API call to change password would go here
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Call the actual password change API
+      const response = await fetch('/api/user/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to change password')
+      }
       
       setSecuritySettings(prev => ({
         ...prev,
@@ -273,9 +410,15 @@ function SettingsPage() {
       
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
       setShowPasswordForm(false)
-      toast.success('Password changed successfully')
+      toast.success('Password changed successfully. Please sign in again with your new password.')
+      
+      // Optionally redirect to login after password change
+      // window.location.href = '/login'
+      
     } catch (error) {
-      toast.error('Failed to change password')
+      console.error('Password change error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to change password'
+      toast.error(errorMessage)
     } finally {
       setSaving(false)
     }
@@ -304,13 +447,31 @@ function SettingsPage() {
   }
 
   const exportData = async (format: string = 'json') => {
+    // Validate format
+    if (!['json', 'csv'].includes(format)) {
+      toast.error('Invalid export format. Only JSON and CSV are supported.')
+      return
+    }
+
     setSaving(true)
     try {
-      // Call our data export API
-      const response = await fetch(`/api/user/export?format=${format}`)
+      // Call our data export API with backup endpoint
+      const response = await fetch(`/api/user/backup?format=${format}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
       
       if (!response.ok) {
-        throw new Error('Failed to export data')
+        const errorData = await response.json().catch(() => ({ error: 'Failed to export data' }))
+        throw new Error(errorData.error || `HTTP ${response.status}: Failed to export data`)
+      }
+
+      // Check if response is actually file data
+      const contentType = response.headers.get('content-type')
+      if (!contentType || (!contentType.includes('application/json') && !contentType.includes('text/csv') && !contentType.includes('application/octet-stream'))) {
+        throw new Error('Invalid response format from server')
       }
 
       // Get the filename from the response headers
@@ -326,17 +487,27 @@ function SettingsPage() {
 
       // Create download
       const blob = await response.blob()
+      
+      // Validate blob size
+      if (blob.size === 0) {
+        throw new Error('Export file is empty')
+      }
+
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
       a.download = filename
+      a.style.display = 'none'
+      document.body.appendChild(a)
       a.click()
+      document.body.removeChild(a)
       URL.revokeObjectURL(url)
       
-      toast.success(`Data exported successfully as ${format.toUpperCase()}`)
+      toast.success(`Data exported successfully as ${format.toUpperCase()} (${(blob.size / 1024).toFixed(1)} KB)`)
     } catch (error) {
       console.error('Export error:', error)
-      toast.error('Failed to export data')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to export data'
+      toast.error(`Export failed: ${errorMessage}`)
     } finally {
       setSaving(false)
     }

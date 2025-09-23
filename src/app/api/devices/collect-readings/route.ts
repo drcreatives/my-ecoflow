@@ -6,45 +6,94 @@ import { executeQuery } from '@/lib/database'
 /**
  * Background job endpoint to collect and store device readings
  * This can be called periodically by a cron job or monitoring system
+ * Now respects user's collection interval preferences
  */
-export async function POST(_request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     console.log('📊 Starting background reading collection...')
     
-    // Verify authentication (could be a service account or API key)
-    const supabase = await createServerSupabaseClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // Check if this is a user-specific collection or global collection
+    const url = new URL(request.url);
+    const userId = url.searchParams.get('userId');
+    const forceCollection = url.searchParams.get('force') === 'true';
     
-    // Get all devices for this user using direct PostgreSQL
-    const devices = await executeQuery<{
-      id: string
-      deviceSn: string
-      deviceName: string
-      userId: string
-    }>(`
-      SELECT id, device_sn as "deviceSn", device_name as "deviceName", user_id as "userId"
-      FROM devices
-      WHERE user_id = $1
-    `, [user.id])
+    let targetUsers: string[] = [];
+    
+    if (userId) {
+      // Specific user collection
+      targetUsers = [userId];
+    } else {
+      // Global collection - get all users with their collection intervals
+      const allUsers = await executeQuery<{
+        user_id: string;
+        collection_interval_minutes: number;
+        last_collection: string | null;
+      }>(`
+        SELECT 
+          drs.user_id,
+          drs.collection_interval_minutes,
+          MAX(dr.recorded_at) as last_collection
+        FROM data_retention_settings drs
+        LEFT JOIN devices d ON d.user_id = drs.user_id
+        LEFT JOIN device_readings dr ON dr.device_id = d.id
+        GROUP BY drs.user_id, drs.collection_interval_minutes
+      `);
 
-    if (devices.length === 0) {
-      console.log('ℹ️ No devices found for user')
-      return NextResponse.json({
-        message: 'No devices found',
-        collected: 0 
-      })
+      // Filter users who need collection based on their interval
+      const now = new Date();
+      targetUsers = allUsers.filter(user => {
+        if (forceCollection) return true;
+        
+        if (!user.last_collection) return true; // No previous collection
+        
+        const lastCollection = new Date(user.last_collection);
+        const intervalMs = user.collection_interval_minutes * 60 * 1000;
+        const timeSinceLastCollection = now.getTime() - lastCollection.getTime();
+        
+        return timeSinceLastCollection >= intervalMs;
+      }).map(user => user.user_id);
+
+      console.log(`📈 Found ${targetUsers.length} users needing collection out of ${allUsers.length} total users`);
     }
 
-    let successCount = 0
-    let errorCount = 0
-    const results = []
+    if (targetUsers.length === 0) {
+      return NextResponse.json({
+        message: 'No users need collection at this time',
+        collected: 0,
+        skipped: 'All users are within their collection interval'
+      });
+    }
+    let totalSuccessCount = 0;
+    let totalErrorCount = 0;
+    const allResults = [];
 
-    // Collect readings for each device
-    for (const device of devices) {
+    // Process each user
+    for (const currentUserId of targetUsers) {
+      console.log(`👤 Processing user: ${currentUserId}`);
+      
+      // Get all devices for this user using direct PostgreSQL
+      const devices = await executeQuery<{
+        id: string
+        deviceSn: string
+        deviceName: string
+        userId: string
+      }>(`
+        SELECT id, device_sn as "deviceSn", device_name as "deviceName", user_id as "userId"
+        FROM devices
+        WHERE user_id = $1
+      `, [currentUserId])
+
+      if (devices.length === 0) {
+        console.log(`ℹ️ No devices found for user ${currentUserId}`)
+        continue;
+      }
+
+      let successCount = 0
+      let errorCount = 0
+      const results = []
+
+      // Collect readings for each device
+      for (const device of devices) {
       try {
         console.log(`📡 Fetching reading for device: ${device.deviceSn}`)
         
@@ -150,20 +199,32 @@ export async function POST(_request: NextRequest) {
       }
     }
 
-    console.log(`📊 Collection complete: ${successCount} success, ${errorCount} errors`)
+    console.log(`📊 User ${currentUserId} collection complete: ${successCount} success, ${errorCount} errors`)
 
-    const result = {
-      message: 'Reading collection completed',
-      timestamp: new Date().toISOString(),
-      summary: {
-        totalDevices: devices.length,
-        successful: successCount,
-        failed: errorCount
-      },
+    totalSuccessCount += successCount;
+    totalErrorCount += errorCount;
+    
+    allResults.push({
+      userId: currentUserId,
+      deviceCount: devices.length,
+      successful: successCount,
+      failed: errorCount,
       results
-    }
+    });
+  }
 
-    return NextResponse.json(result)
+  const result = {
+    message: 'Reading collection completed',
+    timestamp: new Date().toISOString(),
+    summary: {
+      totalUsers: targetUsers.length,
+      totalSuccessful: totalSuccessCount,
+      totalFailed: totalErrorCount
+    },
+    userResults: allResults
+  }
+
+  return NextResponse.json(result)
 
   } catch (error) {
     console.error('❌ Error in reading collection:', error)
