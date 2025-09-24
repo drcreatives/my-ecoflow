@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useDeviceStore } from "@/stores/deviceStore";
 import {
   Plus,
   Search,
@@ -24,32 +25,15 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatRemainingTime } from "@/lib/data-utils";
-
-interface DeviceData {
-  id: string;
-  deviceSn: string;
-  deviceName: string;
-  deviceType?: string;
-  isActive: boolean;
-  online: boolean;
-  status?: string;
-  userId: string;
-  currentReading?: {
-    batteryLevel?: number;
-    inputWatts?: number;
-    outputWatts?: number;
-    temperature?: number;
-    remainingTime?: number;
-    status?: string;
-  };
-}
+import { formatRemainingTime, DeviceData } from "@/lib/data-utils";
 
 const DevicesPage = () => {
   const router = useRouter();
-  const [devices, setDevices] = useState<DeviceData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  
+  // Use Zustand store for devices, loading, and error state
+  const { devices, isLoading: loading, error, fetchDevices } = useDeviceStore();
+  
+  // Keep local UI state for search and filtering
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<
     "all" | "online" | "offline"
@@ -58,32 +42,7 @@ const DevicesPage = () => {
 
   useEffect(() => {
     fetchDevices();
-  }, []);
-
-  const fetchDevices = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await fetch("/api/devices");
-      if (!response.ok) {
-        if (response.status === 401) {
-          router.push("/login");
-          return;
-        }
-        throw new Error("Failed to fetch devices");
-      }
-
-      const data: { devices: DeviceData[]; total: number } =
-        await response.json();
-      setDevices(data.devices || []);
-    } catch (err) {
-      console.error("Error fetching devices:", err);
-      setError(err instanceof Error ? err.message : "Failed to load devices");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [fetchDevices]);
 
   // Filter devices based on search and status
   const filteredDevices = devices.filter((device) => {
@@ -248,9 +207,9 @@ const DevicesPage = () => {
                 className="group-hover:translate-x-1 transition-transform"
               />
             </Link>
-            <button className="p-2 border border-gray-700 hover:border-gray-600 rounded-lg transition-colors">
+            <Link href={`/device/${device.id}/settings`} className="flex items-center p-2 border border-gray-700 hover:border-gray-600 rounded-lg transition-colors">
               <Settings size={16} className="text-gray-400" />
-            </button>
+            </Link>
           </div>
         </div>
       </div>
