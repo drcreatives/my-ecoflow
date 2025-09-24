@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
+import { useUserStore } from '@/stores/userStore'
 import { cn } from '@/lib/utils'
 
 interface UserProfile {
@@ -60,16 +61,24 @@ interface SecuritySettings {
 }
 
 function SettingsPage() {
+  // Store state management
   const { user, logout } = useAuthStore()
   const { notifications, clearAllNotifications } = useUIStore()
-  const router = useRouter()
-  
-  // State management
+  const {
+    profile,
+    notifications: userNotifications,
+    dataRetention,
+    fetchProfile,
+    updateProfile,
+    updateNotificationSettings,
+    changePassword,
+    exportData: exportUserData,
+    isLoading: userLoading
+  } = useUserStore()  // Keep local UI state
   const [activeTab, setActiveTab] = useState('profile')
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   
-  // Settings state
+  // Initialize local settings from store on load
   const [userProfile, setUserProfile] = useState<UserProfile>({
     email: user?.email || '',
     firstName: '',
@@ -113,6 +122,11 @@ function SettingsPage() {
     confirm: false
   })
 
+  // Debug: Log userProfile state changes
+  useEffect(() => {
+    console.log('userProfile state changed:', userProfile)
+  }, [userProfile])
+
   // Test email state
   const [testingEmail, setTestingEmail] = useState(false)
 
@@ -120,68 +134,66 @@ function SettingsPage() {
     loadUserSettings()
   }, [])
 
+  // Update local state when store profile changes
+  useEffect(() => {
+    console.log('Profile data from store:', profile)
+    if (profile) {
+      console.log('Updating userProfile state with:', {
+        email: profile.email,
+        firstName: profile.firstName || '',
+        lastName: profile.lastName || '',
+        createdAt: profile.createdAt ? profile.createdAt : new Date().toISOString()
+      })
+      setUserProfile({
+        email: profile.email,
+        firstName: profile.firstName || '',
+        lastName: profile.lastName || '',
+        createdAt: profile.createdAt ? (typeof profile.createdAt === 'string' ? profile.createdAt : profile.createdAt.toISOString()) : new Date().toISOString()
+      })
+    }
+  }, [profile])
+
+  // Update local notification settings when store data changes
+  useEffect(() => {
+    if (userNotifications) {
+      setNotificationSettings({
+        deviceAlerts: userNotifications.deviceAlerts,
+        lowBattery: true,
+        powerThreshold: true,
+        systemUpdates: userNotifications.systemUpdates,
+        weeklyReports: userNotifications.weeklyReports,
+        emailNotifications: userNotifications.emailNotifications,
+        pushNotifications: userNotifications.pushNotifications
+      })
+    }
+  }, [userNotifications])
+
+  // Update local data settings when store data changes
+  useEffect(() => {
+    if (dataRetention) {
+      const retentionDays = dataRetention.retentionPeriod === '30d' ? 30 :
+                           dataRetention.retentionPeriod === '90d' ? 90 :
+                           dataRetention.retentionPeriod === '1y' ? 365 : 90
+                           
+      setDataSettings({
+        retentionPeriod: retentionDays,
+        autoBackup: dataRetention.autoCleanup,
+        exportFormat: 'json',
+        collectInterval: 5
+      })
+    }
+  }, [dataRetention])
+
   const loadUserSettings = async () => {
-    setLoading(true)
     try {
-      // Load user profile from API
-      const profileResponse = await fetch('/api/user/profile')
-      if (profileResponse.ok) {
-        const { profile } = await profileResponse.json()
-        setUserProfile({
-          email: profile.email,
-          firstName: profile.firstName || '',
-          lastName: profile.lastName || '',
-          createdAt: profile.createdAt
-        })
-      } else {
-        console.error('Failed to load profile:', await profileResponse.text())
-      }
+      // Use store action to fetch user profile
+      console.log('Loading user settings...')
+      await fetchProfile()
+      console.log('Profile fetched, current profile:', profile)
+      // Note: Local state will be updated via useEffect when profile data arrives
       
-      // Load notification settings from API
-      try {
-        const notificationResponse = await fetch('/api/user/notifications')
-        if (notificationResponse.ok) {
-          const { settings } = await notificationResponse.json()
-          setNotificationSettings({
-            deviceAlerts: settings.deviceAlerts,
-            lowBattery: settings.lowBattery,
-            powerThreshold: settings.powerThreshold,
-            systemUpdates: settings.systemUpdates,
-            weeklyReports: settings.weeklyReports,
-            emailNotifications: settings.emailNotifications,
-            pushNotifications: settings.pushNotifications
-          })
-        } else {
-          // Fallback to localStorage if API fails
-          const savedNotifications = localStorage.getItem('notificationSettings')
-          if (savedNotifications) {
-            setNotificationSettings(JSON.parse(savedNotifications))
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load notification settings:', error)
-        // Fallback to localStorage
-        const savedNotifications = localStorage.getItem('notificationSettings')
-        if (savedNotifications) {
-          setNotificationSettings(JSON.parse(savedNotifications))
-        }
-      }
-      
-      const savedDataSettings = localStorage.getItem('dataSettings')
-      if (savedDataSettings) {
-        setDataSettings(JSON.parse(savedDataSettings))
-      }
-      
-      const savedSecuritySettings = localStorage.getItem('securitySettings')
-      if (savedSecuritySettings) {
-        setSecuritySettings(JSON.parse(savedSecuritySettings))
-      }
-      
-    } catch (error) {
-      console.error('Failed to load settings:', error)
-      toast.error('Failed to load settings')
-    } finally {
-      setLoading(false)
+    } catch (err) {
+      console.error('Error loading user settings:', err)
     }
   }
 
@@ -222,52 +234,40 @@ function SettingsPage() {
           return
         }
 
-        // Save user profile via API
-        const response = await fetch('/api/user/profile', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            firstName: settings.firstName.trim(),
-            lastName: settings.lastName.trim()
-          })
+        // Save user profile via store action
+        await updateProfile({
+          firstName: settings.firstName.trim(),
+          lastName: settings.lastName.trim()
         })
         
-        if (response.ok) {
-          const { profile } = await response.json()
-          setUserProfile(profile)
-          toast.success('Profile updated successfully')
-        } else {
-          const error = await response.json()
-          toast.error(error.error || 'Failed to update profile')
-        }
+        // Update local state
+        setUserProfile(prev => ({
+          ...prev,
+          firstName: settings.firstName.trim(),
+          lastName: settings.lastName.trim()
+        }))
+        
+        toast.success('Profile updated successfully')
       } else if (settingsType === 'notificationSettings') {
-        // Save notification settings via API
-        const response = await fetch('/api/user/notifications', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(settings)
+                // Save notification settings via store action
+        await updateNotificationSettings({
+          emailNotifications: settings.emailAlerts, // Map emailAlerts to emailNotifications
+          pushNotifications: settings.pushNotifications,
+          smsNotifications: false, // Default value for store interface
+          deviceAlerts: settings.alertTypes.includes('low-battery') || settings.alertTypes.includes('high-temperature'),
+          systemUpdates: settings.alertTypes.includes('maintenance'),
+          weeklyReports: settings.alertTypes.includes('weekly-report')
         })
         
-        if (response.ok) {
-          const { settings: updatedSettings } = await response.json()
-          setNotificationSettings({
-            deviceAlerts: updatedSettings.deviceAlerts,
-            lowBattery: updatedSettings.lowBattery,
-            powerThreshold: updatedSettings.powerThreshold,
-            systemUpdates: updatedSettings.systemUpdates,
-            weeklyReports: updatedSettings.weeklyReports,
-            emailNotifications: updatedSettings.emailNotifications,
-            pushNotifications: updatedSettings.pushNotifications
-          })
-          toast.success('Notification settings updated successfully')
-        } else {
-          const error = await response.json()
-          toast.error(error.error || 'Failed to update notification settings')
-        }
+        // Update local state
+        setNotificationSettings(prev => ({
+          ...prev,
+          emailAlerts: settings.emailAlerts,
+          pushNotifications: settings.pushNotifications,
+          alertTypes: settings.alertTypes
+        }))
+        
+        toast.success('Notification settings updated successfully')
       } else if (settingsType === 'dataSettings') {
         // Validate data settings before saving
         if (settings.retentionPeriod < 1 || settings.retentionPeriod > 365) {
@@ -383,23 +383,8 @@ function SettingsPage() {
     
     setSaving(true)
     try {
-      // Call the actual password change API
-      const response = await fetch('/api/user/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          currentPassword: passwordForm.currentPassword,
-          newPassword: passwordForm.newPassword
-        })
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to change password')
-      }
+      // Call the store action for password change
+      await changePassword(passwordForm.currentPassword, passwordForm.newPassword)
       
       setSecuritySettings(prev => ({
         ...prev,
@@ -518,7 +503,7 @@ function SettingsPage() {
     { id: 'security', label: 'Security', icon: Shield },
   ]
 
-  if (loading) {
+  if (userLoading) {
     return (
       
         <div className="flex items-center justify-center h-64">
@@ -601,7 +586,7 @@ function SettingsPage() {
                           </label>
                           <input
                             type="text"
-                            value={new Date(userProfile.createdAt).toLocaleDateString()}
+                            value={userProfile.createdAt ? new Date(userProfile.createdAt).toLocaleDateString() : 'Loading...'}
                             disabled
                             className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green disabled:opacity-60"
                           />

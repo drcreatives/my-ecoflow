@@ -1,17 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
-  ArrowLeft, 
   Calendar,
   Download,
   Filter,
-  TrendingUp,
-  TrendingDown,
   BarChart3,
-  Clock,
   Battery,
   Zap,
   Thermometer,
@@ -23,6 +18,7 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { useDeviceStore } from '@/stores/deviceStore'
+import { useReadingsStore } from '@/stores/readingsStore'
 import { DeviceReading } from '@/lib/data-utils'
 import { cn } from '@/lib/utils'
 
@@ -54,12 +50,36 @@ interface DeviceOption {
 }
 
 function HistoryPage() {
+  // Use stores for data management
   const { devices, fetchDevices, isLoading: devicesLoading } = useDeviceStore()
-  const [readings, setReadings] = useState<DeviceReading[]>([])
+  const { 
+    readings, 
+    totalCount, 
+    hasMore, 
+    isLoading, 
+    error, 
+    currentFilters,
+    fetchReadings, 
+    loadMoreReadings, 
+    exportReadings, 
+    clearReadings 
+  } = useReadingsStore()
+
+  // Keep local UI state  
   const [summary, setSummary] = useState<HistorySummary | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+
+  // Debug: Log readings state changes
+  useEffect(() => {
+    console.log('Readings state changed:', {
+      readingsCount: readings.length,
+      totalCount,
+      hasMore,
+      isLoading,
+      error,
+      currentFilters
+    })
+  }, [readings, totalCount, hasMore, isLoading, error, currentFilters])
 
   // Filter state
   const [filters, setFilters] = useState<HistoryFilters>({
@@ -72,7 +92,7 @@ function HistoryPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   
-  // Pagination state
+  // Pagination state - now managed by readings store
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
@@ -89,11 +109,11 @@ function HistoryPage() {
 
   const selectedDevice = deviceOptions.find(d => d.id === filters.deviceId)
 
-  // Pagination calculations
-  const totalPages = Math.ceil(readings.length / itemsPerPage)
+  // Pagination calculations using store's total count
+  const totalPages = Math.ceil(totalCount / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedReadings = readings.slice(startIndex, endIndex)
+  const paginatedReadings = readings.slice(0, Math.min(readings.length, itemsPerPage))
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -105,58 +125,80 @@ function HistoryPage() {
     fetchDevices()
   }, [fetchDevices])
 
-  // Fetch history data when filters change
+  // Set default device when devices are loaded
   useEffect(() => {
-    if (devices.length > 0) {
+    if (devices.length > 0 && filters.deviceId === 'all') {
+      // Set the first device as default instead of 'all'
+      const firstDevice = devices[0]
+      console.log('Setting default device:', firstDevice)
+      setFilters(prev => ({
+        ...prev,
+        deviceId: firstDevice.id
+      }))
+    }
+  }, [devices])
+
+  // Fetch history data when filters change and we have a valid device
+  useEffect(() => {
+    if (devices.length > 0 && filters.deviceId !== 'all') {
+      console.log('Fetching history data for:', filters)
       fetchHistoryData()
     }
   }, [filters, devices])
 
   const fetchHistoryData = async () => {
+    console.log('fetchHistoryData called with filters:', filters)
+    console.log('Available devices:', devices.map(d => ({ id: d.id, name: d.deviceName, sn: d.deviceSn })))
+    
     try {
-      setIsLoading(true)
-      setError(null)
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        timeRange: filters.timeRange,
-        aggregation: filters.aggregation
-      })
-
-      if (filters.deviceId !== 'all') {
-        params.append('deviceId', filters.deviceId)
+      // Convert local filters to store options format
+      const options: any = {
+        aggregation: filters.aggregation,
       }
 
+      // Handle timeRange - skip 'custom' since store doesn't support it
+      if (filters.timeRange !== 'custom') {
+        options.timeRange = filters.timeRange
+      }
+
+      // Convert string dates to Date objects
       if (filters.customStartDate) {
-        params.append('startDate', filters.customStartDate)
+        options.startDate = new Date(filters.customStartDate)
       }
-
       if (filters.customEndDate) {
-        params.append('endDate', filters.customEndDate)
+        options.endDate = new Date(filters.customEndDate)
       }
 
-      // Fetch data from API
-      const response = await fetch(`/api/history/readings?${params.toString()}`, {
-        credentials: 'include'
-      })
-      const data = await response.json()
+      console.log('Store options being used:', options)
 
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch history data')
+      // Use store action to fetch readings
+      if (filters.deviceId !== 'all') {
+        console.log('Fetching readings for device:', filters.deviceId)
+        await fetchReadings(filters.deviceId, options)
+      } else {
+        // For 'all' devices, fetch readings for the first device as fallback
+        // TODO: Implement multi-device reading aggregation in the future
+        if (devices.length > 0) {
+          console.log('Fetching readings for first device (fallback):', devices[0].id)
+          await fetchReadings(devices[0].id, options)
+        } else {
+          console.log('No devices available, clearing readings')
+          clearReadings()
+        }
       }
 
-      // Transform API response to local format
-      const apiReadings = data.data.readings.map((reading: any) => ({
-        ...reading,
-        recordedAt: new Date(reading.recordedAt)
-      }))
-
-      setReadings(apiReadings)
-      setSummary(data.data.summary)
       setLastUpdated(new Date())
+      
+      // Debug logging to help diagnose issues
+      console.log('History Data Fetch Results:', {
+        deviceId: filters.deviceId,
+        readingsCount: readings.length,
+        totalCount,
+        options,
+        hasError: !!error
+      })
     } catch (err) {
       console.error('Error fetching history data:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load historical data')
       
       // For debugging: Log the exact error details
       console.log('API Response Error Details:', {
@@ -165,8 +207,6 @@ function HistoryPage() {
         timeRange: filters.timeRange,
         aggregation: filters.aggregation
       })
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -245,83 +285,34 @@ function HistoryPage() {
     try {
       setIsExporting(true)
       
-      // Use the API endpoint for export
-      const response = await fetch('/api/history/readings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          format: 'csv',
-          filters: {
-            deviceId: filters.deviceId,
-            timeRange: filters.timeRange,
-            aggregation: filters.aggregation,
-            startDate: filters.customStartDate,
-            endDate: filters.customEndDate
-          }
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('Export failed')
+      // Convert local filters to store options format
+      const options: any = {
+        aggregation: filters.aggregation,
       }
 
-      // Handle CSV download
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
+      // Handle timeRange - skip 'custom' since store doesn't support it
+      if (filters.timeRange !== 'custom') {
+        options.timeRange = filters.timeRange
+      }
+
+      // Convert string dates to Date objects
+      if (filters.customStartDate) {
+        options.startDate = new Date(filters.customStartDate)
+      }
+      if (filters.customEndDate) {
+        options.endDate = new Date(filters.customEndDate)
+      }
       
-      const deviceName = selectedDevice?.name || 'All-Devices'
-      const timeRange = filters.timeRange
-      const timestamp = new Date().toISOString().split('T')[0]
+      // Use store action to export readings
+      if (filters.deviceId !== 'all') {
+        await exportReadings(filters.deviceId, 'csv', options)
+      } else {
+        throw new Error('Export for all devices not yet supported')
+      }
       
-      link.download = `ecoflow-history-${deviceName}-${timeRange}-${timestamp}.csv`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
     } catch (err) {
       console.error('Export failed:', err)
-      setError('Failed to export data')
-      
-        // Fallback to client-side export for development
-        console.log('Falling back to client-side export')
-        try {
-          const csvHeaders = ['Timestamp', 'Device ID', 'Battery %', 'Input (W)', 'Output (W)', 'Temperature (°C)', 'Status']
-          const csvData = readings.map(reading => [
-            reading.recordedAt.toISOString(),
-            reading.deviceId,
-            reading.batteryLevel?.toString() || '0',
-            reading.inputWatts?.toString() || '0',
-            reading.outputWatts?.toString() || '0',
-            reading.temperature?.toString() || '0',
-            reading.status || 'unknown'
-          ])
-
-          const csvContent = [csvHeaders, ...csvData]
-            .map(row => row.join(','))
-            .join('\n')
-
-        const blob = new Blob([csvContent], { type: 'text/csv' })
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        
-        const deviceName = selectedDevice?.name || 'All-Devices'
-        const timeRange = filters.timeRange
-        const timestamp = new Date().toISOString().split('T')[0]
-        
-        link.download = `ecoflow-history-${deviceName}-${timeRange}-${timestamp}.csv`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(url)
-      } catch (fallbackErr) {
-        console.error('Fallback export also failed:', fallbackErr)
-      }
+      alert(err instanceof Error ? err.message : 'Failed to export data')
     } finally {
       setIsExporting(false)
     }
@@ -596,6 +587,24 @@ function HistoryPage() {
                   <Loader2 className="w-8 h-8 text-accent-green animate-spin mx-auto mb-4" />
                   <p className="text-gray-400">Loading historical data...</p>
                 </div>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+                <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-400 mb-2">Error Loading Data</h3>
+                <p className="text-gray-500 mb-4">
+                  {error}
+                </p>
+                <button
+                  onClick={() => {
+                    console.log('Retrying data fetch...')
+                    fetchHistoryData()
+                  }}
+                  className="flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 text-black font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  <RefreshCw size={16} />
+                  Retry
+                </button>
               </div>
             ) : readings.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-center p-6">
