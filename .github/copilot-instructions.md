@@ -4,30 +4,17 @@
 
 This is a full-stack Next.js dashboard for monitoring EcoFlow Delta 2 power stations. The application provides real-time device monitoring, historical data analytics, and device control capabilities with **fully functional authentication and EcoFlow API integration**.
 
-## Current Project Status (COMPLETED ✅)### UI/UX Guidelines
+## Current Project Status - SPA ARCHITECTURE COMPLETED ✅
 
-### Tailwind CSS & Custom Components
-```typescript
-// Use Tailwind CSS with consistent dark theme classes
-<div className="bg-primary-dark border border-gray-700 rounded-lg p-4">
-  <h3 className="text-white font-semibold mb-2">Device Status</h3>
-  <p className="text-gray-400 text-sm">Battery Level</p>
-  <p className="text-accent-green text-2xl font-bold">{batteryLevel}%</p>
-</div>
+### ✅ **Single Page Application (SPA) Architecture**
+- **Full SPA Conversion**: Successfully converted all 8 dashboard pages to SPA architecture using Next.js route groups
+- **Route Group Pattern**: All dashboard pages organized under `(dashboard)` route group with persistent layout
+- **Performance Optimization**: Implemented global state persistence in AuthWrapper to prevent re-initialization on navigation
+- **Fast Navigation**: Navigation between pages is now instant without unnecessary auth checks or API calls
+- **Persistent Layout**: Single layout wrapper (`DashboardLayout`) shared across all dashboard pages
+- **Memory Efficiency**: Global state caching prevents redundant device fetching and reading collection restarts
 
-// Custom dropdown components for dark theme consistency
-const CustomDropdown = ({ options, value, onChange }) => {
-  return (
-    <div className="relative">
-      <button className="bg-primary-dark border border-gray-700 rounded-lg px-3 py-2 text-white">
-        {value}
-        <ChevronDown className="ml-2" />
-      </button>
-      {/* Custom dropdown menu with dark styling */}
-    </div>
-  );
-};
-```ation System**
+### ✅ **Authentication System**
 - **Supabase Authentication**: Fully implemented with email/password signup and login
 - **Modern Auth UI**: Beautiful, responsive login/signup page with form validation
 - **Protected Routes**: AuthWrapper component protecting dashboard and sensitive pages
@@ -83,12 +70,16 @@ const CustomDropdown = ({ options, value, onChange }) => {
 ```
 src/
 ├── app/                           # Next.js App Router pages
+│   ├── (dashboard)/              # SPA Route Group with persistent layout ✅
+│   │   ├── layout.tsx            # Persistent DashboardLayout wrapper ✅
+│   │   ├── dashboard/            # Main dashboard page ✅
+│   │   ├── devices/              # Device management pages ✅
+│   │   ├── device/[deviceId]/    # Individual device pages ✅
+│   │   ├── history/              # Historical data page ✅
+│   │   ├── analytics/            # Analytics dashboard ✅
+│   │   └── settings/             # Settings page ✅
 │   ├── login/                    # Modern authentication page ✅
-│   ├── dashboard/                # Protected dashboard ✅
-│   ├── devices/                  # Device management pages ✅
-│   │   ├── page.tsx             # Main devices listing page ✅
-│   │   └── add/                 # Add device page ✅
-│   │       └── page.tsx         # Device discovery & registration ✅
+│   ├── page.tsx                  # Landing/redirect page ✅
 │   └── api/                      # API routes ✅
 │       ├── auth/                 # Authentication endpoints ✅
 │       ├── devices/              # Device management APIs ✅
@@ -102,7 +93,7 @@ src/
 │   ├── forms/                    # Form components
 │   ├── charts/                   # Chart components
 │   ├── layout/                   # Layout components with logout ✅
-│   ├── AuthWrapper.tsx           # Route protection ✅
+│   ├── AuthWrapper.tsx           # Route protection with state persistence ✅
 │   └── LogoutButton.tsx          # Auth controls ✅
 ├── lib/                          # Utility functions and configs
 │   ├── ecoflow-api.ts           # Working EcoFlow API wrapper ✅
@@ -410,6 +401,29 @@ const data = await executeQuery<Device[]>(
 
 ## UI/UX Guidelines
 
+### Tailwind CSS & Custom Components
+```typescript
+// Use Tailwind CSS with consistent dark theme classes
+<div className="bg-primary-dark border border-gray-700 rounded-lg p-4">
+  <h3 className="text-white font-semibold mb-2">Device Status</h3>
+  <p className="text-gray-400 text-sm">Battery Level</p>
+  <p className="text-accent-green text-2xl font-bold">{batteryLevel}%</p>
+</div>
+
+// Custom dropdown components for dark theme consistency
+const CustomDropdown = ({ options, value, onChange }) => {
+  return (
+    <div className="relative">
+      <button className="bg-primary-dark border border-gray-700 rounded-lg px-3 py-2 text-white">
+        {value}
+        <ChevronDown className="ml-2" />
+      </button>
+      {/* Custom dropdown menu with dark styling */}
+    </div>
+  );
+};
+```
+
 ### Chakra UI Usage
 ```typescript
 // Use Chakra UI components with consistent props
@@ -507,33 +521,52 @@ const animateCard = (element: HTMLElement) => {
 - **Mobile-First Design**: Responsive layouts with floating action buttons
 - **Multiple Navigation Paths**: Header buttons, grid cards, floating FAB, and empty state CTAs
 
-### Development Commands
+### Development Commands & Testing Guidelines
+
+**IMPORTANT**: The developer is already running the application on port 3000. **NEVER run `npm run dev`** or start additional development servers.
+
 ```bash
-# Start development server
-npm run dev
+# Code Quality & Testing (Use these for validation)
+npm run lint              # ESLint validation
+npm run type-check        # TypeScript type checking
+npm run build            # Production build test
 
-# Test EcoFlow API connection
-curl http://localhost:3000/api/test-ecoflow
+# API Testing (Application already running on port 3000)
+curl http://localhost:3000/api/test-ecoflow           # Test EcoFlow API connection
+curl http://localhost:3000/api/test-official-format   # Signature format verification
+curl http://localhost:3000/api/devices               # Protected device management
 
-# Test authentication
-# Visit: http://localhost:3000/login
+# Manual Testing URLs (Application running on port 3000)
+# Visit: http://localhost:3000/login                  # Authentication flow
+# Visit: http://localhost:3000/dashboard              # Main dashboard (requires login)
+# Visit: http://localhost:3000/devices                # Device management (requires login)
+# Visit: http://localhost:3000/devices/add            # Add new devices (requires login)
+# Visit: http://localhost:3000/history                # Historical data (requires login)
+# Visit: http://localhost:3000/analytics              # Analytics dashboard (requires login)
+# Visit: http://localhost:3000/settings               # Settings page (requires login)
 
-# Access protected dashboard
-# Visit: http://localhost:3000/dashboard (requires login)
-
-# Access devices management
-# Visit: http://localhost:3000/devices (requires login)
-
-# Add new devices
-# Visit: http://localhost:3000/devices/add (requires login)
+# Database Testing
+# Visit: http://localhost:3000/api/test-db-connection  # Database connection validation
+# Visit: http://localhost:3000/api/test-migration      # Schema validation
 ```
 
+**Testing Protocol**:
+1. **Always use lint and type-check commands** instead of starting dev server
+2. **Application is already running** - test endpoints directly at localhost:3000
+3. **For builds**, use `npm run build` to validate production readiness
+4. **Never interrupt** the existing development server
+
 ### Key Files & Their Status
+- ✅ `src/app/(dashboard)/layout.tsx` - Persistent SPA layout wrapper (COMPLETED)
 - ✅ `src/app/login/page.tsx` - Modern auth UI (COMPLETED)
-- ✅ `src/app/devices/page.tsx` - Full devices management page (COMPLETED)
-- ✅ `src/app/devices/add/page.tsx` - Device registration page (COMPLETED)
+- ✅ `src/app/(dashboard)/dashboard/page.tsx` - Main dashboard page (COMPLETED)
+- ✅ `src/app/(dashboard)/devices/page.tsx` - Full devices management page (COMPLETED)
+- ✅ `src/app/(dashboard)/devices/add/page.tsx` - Device registration page (COMPLETED)
+- ✅ `src/app/(dashboard)/history/page.tsx` - Historical data page (COMPLETED)
+- ✅ `src/app/(dashboard)/analytics/page.tsx` - Analytics dashboard (COMPLETED)
+- ✅ `src/app/(dashboard)/settings/page.tsx` - Settings page (COMPLETED)
 - ✅ `src/lib/ecoflow-api.ts` - Working API wrapper (COMPLETED)
-- ✅ `src/components/AuthWrapper.tsx` - Route protection (COMPLETED)
+- ✅ `src/components/AuthWrapper.tsx` - Route protection with state persistence (COMPLETED)
 - ✅ `src/lib/supabase.ts` - Auth client (COMPLETED)
 - ✅ `src/lib/database.ts` - Direct PostgreSQL connection (COMPLETED)
 - ✅ `prisma/schema.prisma` - Database schema (COMPLETED)
@@ -543,19 +576,25 @@ curl http://localhost:3000/api/test-ecoflow
 ## Future Development Notes
 
 ### Current Status Summary
-🎉 **The EcoFlow Dashboard is now FULLY FUNCTIONAL with Complete Device Management!**
+🎉 **The EcoFlow Dashboard is now FULLY FUNCTIONAL with Complete SPA Architecture!**
+
+#### ✅ **SPA Infrastructure** (COMPLETED):
+1. **Single Page Application Architecture** - Full SPA conversion using Next.js route groups
+2. **Performance Optimization** - Global state persistence preventing unnecessary re-initialization
+3. **Fast Navigation** - Instant page transitions without auth checks or API calls
+4. **Persistent Layout** - Single DashboardLayout wrapper shared across all dashboard pages
 
 #### ✅ **Core Infrastructure** (COMPLETED):
-1. **Modern Authentication System** - Supabase auth with beautiful UI
-2. **Working EcoFlow API Integration** - Real device data (DELTA 2: R331ZKB5SG7V0293)
-3. **Production Database** - Direct PostgreSQL connection with SSL
-4. **Comprehensive Testing Suite** - Full API validation
+5. **Modern Authentication System** - Supabase auth with beautiful UI
+6. **Working EcoFlow API Integration** - Real device data (DELTA 2: R331ZKB5SG7V0293)
+7. **Production Database** - Direct PostgreSQL connection with SSL
+8. **Comprehensive Testing Suite** - Full API validation
 
 #### ✅ **Device Management** (COMPLETED):
-5. **Devices Listing Page** - `/devices` with search, filtering, and device cards
-6. **Device Registration** - `/devices/add` with API discovery and manual entry
-7. **Custom UI Components** - Dark-themed dropdowns and responsive design
-8. **Multiple Navigation Paths** - Header buttons, grid cards, floating FAB
+9. **Devices Listing Page** - `/devices` with search, filtering, and device cards
+10. **Device Registration** - `/devices/add` with API discovery and manual entry
+11. **Custom UI Components** - Dark-themed dropdowns and responsive design
+12. **Multiple Navigation Paths** - Header buttons, grid cards, floating FAB
 
 #### ⚠️ **Minor Issues**:
 - Database permissions for collect-readings endpoint (identified, needs service role auth)
