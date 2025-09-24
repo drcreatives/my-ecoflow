@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
         AND dr.recorded_at <= $3
     `
 
-    let queryParams: any[] = [userId, startTime.toISOString(), endTime.toISOString()]
+    const queryParams: any[] = [userId, startTime.toISOString(), endTime.toISOString()]
     let paramIndex = 4
 
     // Add device filter if specified
@@ -216,7 +216,7 @@ export async function GET(request: NextRequest) {
 
     // Execute main query
     const queryResult = await executeQuery<any>(aggregatedQuery, queryParams)
-    let rawReadings: any[] = Array.isArray(queryResult) ? queryResult : []
+    const rawReadings: any[] = Array.isArray(queryResult) ? queryResult : []
 
     // Debug: Log query results
     console.log('History API Debug:', {

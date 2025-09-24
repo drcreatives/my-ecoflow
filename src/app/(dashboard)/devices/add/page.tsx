@@ -210,7 +210,7 @@ const AddDevicePage = () => {
                 <div>
                   <h3 className="text-blue-400 font-medium mb-2">How it works</h3>
                   <ul className="text-gray-300 text-sm space-y-1">
-                    <li>• We'll search for devices associated with your EcoFlow account</li>
+                    <li>• We&apos;ll search for devices associated with your EcoFlow account</li>
                     <li>• Select devices you want to monitor in this dashboard</li>
                     <li>• Registered devices will appear in your devices list</li>
                     <li>• You can monitor both online and offline devices</li>
@@ -297,7 +297,7 @@ const AddDevicePage = () => {
               <div className="mt-8 bg-primary-dark rounded-lg border border-gray-800 p-6">
                 <h3 className="text-lg font-semibold text-white mb-3">Manual Device Entry</h3>
                 <p className="text-gray-400 mb-4">
-                  If your device isn't appearing in the search results, you can manually add it by serial number.
+                  If your device isn&apos;t appearing in the search results, you can manually add it by serial number.
                 </p>
                 <button 
                   className="bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
