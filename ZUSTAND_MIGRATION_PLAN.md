@@ -44,17 +44,17 @@ Create a new `readingsStore` for historical data:
 
 ## Implementation Plan
 
-### Phase 1: Store Enhancements (Priority: HIGH)
+### Phase 1: Store Enhancements (Priority: HIGH) ✅ **COMPLETED**
 
-#### 1.1 Extend Device Store
+#### 1.1 Extend Device Store ✅
 **File**: `src/stores/deviceStore.ts`
 
-Add the following actions without changing existing ones:
+**Added the following actions**:
 ```typescript
 interface DeviceActions {
   // ... existing actions ...
   
-  // New actions for device management
+  // New actions for device management ✅
   discoverDevices: () => Promise<EcoFlowDevice[]>
   registerDevice: (deviceSn: string, deviceName: string) => Promise<void>
   unregisterDevice: (deviceId: string) => Promise<void>
@@ -62,13 +62,14 @@ interface DeviceActions {
 }
 ```
 
-#### 1.2 Create User Store
-**File**: `src/stores/userStore.ts`
+#### 1.2 Create User Store ✅
+**File**: `src/stores/userStore.ts` **CREATED**
 
 ```typescript
 interface UserState {
   profile: UserProfile | null
   notifications: NotificationSettings | null
+  dataRetention: DataRetentionSettings | null
   isLoading: boolean
   error: string | null
 }
@@ -83,23 +84,33 @@ interface UserActions {
 }
 ```
 
-#### 1.3 Create Readings Store
-**File**: `src/stores/readingsStore.ts`
+#### 1.3 Create Readings Store ✅
+**File**: `src/stores/readingsStore.ts` **CREATED**
 
 ```typescript
 interface ReadingsState {
   readings: DeviceReading[]
-  isLoading: boolean
-  error: string | null
   totalCount: number
   hasMore: boolean
+  isLoading: boolean
+  error: string | null
+  currentFilters: ReadingOptions | null
 }
 
 interface ReadingsActions {
   fetchReadings: (deviceId: string, options?: ReadingOptions) => Promise<void>
+  loadMoreReadings: (deviceId: string) => Promise<void>
   exportReadings: (deviceId: string, format: string, options?: ReadingOptions) => Promise<void>
   clearReadings: () => void
 }
+```
+
+#### 1.4 Store Index File ✅
+**File**: `src/stores/index.ts` **CREATED**
+
+Centralized exports for all stores to enable easy imports:
+```typescript
+export { useAuthStore, useDeviceStore, useUIStore, useUserStore, useReadingsStore } from './stores'
 ```
 
 ### Phase 2: Page Migrations (Priority: HIGH)

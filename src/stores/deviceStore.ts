@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
+import { EcoFlowDevice } from '@/types'
 import { 
   DeviceData, 
   DeviceReading, 
@@ -40,6 +41,12 @@ interface DeviceActions {
     cmdId: number
     param: Record<string, unknown>
   }) => Promise<boolean>
+  
+  // Device registration and management
+  discoverDevices: () => Promise<EcoFlowDevice[]>
+  registerDevice: (deviceSn: string, deviceName: string) => Promise<void>
+  unregisterDevice: (deviceId: string) => Promise<void>
+  updateDeviceSettings: (deviceId: string, settings: Partial<DeviceData>) => Promise<void>
   
   // Utility actions
   clearError: () => void
@@ -174,6 +181,149 @@ export const useDeviceStore = create<DeviceStore>()(
           })
           console.error('Failed to control device:', error)
           return false
+        }
+      },
+
+      // Device registration and management actions
+      discoverDevices: async () => {
+        try {
+          set({ isLoading: true, error: null })
+          
+          const response = await fetch('/api/devices/discover')
+          
+          if (!response.ok) {
+            throw new Error('Failed to discover devices')
+          }
+          
+          const data: { devices: EcoFlowDevice[] } = await response.json()
+          
+          set({ isLoading: false })
+          
+          return data.devices || []
+          
+        } catch (error) {
+          const errorMessage = handleAPIError(error)
+          set({
+            error: errorMessage,
+            isLoading: false,
+          })
+          console.error('Failed to discover devices:', error)
+          return []
+        }
+      },
+
+      registerDevice: async (deviceSn: string, deviceName: string) => {
+        try {
+          set({ isLoading: true, error: null })
+          
+          const response = await fetch('/api/devices', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              deviceSn,
+              deviceName,
+              deviceType: 'DELTA_2'
+            }),
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(errorData.error || 'Failed to register device')
+          }
+
+          // Refresh the devices list to include the new device
+          await get().fetchDevices()
+          
+          set({ isLoading: false })
+          
+        } catch (error) {
+          const errorMessage = handleAPIError(error)
+          set({
+            error: errorMessage,
+            isLoading: false,
+          })
+          console.error('Failed to register device:', error)
+          throw error
+        }
+      },
+
+      unregisterDevice: async (deviceId: string) => {
+        try {
+          set({ isLoading: true, error: null })
+          
+          const response = await fetch(`/api/devices/${deviceId}`, {
+            method: 'DELETE',
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(errorData.error || 'Failed to unregister device')
+          }
+
+          // Remove the device from local state
+          const { devices } = get()
+          const updatedDevices = devices.filter(device => device.id !== deviceId)
+          
+          set({ 
+            devices: updatedDevices,
+            currentDevice: get().currentDevice?.id === deviceId ? null : get().currentDevice,
+            isLoading: false 
+          })
+          
+        } catch (error) {
+          const errorMessage = handleAPIError(error)
+          set({
+            error: errorMessage,
+            isLoading: false,
+          })
+          console.error('Failed to unregister device:', error)
+          throw error
+        }
+      },
+
+      updateDeviceSettings: async (deviceId: string, settings: Partial<DeviceData>) => {
+        try {
+          set({ isLoading: true, error: null })
+          
+          const response = await fetch(`/api/devices/${deviceId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(settings),
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(errorData.error || 'Failed to update device settings')
+          }
+
+          const updatedDevice = await response.json()
+
+          // Update the device in local state
+          const { devices } = get()
+          const updatedDevices = devices.map(device => 
+            device.id === deviceId ? { ...device, ...updatedDevice } : device
+          )
+          
+          set({ 
+            devices: updatedDevices,
+            currentDevice: get().currentDevice?.id === deviceId 
+              ? { ...get().currentDevice, ...updatedDevice }
+              : get().currentDevice,
+            isLoading: false 
+          })
+          
+        } catch (error) {
+          const errorMessage = handleAPIError(error)
+          set({
+            error: errorMessage,
+            isLoading: false,
+          })
+          console.error('Failed to update device settings:', error)
+          throw error
         }
       },
 
