@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
+import { useEffect, use } from 'react'
 import { formatRemainingTime } from '@/lib/data-utils'
 import { useRouter } from 'next/navigation'
+import { useDeviceStore } from '@/stores/deviceStore'
 import Link from 'next/link'
 import { 
   ArrowLeft, 
@@ -18,9 +19,7 @@ import {
   TrendingUp,
   TrendingDown,
   AlertTriangle,
-  Loader2
 } from 'lucide-react'
-import { DeviceData } from '@/lib/data-utils'
 
 interface DevicePageProps {
   params: Promise<{ deviceId: string }>
@@ -29,13 +28,19 @@ interface DevicePageProps {
 export default function DevicePage({ params }: DevicePageProps) {
   const { deviceId } = use(params)
   const router = useRouter()
-  const [device, setDevice] = useState<DeviceData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  
+  // Use Zustand store for device management
+  const { devices, isLoading: loading, error, fetchDevices, getDeviceById } = useDeviceStore()
+  
+  // Get device from store
+  const device = getDeviceById(deviceId)
 
   useEffect(() => {
-    fetchDeviceDetails()
-  }, [deviceId])
+    // Ensure devices are loaded
+    if (devices.length === 0 && !loading) {
+      fetchDevices()
+    }
+  }, [devices.length, loading, fetchDevices])
 
   const handleBack = () => {
     // Check if there's navigation history
@@ -44,29 +49,6 @@ export default function DevicePage({ params }: DevicePageProps) {
     } else {
       // Fallback to devices page if no history
       router.push('/devices')
-    }
-  }
-
-  const fetchDeviceDetails = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch('/api/devices')
-      if (!response.ok) {
-        throw new Error('Failed to fetch devices')
-      }
-      
-      const data: { devices: DeviceData[], total: number } = await response.json()
-      const deviceData = data.devices.find(d => d.id === deviceId)
-      
-      if (!deviceData) {
-        throw new Error('Device not found')
-      }
-      
-      setDevice(deviceData)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -93,7 +75,8 @@ export default function DevicePage({ params }: DevicePageProps) {
     return 'text-red-400'
   }
 
-  if (loading) {
+  // Show loading while fetching devices or if device hasn't loaded yet
+  if (loading || (devices.length === 0 && !error)) {
     return (
       
         
@@ -176,7 +159,7 @@ export default function DevicePage({ params }: DevicePageProps) {
     )
   }
 
-  if (!device) {
+  if (!device && devices.length > 0 && !loading) {
     return (
       
         
@@ -195,6 +178,11 @@ export default function DevicePage({ params }: DevicePageProps) {
         
       
     )
+  }
+
+  // Only render content if device is found and loaded
+  if (!device) {
+    return null // This should not happen due to previous checks, but keeps TypeScript happy
   }
 
   const reading = device.currentReading
@@ -492,7 +480,7 @@ export default function DevicePage({ params }: DevicePageProps) {
                 <span>Device Settings</span>
               </button>
               <button 
-                onClick={fetchDeviceDetails}
+                onClick={fetchDevices}
                 className="w-full bg-accent-blue hover:bg-accent-blue/80 text-white px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
               >
                 <Activity className="w-4 h-4" />
