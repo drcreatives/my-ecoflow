@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useDeviceStore } from "@/stores/deviceStore";
 import { 
   ArrowLeft, 
   Plus, 
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Local interface that matches the actual API response structure
 interface EcoFlowDevice {
   sn: string;
   deviceName: string;
@@ -27,6 +29,11 @@ interface EcoFlowDevice {
 
 const AddDevicePage = () => {
   const router = useRouter();
+  
+  // Use store actions for device management
+  const { discoverDevices, registerDevice: registerDeviceAction, isLoading: storeLoading } = useDeviceStore();
+  
+  // Local state for UI and discovered devices
   const [devices, setDevices] = useState<EcoFlowDevice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,19 +46,21 @@ const AddDevicePage = () => {
       setError(null);
       setSearchPerformed(true);
       
-      const response = await fetch('/api/devices');
-      if (!response.ok) {
-        if (response.status === 401) {
-          router.push('/login');
-          return;
-        }
-        throw new Error('Failed to fetch devices');
-      }
+      // Use store action for device discovery
+      const discoveredDevices = await discoverDevices();
       
-      const data: { devices: EcoFlowDevice[], total: number } = await response.json();
-      setDevices(data.devices || []);
+      // Transform the store response to match the local interface
+      const devicesWithRegistrationStatus = discoveredDevices.map(device => ({
+        sn: device.deviceSn,
+        deviceName: device.deviceName,
+        deviceType: device.deviceType,
+        online: device.onlineStatus ? 1 : 0,
+        isRegistered: false // Default to not registered, could check against current devices
+      }));
+      
+      setDevices(devicesWithRegistrationStatus);
     } catch (err) {
-      console.error('Error fetching devices:', err);
+      console.error('Error discovering devices:', err);
       setError(err instanceof Error ? err.message : 'Failed to search devices');
     } finally {
       setLoading(false);
@@ -62,24 +71,10 @@ const AddDevicePage = () => {
     try {
       setRegistering(deviceSn);
       
-      const response = await fetch('/api/devices', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          deviceSn,
-          deviceName,
-          deviceType: 'DELTA_2'
-        }),
-      });
+      // Use store action for device registration
+      await registerDeviceAction(deviceSn, deviceName);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to register device');
-      }
-
-      // Update the device list to show it's now registered
+      // Update the local device list to show it's now registered
       setDevices(prev => prev.map(device => 
         device.sn === deviceSn 
           ? { ...device, isRegistered: true }
