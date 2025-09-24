@@ -15,8 +15,6 @@ import {
   Info,
   ExternalLink
 } from 'lucide-react';
-import { AppLayout } from '@/components/layout';
-import AuthWrapper from '@/components/AuthWrapper';
 import { cn } from '@/lib/utils';
 
 interface EcoFlowDevice {
@@ -187,10 +185,8 @@ const AddDevicePage = () => {
   };
 
   return (
-    <AuthWrapper>
-      <AppLayout>
-        <div className="min-h-screen bg-primary-black text-accent-gray">
-          <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-primary-black text-accent-gray">
+      <div className="container mx-auto px-4 py-8">
             {/* Header */}
             <div className="flex items-center gap-4 mb-8">
               <Link 
@@ -313,8 +309,6 @@ const AddDevicePage = () => {
             )}
           </div>
         </div>
-      </AppLayout>
-    </AuthWrapper>
   );
 };
 
