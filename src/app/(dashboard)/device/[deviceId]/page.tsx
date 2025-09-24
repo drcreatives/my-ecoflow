@@ -21,8 +21,6 @@ import {
   Loader2
 } from 'lucide-react'
 import { DeviceData } from '@/lib/data-utils'
-import { AppLayout } from '@/components/layout'
-import AuthWrapper from '@/components/AuthWrapper'
 
 interface DevicePageProps {
   params: Promise<{ deviceId: string }>
@@ -97,8 +95,8 @@ export default function DevicePage({ params }: DevicePageProps) {
 
   if (loading) {
     return (
-      <AuthWrapper>
-        <AppLayout>
+      
+        
           <div className="min-h-screen bg-primary-black text-accent-gray">
             <div className="container mx-auto px-4 py-8">
               {/* Back button skeleton */}
@@ -151,15 +149,15 @@ export default function DevicePage({ params }: DevicePageProps) {
               </div>
             </div>
           </div>
-        </AppLayout>
-      </AuthWrapper>
+        
+      
     )
   }
 
   if (error) {
     return (
-      <AuthWrapper>
-        <AppLayout>
+      
+        
           <div className="min-h-screen bg-primary-black text-accent-gray flex items-center justify-center">
             <div className="text-center">
               <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
@@ -173,15 +171,15 @@ export default function DevicePage({ params }: DevicePageProps) {
               </button>
             </div>
           </div>
-        </AppLayout>
-      </AuthWrapper>
+        
+      
     )
   }
 
   if (!device) {
     return (
-      <AuthWrapper>
-        <AppLayout>
+      
+        
           <div className="min-h-screen bg-primary-black text-accent-gray flex items-center justify-center">
             <div className="text-center">
               <h1 className="text-2xl font-bold text-white mb-2">Device Not Found</h1>
@@ -194,16 +192,16 @@ export default function DevicePage({ params }: DevicePageProps) {
               </button>
             </div>
           </div>
-        </AppLayout>
-      </AuthWrapper>
+        
+      
     )
   }
 
   const reading = device.currentReading
 
   return (
-    <AuthWrapper>
-      <AppLayout>
+    
+      
         <div className="min-h-screen bg-primary-black text-accent-gray">
           <div className="container mx-auto px-4 py-8">
             {/* Header */}
@@ -546,7 +544,7 @@ export default function DevicePage({ params }: DevicePageProps) {
         </div>
           </div>
         </div>
-      </AppLayout>
-    </AuthWrapper>
+      
+    
   )
 }

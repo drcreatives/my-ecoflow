@@ -21,8 +21,6 @@ import {
   Wifi,
   WifiOff
 } from 'lucide-react';
-import { AppLayout } from '@/components/layout';
-import AuthWrapper from '@/components/AuthWrapper';
 import { DeviceData } from '@/lib/data-utils';
 
 interface DeviceSettingsPageProps {
@@ -149,8 +147,8 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
 
   if (loading) {
     return (
-      <AuthWrapper>
-        <AppLayout>
+      
+        
           <div className="min-h-screen bg-primary-black text-accent-gray">
             <div className="container mx-auto px-4 py-8">
               <div className="flex flex-col items-center justify-center py-16">
@@ -160,15 +158,15 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
               </div>
             </div>
           </div>
-        </AppLayout>
-      </AuthWrapper>
+        
+      
     );
   }
 
   if (error) {
     return (
-      <AuthWrapper>
-        <AppLayout>
+      
+        
           <div className="min-h-screen bg-primary-black text-accent-gray flex items-center justify-center">
             <div className="text-center">
               <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
@@ -182,15 +180,15 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
               </button>
             </div>
           </div>
-        </AppLayout>
-      </AuthWrapper>
+        
+      
     );
   }
 
   if (!device) {
     return (
-      <AuthWrapper>
-        <AppLayout>
+      
+        
           <div className="min-h-screen bg-primary-black text-accent-gray flex items-center justify-center">
             <div className="text-center">
               <h1 className="text-2xl font-bold text-white mb-2">Device Not Found</h1>
@@ -203,14 +201,14 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
               </button>
             </div>
           </div>
-        </AppLayout>
-      </AuthWrapper>
+        
+      
     );
   }
 
   return (
-    <AuthWrapper>
-      <AppLayout>
+    
+      
         <div className="min-h-screen bg-primary-black text-accent-gray">
           <div className="container mx-auto px-4 py-8">
             {/* Header */}
@@ -507,7 +505,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
             </div>
           </div>
         </div>
-      </AppLayout>
-    </AuthWrapper>
+      
+    
   );
 }
