@@ -67,6 +67,8 @@ export const useReadingsStore = create<ReadingsStore>()(
 
       // Data fetching actions
       fetchReadings: async (deviceId: string, options: ReadingOptions = {}) => {
+        console.log('[ReadingsStore] fetchReadings called:', { deviceId, options })
+        
         try {
           set({ 
             isLoading: true, 
@@ -92,18 +94,44 @@ export const useReadingsStore = create<ReadingsStore>()(
             params.append('endDate', options.endDate.toISOString())
           }
           
-          const response = await fetch(`/api/history/readings?${params.toString()}`)
+          const apiUrl = `/api/history/readings?${params.toString()}`
+          console.log('[ReadingsStore] Making API request to:', apiUrl)
+          
+          const response = await fetch(apiUrl, {
+            credentials: 'include', // Include cookies for authentication
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          })
+          
+          console.log('[ReadingsStore] API response status:', response.status, response.statusText)
           
           if (!response.ok) {
-            throw new Error('Failed to fetch readings')
+            const errorText = await response.text()
+            console.error('[ReadingsStore] API error response:', errorText)
+            throw new Error(`API Error ${response.status}: ${response.statusText}`)
           }
           
           const data = await response.json()
           
+          console.log('[ReadingsStore] API response data:', {
+            success: data.success,
+            dataStructure: Object.keys(data),
+            readingsCount: data.data?.readings?.length || 0,
+            total: data.data?.pagination?.total,
+            hasMore: data.data?.pagination?.hasMore,
+            firstReading: data.data?.readings?.[0]
+          })
+          
+          // Extract readings from the nested data structure
+          const readings = data.data?.readings || []
+          const total = data.data?.pagination?.total || 0
+          const hasMore = data.data?.pagination?.hasMore || false
+          
           set({
-            readings: data.readings || [],
-            totalCount: data.total || 0,
-            hasMore: data.hasMore || false,
+            readings,
+            totalCount: total,
+            hasMore,
             isLoading: false,
             lastUpdated: new Date(),
           })
@@ -151,7 +179,12 @@ export const useReadingsStore = create<ReadingsStore>()(
             params.append('endDate', options.endDate.toISOString())
           }
           
-          const response = await fetch(`/api/history/readings?${params.toString()}`)
+          const response = await fetch(`/api/history/readings?${params.toString()}`, {
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          })
           
           if (!response.ok) {
             throw new Error('Failed to load more readings')
@@ -159,10 +192,15 @@ export const useReadingsStore = create<ReadingsStore>()(
           
           const data = await response.json()
           
+          // Extract readings from the nested data structure
+          const newReadings = data.data?.readings || []
+          const total = data.data?.pagination?.total || 0
+          const hasMore = data.data?.pagination?.hasMore || false
+          
           set({
-            readings: [...readings, ...(data.readings || [])],
-            totalCount: data.total || 0,
-            hasMore: data.hasMore || false,
+            readings: [...readings, ...newReadings],
+            totalCount: total,
+            hasMore,
             isLoading: false,
             lastUpdated: new Date(),
           })
@@ -204,7 +242,12 @@ export const useReadingsStore = create<ReadingsStore>()(
             params.append('endDate', options.endDate.toISOString())
           }
           
-          const response = await fetch(`/api/history/readings?${params.toString()}`)
+          const response = await fetch(`/api/history/readings?${params.toString()}`, {
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          })
           
           if (!response.ok) {
             throw new Error('Failed to export readings')

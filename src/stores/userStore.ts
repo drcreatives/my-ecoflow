@@ -86,7 +86,14 @@ export const useUserStore = create<UserStore>()(
             throw new Error('Failed to fetch profile')
           }
           
-          const profile = await response.json()
+          const data = await response.json()
+          
+          console.log('[UserStore] Raw API response:', data)
+          
+          // Extract profile from nested structure if needed
+          const profile = data.profile || data
+          
+          console.log('[UserStore] Extracted profile:', profile)
           
           set({
             profile,
