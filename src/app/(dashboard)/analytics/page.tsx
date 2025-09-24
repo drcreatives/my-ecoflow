@@ -1,8 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react";
-import { AppLayout } from "@/components/layout";
-import AuthWrapper from "@/components/AuthWrapper";
 import { useDeviceStore } from "@/stores/deviceStore";
 import { DeviceReading } from "@/lib/data-utils";
 import { CombinedChart, BatteryLevelChart, TemperatureChart, transformReadingsToChartData } from "@/components/charts/HistoryCharts";
@@ -121,7 +119,7 @@ function AnalyticsPage() {
 
 	if (devicesLoading) {
 		return (
-			<AppLayout>
+			
 				<div className="p-6">
 					<div className="flex items-center justify-center h-64">
 						<div className="text-center">
@@ -130,12 +128,12 @@ function AnalyticsPage() {
 						</div>
 					</div>
 				</div>
-			</AppLayout>
+			
 		);
 	}
 
 	return (
-		<AppLayout>
+		
 			<div className="p-4 sm:p-6">
 				<div className="flex flex-col gap-6">
 					{/* Header */}
@@ -383,14 +381,14 @@ function AnalyticsPage() {
 					)}
 				</div>
 			</div>
-		</AppLayout>
+		
 	);
 }
 
 export default function AnalyticsPageWrapper() {
 	return (
-		<AuthWrapper>
+		
 			<AnalyticsPage />
-		</AuthWrapper>
+		
 	);
 }

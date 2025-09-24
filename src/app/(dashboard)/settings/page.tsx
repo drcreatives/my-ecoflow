@@ -25,8 +25,6 @@ import {
   Loader2,
   AlertTriangle
 } from 'lucide-react'
-import { AppLayout } from '@/components/layout'
-import AuthWrapper from '@/components/AuthWrapper'
 import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
 import { cn } from '@/lib/utils'
@@ -522,19 +520,19 @@ function SettingsPage() {
 
   if (loading) {
     return (
-      <AppLayout>
+      
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <Loader2 className="w-8 h-8 text-accent-green animate-spin mx-auto mb-4" />
             <p className="text-gray-400">Loading settings...</p>
           </div>
         </div>
-      </AppLayout>
+      
     )
   }
 
   return (
-    <AppLayout>
+    
       <div className="p-4 sm:p-6">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
@@ -1054,14 +1052,14 @@ function SettingsPage() {
           </div>
         </div>
       </div>
-    </AppLayout>
+    
   )
 }
 
 export default function SettingsPageWrapper() {
   return (
-    <AuthWrapper>
+    
       <SettingsPage />
-    </AuthWrapper>
+    
   )
 }

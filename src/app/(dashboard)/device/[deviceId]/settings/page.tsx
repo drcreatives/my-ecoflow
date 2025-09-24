@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDeviceStore } from '@/stores/deviceStore';
 import Link from 'next/link';
 import { 
   ArrowLeft,
@@ -9,7 +10,6 @@ import {
   Edit3,
   Trash2,
   Power,
-  RotateCcw,
   AlertTriangle,
   CheckCircle,
   Save,
@@ -17,13 +17,9 @@ import {
   Loader2,
   Info,
   Bell,
-  BellOff,
   Wifi,
   WifiOff
 } from 'lucide-react';
-import { AppLayout } from '@/components/layout';
-import AuthWrapper from '@/components/AuthWrapper';
-import { DeviceData } from '@/lib/data-utils';
 
 interface DeviceSettingsPageProps {
   params: Promise<{ deviceId: string }>;
@@ -32,10 +28,15 @@ interface DeviceSettingsPageProps {
 export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) {
   const { deviceId } = use(params);
   const router = useRouter();
-  const [device, setDevice] = useState<DeviceData | null>(null);
-  const [loading, setLoading] = useState(true);
+  
+  // Use Zustand store for device management  
+  const { devices, isLoading: loading, error, fetchDevices, getDeviceById, updateDeviceSettings, unregisterDevice } = useDeviceStore();
+  
+  // Get device from store
+  const device = getDeviceById(deviceId);
+  
+  // Keep local UI state for form management
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     deviceName: '',
@@ -49,8 +50,25 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
   });
 
   useEffect(() => {
-    fetchDeviceDetails();
-  }, [deviceId]);
+    // Ensure devices are loaded
+    if (devices.length === 0 && !loading) {
+      fetchDevices();
+    }
+    
+    // Initialize form data when device is available
+    if (device) {
+      setFormData({
+        deviceName: device.deviceName,
+        notifications: true,
+        autoCollectData: !device.id.startsWith('temp-'),
+        alertThresholds: {
+          lowBattery: 20,
+          highTemperature: 60,
+          powerLimit: 1000
+        }
+      });
+    }
+  }, [devices.length, loading, fetchDevices, device]);
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -60,66 +78,21 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
     }
   };
 
-  const fetchDeviceDetails = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/devices');
-      if (!response.ok) {
-        throw new Error('Failed to fetch devices');
-      }
-      
-      const data: { devices: DeviceData[], total: number } = await response.json();
-      const deviceData = data.devices.find(d => d.id === deviceId);
-      
-      if (!deviceData) {
-        throw new Error('Device not found');
-      }
-      
-      setDevice(deviceData);
-      setFormData({
-        deviceName: deviceData.deviceName,
-        notifications: true,
-        autoCollectData: !deviceData.id.startsWith('temp-'),
-        alertThresholds: {
-          lowBattery: 20,
-          highTemperature: 60,
-          powerLimit: 1000
-        }
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSave = async () => {
+    if (!device) return;
+    
     try {
       setSaving(true);
       
-      // Update device name
-      const response = await fetch(`/api/devices/${deviceId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          deviceName: formData.deviceName,
-        }),
+      // Use store action to update device settings
+      await updateDeviceSettings(deviceId, {
+        deviceName: formData.deviceName
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to update device');
-      }
-
-      // Update local device data
-      if (device) {
-        setDevice({ ...device, deviceName: formData.deviceName });
-      }
       
       setIsEditing(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save changes');
+      console.error('Failed to save device settings:', err);
+      alert('Failed to save device settings. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -132,25 +105,22 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
 
     try {
       setSaving(true);
-      const response = await fetch(`/api/devices/${deviceId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to remove device');
-      }
-
+      
+      // Use store action to unregister device
+      await unregisterDevice(deviceId);
+      
       router.push('/devices');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove device');
+      console.error('Failed to remove device:', err);
+      alert('Failed to remove device. Please try again.');
       setSaving(false);
     }
   };
 
-  if (loading) {
+  if (loading || (devices.length === 0 && !error)) {
     return (
-      <AuthWrapper>
-        <AppLayout>
+      
+        
           <div className="min-h-screen bg-primary-black text-accent-gray">
             <div className="container mx-auto px-4 py-8">
               <div className="flex flex-col items-center justify-center py-16">
@@ -160,15 +130,15 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
               </div>
             </div>
           </div>
-        </AppLayout>
-      </AuthWrapper>
+        
+      
     );
   }
 
   if (error) {
     return (
-      <AuthWrapper>
-        <AppLayout>
+      
+        
           <div className="min-h-screen bg-primary-black text-accent-gray flex items-center justify-center">
             <div className="text-center">
               <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
@@ -182,15 +152,15 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
               </button>
             </div>
           </div>
-        </AppLayout>
-      </AuthWrapper>
+        
+      
     );
   }
 
-  if (!device) {
+  if (!device && devices.length > 0 && !loading) {
     return (
-      <AuthWrapper>
-        <AppLayout>
+      
+        
           <div className="min-h-screen bg-primary-black text-accent-gray flex items-center justify-center">
             <div className="text-center">
               <h1 className="text-2xl font-bold text-white mb-2">Device Not Found</h1>
@@ -203,14 +173,19 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
               </button>
             </div>
           </div>
-        </AppLayout>
-      </AuthWrapper>
+        
+      
     );
   }
 
+  // Only render content if device is found and loaded
+  if (!device) {
+    return null // This should not happen due to previous checks, but keeps TypeScript happy
+  }
+
   return (
-    <AuthWrapper>
-      <AppLayout>
+    
+      
         <div className="min-h-screen bg-primary-black text-accent-gray">
           <div className="container mx-auto px-4 py-8">
             {/* Header */}
@@ -507,7 +482,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
             </div>
           </div>
         </div>
-      </AppLayout>
-    </AuthWrapper>
+      
+    
   );
 }

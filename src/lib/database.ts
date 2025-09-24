@@ -9,7 +9,7 @@ function getPool(): Pool {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
     
     // Parse the DATABASE_URL to extract connection details
-    let dbUrl = process.env.DATABASE_URL || ''
+    const dbUrl = process.env.DATABASE_URL || ''
     
     // Create pool with direct connection (no prepared statements)
     pool = new Pool({
