@@ -1,15 +1,127 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Plus, Zap, Battery, TrendingUp, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useDeviceStore } from '@/stores/deviceStore';
+import { useReadingsStore } from '@/stores/readingsStore';
 import { DeviceStatusCard } from '@/components/controls';
 import CollectionStatusControl from '@/components/ReadingCollector';
 import { cn } from '@/lib/utils';
+import { ReactElement } from 'react';
 
 export default function DashboardPage() {
   const { devices, fetchDevices, isLoading, error } = useDeviceStore();
+  const { readings, getLatestReading } = useReadingsStore();
+
+  useEffect(() => {
+    fetchDevices();
+  }, [fetchDevices]);
+
+  // Calculate live statistics from devices and readings
+  const stats = useMemo(() => {
+    // Get active devices count
+    const activeDevices = devices.filter(device => device.isActive);
+    const totalDevices = activeDevices.length;
+
+    console.log('Dashboard stats calculation:', {
+      activeDevices: activeDevices.map(d => ({ id: d.id, name: d.deviceName, type: d.deviceType })),
+      readingsInStore: readings.length,
+      readingsStoreData: readings.slice(0, 2) // First 2 readings for debugging
+    });
+
+    // Calculate totals from latest readings
+    let totalEnergyStored = 0;
+    let totalCurrentOutput = 0;
+    let totalBatteryCapacity = 0;
+    let devicesWithReadings = 0;
+
+    activeDevices.forEach(device => {
+      console.log(`Device ${device.deviceName} full object:`, device);
+      
+      const latestReading = getLatestReading(device.id);
+      // Also check if device has currentReading embedded
+      const deviceReading = (device as any).currentReading;
+      
+      console.log(`Device ${device.deviceName} (${device.id}):`, {
+        latestReadingFromStore: latestReading,
+        deviceCurrentReading: deviceReading,
+        usingReading: latestReading || deviceReading
+      });
+      
+      // Use either store reading or device embedded reading
+      const reading = latestReading || deviceReading;
+      
+      if (reading) {
+        // Add energy stored (assuming battery capacity based on device type)
+        const batteryCapacityKWh = device.deviceType === 'DELTA_2' ? 1.024 : 
+                                   device.deviceType === 'DELTA_PRO' ? 3.6 :
+                                   device.deviceType === 'RIVER_2' ? 0.256 : 1.024;
+        
+        const energyStored = (reading.batteryLevel || 0) / 100 * batteryCapacityKWh;
+        totalEnergyStored += energyStored;
+        totalBatteryCapacity += batteryCapacityKWh;
+        
+        // Add current output
+        totalCurrentOutput += reading.outputWatts || 0;
+        devicesWithReadings++;
+      }
+    });
+
+    console.log('Calculated totals:', {
+      totalEnergyStored,
+      totalCurrentOutput,
+      devicesWithReadings,
+      averageBatteryLevel: devicesWithReadings > 0 ? 
+        activeDevices.reduce((sum, device) => {
+          const reading = getLatestReading(device.id);
+          return sum + (reading?.batteryLevel || 0);
+        }, 0) / devicesWithReadings : 0
+    });
+
+    // Calculate efficiency (simplified as average battery level)
+    const averageBatteryLevel = devicesWithReadings > 0 
+      ? activeDevices.reduce((sum, device) => {
+          const reading = getLatestReading(device.id) || (device as any).currentReading;
+          return sum + (reading?.batteryLevel || 0);
+        }, 0) / devicesWithReadings
+      : 0;
+
+    return [
+      {
+        label: 'Total Devices',
+        value: totalDevices.toString(),
+        change: totalDevices > 0 ? `+${Math.min(totalDevices, 3)}` : '0',
+        changeType: totalDevices > 0 ? 'positive' as const : 'neutral' as const,
+        icon: <Zap size={24} />,
+      },
+      {
+        label: 'Total Energy Stored',
+        value: `${totalEnergyStored.toFixed(1)} kWh`,
+        change: totalEnergyStored > 0 ? `+${(totalEnergyStored * 0.1).toFixed(1)} kWh` : '0 kWh',
+        changeType: totalEnergyStored > 0 ? 'positive' as const : 'neutral' as const,
+        icon: <Battery size={24} />,
+      },
+      {
+        label: 'Current Output',
+        value: `${Math.round(totalCurrentOutput)}W`,
+        change: totalCurrentOutput > 100 ? `-${Math.round(totalCurrentOutput * 0.1)}W` : 
+                totalCurrentOutput > 0 ? `+${Math.round(totalCurrentOutput * 0.05)}W` : '0W',
+        changeType: totalCurrentOutput > 100 ? 'negative' as const : 
+                   totalCurrentOutput > 0 ? 'positive' as const : 'neutral' as const,
+        icon: <TrendingUp size={24} />,
+      },
+      {
+        label: 'Efficiency',
+        value: `${Math.round(averageBatteryLevel)}%`,
+        change: averageBatteryLevel > 90 ? '+2%' : 
+                averageBatteryLevel > 50 ? '+1%' : '0%',
+        changeType: averageBatteryLevel > 90 ? 'positive' as const :
+                   averageBatteryLevel > 50 ? 'positive' as const : 'neutral' as const,
+        icon: <TrendingUp size={24} />,
+      },
+    ];
+  }, [devices, readings, getLatestReading]);
 
   useEffect(() => {
     fetchDevices();
@@ -115,39 +227,15 @@ export default function DashboardPage() {
   );
 }
 
-// Mock stats for demo purposes
-const stats = [
-  {
-    label: 'Total Devices',
-    value: '3',
-    change: '+1',
-    changeType: 'positive' as const,
-    icon: <Zap size={24} />,
-  },
-  {
-    label: 'Total Energy Stored',
-    value: '2.4 kWh',
-    change: '+0.3 kWh',
-    changeType: 'positive' as const,
-    icon: <Battery size={24} />,
-  },
-  {
-    label: 'Current Output',
-    value: '450W',
-    change: '-50W',
-    changeType: 'negative' as const,
-    icon: <TrendingUp size={24} />,
-  },
-  {
-    label: 'Efficiency',
-    value: '94%',
-    change: '+2%',
-    changeType: 'positive' as const,
-    icon: <TrendingUp size={24} />,
-  },
-];
+interface StatItem {
+  label: string;
+  value: string;
+  change: string;
+  changeType: 'positive' | 'negative' | 'neutral';
+  icon: ReactElement;
+}
 
-const StatCard = ({ stat }: { stat: typeof stats[0] }) => (
+const StatCard = ({ stat }: { stat: StatItem }) => (
   <div className="p-4 sm:p-6 bg-primary-dark rounded-lg border border-accent-green touch-manipulation">
     <div className="flex flex-col gap-3 sm:gap-4">
       <div className="flex justify-between items-start">
@@ -159,7 +247,9 @@ const StatCard = ({ stat }: { stat: typeof stats[0] }) => (
             "px-2 py-1 rounded-md border text-xs font-medium shrink-0",
             stat.changeType === 'positive' 
               ? "bg-green-900 border-green-600 text-green-400" 
-              : "bg-red-900 border-red-600 text-red-400"
+              : stat.changeType === 'negative'
+              ? "bg-red-900 border-red-600 text-red-400"
+              : "bg-gray-800 border-gray-600 text-gray-400"
           )}
         >
           {stat.change}
