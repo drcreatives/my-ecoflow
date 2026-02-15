@@ -121,12 +121,12 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
     return (
       
         
-          <div className="min-h-screen bg-primary-black text-accent-gray">
+          <div className="min-h-screen text-text-secondary">
             <div className="container mx-auto px-4 py-8">
               <div className="flex flex-col items-center justify-center py-16">
-                <Loader2 size={48} className="animate-spin text-accent-green mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">Loading Device Settings</h3>
-                <p className="text-gray-400">Fetching device configuration...</p>
+                <Loader2 size={48} className="animate-spin text-brand-primary mb-4" />
+                <h3 className="text-lg font-medium text-text-primary mb-2">Loading Device Settings</h3>
+                <p className="text-text-muted">Fetching device configuration...</p>
               </div>
             </div>
           </div>
@@ -139,14 +139,14 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
     return (
       
         
-          <div className="min-h-screen bg-primary-black text-accent-gray flex items-center justify-center">
+          <div className="min-h-screen text-text-secondary flex items-center justify-center">
             <div className="text-center">
-              <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold text-white mb-2">Error Loading Settings</h1>
-              <p className="text-accent-gray mb-6">{error}</p>
+              <AlertTriangle className="w-16 h-16 text-danger mx-auto mb-4" />
+              <h1 className="text-2xl font-bold text-text-primary mb-2">Error Loading Settings</h1>
+              <p className="text-text-secondary mb-6">{error}</p>
               <button
                 onClick={handleBack}
-                className="bg-accent-green hover:bg-accent-green/80 text-primary-black px-6 py-3 rounded-lg font-medium transition-colors"
+                className="bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-6 py-3 rounded-pill font-medium transition-all duration-200 ease-dashboard"
               >
                 Go Back
               </button>
@@ -161,13 +161,13 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
     return (
       
         
-          <div className="min-h-screen bg-primary-black text-accent-gray flex items-center justify-center">
+          <div className="min-h-screen text-text-secondary flex items-center justify-center">
             <div className="text-center">
-              <h1 className="text-2xl font-bold text-white mb-2">Device Not Found</h1>
-              <p className="text-accent-gray mb-6">The device you&apos;re looking for doesn&apos;t exist.</p>
+              <h1 className="text-2xl font-bold text-text-primary mb-2">Device Not Found</h1>
+              <p className="text-text-secondary mb-6">The device you&apos;re looking for doesn&apos;t exist.</p>
               <button
                 onClick={handleBack}
-                className="bg-accent-green hover:bg-accent-green/80 text-primary-black px-6 py-3 rounded-lg font-medium transition-colors"
+                className="bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-6 py-3 rounded-pill font-medium transition-all duration-200 ease-dashboard"
               >
                 Go Back
               </button>
@@ -186,29 +186,29 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
   return (
     
       
-        <div className="min-h-screen bg-primary-black text-accent-gray">
+        <div className="min-h-screen text-text-secondary">
           <div className="container mx-auto px-4 py-8">
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center space-x-4">
                 <button
                   onClick={handleBack}
-                  className="p-2 hover:bg-primary-dark rounded-lg transition-colors group"
+                  className="p-2 hover:bg-surface-1 rounded-inner transition-all duration-200 ease-dashboard group"
                   title="Go back"
                 >
-                  <ArrowLeft className="w-5 h-5 group-hover:text-accent-green transition-colors" />
+                  <ArrowLeft className="w-5 h-5 group-hover:text-brand-primary transition-colors" />
                 </button>
                 <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold text-white">Device Settings</h1>
+                  <h1 className="text-page-title font-medium text-text-primary">Device Settings</h1>
                   <div className="flex items-center space-x-3 mt-1">
-                    <span className="text-accent-gray text-sm">{device.deviceName}</span>
+                    <span className="text-text-secondary text-sm">{device.deviceName}</span>
                     <div className="flex items-center space-x-1">
                       {device.online ? (
-                        <Wifi className="w-4 h-4 text-accent-green" />
+                        <Wifi className="w-4 h-4 text-brand-primary" />
                       ) : (
-                        <WifiOff className="w-4 h-4 text-red-400" />
+                        <WifiOff className="w-4 h-4 text-danger" />
                       )}
-                      <span className={`text-sm font-medium ${device.online ? 'text-accent-green' : 'text-red-400'}`}>
+                      <span className={`text-sm font-medium ${device.online ? 'text-brand-primary' : 'text-danger'}`}>
                         {device.online ? 'Online' : 'Offline'}
                       </span>
                     </div>
@@ -219,7 +219,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
               <div className="flex items-center gap-3">
                 <Link
                   href={`/device/${device.id}`}
-                  className="px-4 py-2 border border-gray-700 hover:border-gray-600 rounded-lg transition-colors text-white"
+                  className="px-4 py-2 border border-stroke-subtle hover:border-stroke-strong rounded-pill transition-all duration-200 ease-dashboard text-text-primary"
                 >
                   View Device
                 </Link>
@@ -229,16 +229,16 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
             {/* Settings Sections */}
             <div className="space-y-6">
               {/* Device Information */}
-              <div className="bg-primary-dark rounded-lg border border-gray-800 p-6">
+              <div className="bg-surface-1 rounded-card border border-stroke-subtle shadow-card p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
-                    <Settings className="w-5 h-5 text-accent-green" />
-                    <h2 className="text-lg font-semibold text-white">Device Information</h2>
+                    <Settings className="w-5 h-5 text-brand-primary" />
+                    <h2 className="text-lg font-medium text-text-primary">Device Information</h2>
                   </div>
                   {!isEditing ? (
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors text-white"
+                      className="flex items-center gap-2 px-3 py-2 bg-surface-2 hover:bg-surface-2/80 rounded-pill transition-all duration-200 ease-dashboard text-text-primary"
                     >
                       <Edit3 size={16} />
                       Edit
@@ -250,7 +250,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                           setIsEditing(false);
                           setFormData(prev => ({ ...prev, deviceName: device.deviceName }));
                         }}
-                        className="flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors text-white"
+                        className="flex items-center gap-2 px-3 py-2 bg-surface-2 hover:bg-surface-2/80 rounded-pill transition-all duration-200 ease-dashboard text-text-primary"
                       >
                         <X size={16} />
                         Cancel
@@ -258,7 +258,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                       <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="flex items-center gap-2 px-3 py-2 bg-accent-green hover:bg-accent-green/90 text-black rounded-lg transition-colors disabled:opacity-50"
+                        className="flex items-center gap-2 px-3 py-2 bg-brand-primary hover:bg-brand-primary/90 text-bg-base rounded-pill transition-all duration-200 ease-dashboard disabled:opacity-50"
                       >
                         {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                         Save
@@ -269,7 +269,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">
+                    <label className="block text-sm font-medium text-text-muted mb-2">
                       Device Name
                     </label>
                     {isEditing ? (
@@ -277,38 +277,38 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                         type="text"
                         value={formData.deviceName}
                         onChange={(e) => setFormData(prev => ({ ...prev, deviceName: e.target.value }))}
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:border-accent-green focus:outline-none text-white"
+                        className="w-full px-3 py-2 bg-surface-2 border border-stroke-subtle rounded-inner focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 focus:outline-none text-text-primary"
                       />
                     ) : (
-                      <p className="text-white font-medium">{device.deviceName}</p>
+                      <p className="text-text-primary font-medium">{device.deviceName}</p>
                     )}
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">
+                    <label className="block text-sm font-medium text-text-muted mb-2">
                       Serial Number
                     </label>
-                    <p className="text-white font-mono">{device.deviceSn}</p>
+                    <p className="text-text-primary font-mono">{device.deviceSn}</p>
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">
+                    <label className="block text-sm font-medium text-text-muted mb-2">
                       Device Type
                     </label>
-                    <p className="text-white">{device.deviceType || 'DELTA 2'}</p>
+                    <p className="text-text-primary">{device.deviceType || 'DELTA 2'}</p>
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">
+                    <label className="block text-sm font-medium text-text-muted mb-2">
                       Status
                     </label>
                     <div className="flex items-center gap-2">
                       {device.online ? (
-                        <CheckCircle className="w-4 h-4 text-accent-green" />
+                        <CheckCircle className="w-4 h-4 text-brand-primary" />
                       ) : (
-                        <AlertTriangle className="w-4 h-4 text-red-400" />
+                        <AlertTriangle className="w-4 h-4 text-danger" />
                       )}
-                      <span className={device.online ? 'text-accent-green' : 'text-red-400'}>
+                      <span className={device.online ? 'text-brand-primary' : 'text-danger'}>
                         {device.online ? 'Connected' : 'Disconnected'}
                       </span>
                     </div>
@@ -317,17 +317,17 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
               </div>
 
               {/* Data Collection Settings */}
-              <div className="bg-primary-dark rounded-lg border border-gray-800 p-6">
+              <div className="bg-surface-1 rounded-card border border-stroke-subtle shadow-card p-6">
                 <div className="flex items-center gap-3 mb-6">
-                  <Power className="w-5 h-5 text-accent-green" />
-                  <h2 className="text-lg font-semibold text-white">Data Collection</h2>
+                  <Power className="w-5 h-5 text-brand-primary" />
+                  <h2 className="text-lg font-medium text-text-primary">Data Collection</h2>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
+                  <div className="flex items-center justify-between p-4 bg-surface-2/50 rounded-inner">
                     <div>
-                      <h3 className="font-medium text-white">Analytics Enabled</h3>
-                      <p className="text-sm text-gray-400">
+                      <h3 className="font-medium text-text-primary">Analytics Enabled</h3>
+                      <p className="text-sm text-text-muted">
                         {formData.autoCollectData 
                           ? 'Device is registered for data collection and analytics'
                           : 'Register device to enable data collection and analytics'
@@ -336,28 +336,28 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                     </div>
                     <div className="flex items-center gap-2">
                       {formData.autoCollectData ? (
-                        <CheckCircle className="w-5 h-5 text-accent-green" />
+                        <CheckCircle className="w-5 h-5 text-brand-primary" />
                       ) : (
-                        <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                        <AlertTriangle className="w-5 h-5 text-warning" />
                       )}
-                      <span className={formData.autoCollectData ? 'text-accent-green' : 'text-yellow-400'}>
+                      <span className={formData.autoCollectData ? 'text-brand-primary' : 'text-warning'}>
                         {formData.autoCollectData ? 'Enabled' : 'Disabled'}
                       </span>
                     </div>
                   </div>
 
                   {!formData.autoCollectData && (
-                    <div className="p-4 bg-yellow-900/20 border border-yellow-900/30 rounded-lg">
+                    <div className="p-4 bg-warning/5 border border-warning/15 rounded-inner">
                       <div className="flex items-start gap-3">
-                        <Info className="w-5 h-5 text-yellow-400 mt-0.5" />
+                        <Info className="w-5 h-5 text-warning mt-0.5" />
                         <div>
-                          <h4 className="font-medium text-yellow-400 mb-1">Analytics Disabled</h4>
-                          <p className="text-sm text-gray-400 mb-3">
+                          <h4 className="font-medium text-warning mb-1">Analytics Disabled</h4>
+                          <p className="text-sm text-text-muted mb-3">
                             This device is not registered for data collection. Enable analytics to track historical data, receive alerts, and access advanced monitoring features.
                           </p>
                           <Link
                             href="/devices/add"
-                            className="inline-flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 text-black font-medium py-2 px-4 rounded-lg transition-colors"
+                            className="inline-flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 text-bg-base font-medium py-2 px-4 rounded-pill transition-all duration-200 ease-dashboard"
                           >
                             Register Device
                           </Link>
@@ -369,22 +369,22 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
               </div>
 
               {/* Notification Settings */}
-              <div className="bg-primary-dark rounded-lg border border-gray-800 p-6">
+              <div className="bg-surface-1 rounded-card border border-stroke-subtle shadow-card p-6">
                 <div className="flex items-center gap-3 mb-6">
-                  <Bell className="w-5 h-5 text-accent-green" />
-                  <h2 className="text-lg font-semibold text-white">Notifications</h2>
+                  <Bell className="w-5 h-5 text-brand-primary" />
+                  <h2 className="text-lg font-medium text-text-primary">Notifications</h2>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
+                  <div className="flex items-center justify-between p-4 bg-surface-2/50 rounded-inner">
                     <div>
-                      <h3 className="font-medium text-white">Push Notifications</h3>
-                      <p className="text-sm text-gray-400">Receive alerts for device status changes</p>
+                      <h3 className="font-medium text-text-primary">Push Notifications</h3>
+                      <p className="text-sm text-text-muted">Receive alerts for device status changes</p>
                     </div>
                     <button
                       onClick={() => setFormData(prev => ({ ...prev, notifications: !prev.notifications }))}
                       className={`relative w-12 h-6 rounded-full transition-colors ${
-                        formData.notifications ? 'bg-accent-green' : 'bg-gray-600'
+                        formData.notifications ? 'bg-brand-primary' : 'bg-stroke-strong'
                       }`}
                     >
                       <div
@@ -396,8 +396,8 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 bg-gray-800/30 rounded-lg">
-                      <label className="block text-sm font-medium text-gray-400 mb-2">
+                    <div className="p-4 bg-surface-2/30 rounded-inner">
+                      <label className="block text-sm font-medium text-text-muted mb-2">
                         Low Battery Alert (%)
                       </label>
                       <input
@@ -409,12 +409,12 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                           ...prev,
                           alertThresholds: { ...prev.alertThresholds, lowBattery: parseInt(e.target.value) }
                         }))}
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:border-accent-green focus:outline-none text-white"
+                        className="w-full px-3 py-2 bg-surface-2 border border-stroke-subtle rounded-inner focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 focus:outline-none text-text-primary"
                       />
                     </div>
 
-                    <div className="p-4 bg-gray-800/30 rounded-lg">
-                      <label className="block text-sm font-medium text-gray-400 mb-2">
+                    <div className="p-4 bg-surface-2/30 rounded-inner">
+                      <label className="block text-sm font-medium text-text-muted mb-2">
                         High Temperature Alert (°C)
                       </label>
                       <input
@@ -426,12 +426,12 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                           ...prev,
                           alertThresholds: { ...prev.alertThresholds, highTemperature: parseInt(e.target.value) }
                         }))}
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:border-accent-green focus:outline-none text-white"
+                        className="w-full px-3 py-2 bg-surface-2 border border-stroke-subtle rounded-inner focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 focus:outline-none text-text-primary"
                       />
                     </div>
 
-                    <div className="p-4 bg-gray-800/30 rounded-lg">
-                      <label className="block text-sm font-medium text-gray-400 mb-2">
+                    <div className="p-4 bg-surface-2/30 rounded-inner">
+                      <label className="block text-sm font-medium text-text-muted mb-2">
                         Power Limit Alert (W)
                       </label>
                       <input
@@ -444,7 +444,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                           ...prev,
                           alertThresholds: { ...prev.alertThresholds, powerLimit: parseInt(e.target.value) }
                         }))}
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:border-accent-green focus:outline-none text-white"
+                        className="w-full px-3 py-2 bg-surface-2 border border-stroke-subtle rounded-inner focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 focus:outline-none text-text-primary"
                       />
                     </div>
                   </div>
@@ -452,25 +452,25 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
               </div>
 
               {/* Danger Zone */}
-              <div className="bg-primary-dark rounded-lg border border-red-900/30 p-6">
+              <div className="bg-surface-1 rounded-card border border-danger/20 shadow-card p-6">
                 <div className="flex items-center gap-3 mb-6">
-                  <AlertTriangle className="w-5 h-5 text-red-400" />
-                  <h2 className="text-lg font-semibold text-white">Danger Zone</h2>
+                  <AlertTriangle className="w-5 h-5 text-danger" />
+                  <h2 className="text-lg font-medium text-text-primary">Danger Zone</h2>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="p-4 bg-red-900/20 border border-red-900/30 rounded-lg">
+                  <div className="p-4 bg-danger/5 border border-danger/15 rounded-inner">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-medium text-white mb-1">Remove Device</h3>
-                        <p className="text-sm text-gray-400">
+                        <h3 className="font-medium text-text-primary mb-1">Remove Device</h3>
+                        <p className="text-sm text-text-muted">
                           Remove this device from your dashboard. This action cannot be undone.
                         </p>
                       </div>
                       <button
                         onClick={handleRemoveDevice}
                         disabled={saving}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                        className="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger/90 text-text-primary rounded-pill transition-all duration-200 ease-dashboard disabled:opacity-50"
                       >
                         {saving ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                         Remove Device
