@@ -59,9 +59,10 @@ export default function RootLayout({
           visibleToasts={4}
           toastOptions={{
             style: {
-              background: '#2b2b2b',
-              border: '1px solid #374151',
-              color: '#ebebeb',
+              background: '#1f201f',
+              border: '1px solid rgba(255,255,255,0.10)',
+              color: 'rgba(255,255,255,0.92)',
+              borderRadius: '18px',
             },
             className: 'sonner-toast',
           }}
