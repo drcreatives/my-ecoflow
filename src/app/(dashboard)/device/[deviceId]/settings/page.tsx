@@ -186,8 +186,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
   return (
     
       
-        <div className="min-h-screen text-text-secondary">
-          <div className="container mx-auto px-4 py-8">
+        <div className="p-4 sm:p-6 text-text-secondary">
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center space-x-4">
@@ -480,7 +479,6 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                 </div>
               </div>
             </div>
-          </div>
         </div>
       
     

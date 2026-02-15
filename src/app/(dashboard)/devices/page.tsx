@@ -218,22 +218,19 @@ const DevicesPage = () => {
 
   if (loading) {
     return (
-      <div>
-        <div className="container mx-auto px-4 py-8">
+      <div className="p-4 sm:p-6">
           <div className="flex items-center justify-center h-64">
             <div className="flex flex-col items-center gap-4">
               <Loader2 size={32} className="animate-spin text-brand-primary" />
               <p className="text-text-secondary">Loading devices...</p>
             </div>
           </div>
-        </div>
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="container mx-auto px-4 py-8">
+    <div className="p-4 sm:p-6">
         {/* Header */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-8">
           <div>
@@ -491,7 +488,6 @@ const DevicesPage = () => {
         >
           <Plus size={24} />
         </Link>
-      </div>
     </div>
   );
 };

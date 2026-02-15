@@ -180,8 +180,7 @@ const AddDevicePage = () => {
   };
 
   return (
-    <div className="text-text-primary">
-      <div className="container mx-auto px-4 py-8">
+    <div className="p-4 sm:p-6 text-text-primary">
             {/* Header */}
             <div className="flex items-center gap-4 mb-8">
               <Link 
@@ -303,7 +302,7 @@ const AddDevicePage = () => {
               </div>
             )}
           </div>
-        </div>
+    </div>
   );
 };
 

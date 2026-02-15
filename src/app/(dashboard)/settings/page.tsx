@@ -519,7 +519,6 @@ function SettingsPage() {
   return (
     
       <div className="p-4 sm:p-6">
-        <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="flex items-center gap-3 mb-8">
             <Settings size={28} className="text-brand-primary" />
@@ -1035,7 +1034,6 @@ function SettingsPage() {
               </div>
             </div>
           </div>
-        </div>
       </div>
     
   )
