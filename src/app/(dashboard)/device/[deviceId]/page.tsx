@@ -91,12 +91,7 @@ export default function DevicePage({ params }: DevicePageProps) {
                 </div>
               </div>
 
-              {/* Center loading spinner */}
-              {/* <div className="flex flex-col items-center justify-center py-16">
-                <Loader2 size={48} className="animate-spin text-accent-green mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">Loading Device Details</h3>
-                <p className="text-gray-400">Fetching device information...</p>
-              </div> */}
+              {/* Center loading spinner — removed deprecated tokens */}
 
               {/* Content skeleton */}
               <div className="space-y-6">
