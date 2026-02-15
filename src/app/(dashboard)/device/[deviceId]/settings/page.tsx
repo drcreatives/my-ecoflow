@@ -146,7 +146,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
               <p className="text-text-secondary mb-6">{error}</p>
               <button
                 onClick={handleBack}
-                className="bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-6 py-3 rounded-pill font-medium transition-all duration-200 ease-dashboard"
+                className="bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-6 py-3 rounded-pill font-medium transition-all duration-160 ease-dashboard"
               >
                 Go Back
               </button>
@@ -167,7 +167,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
               <p className="text-text-secondary mb-6">The device you&apos;re looking for doesn&apos;t exist.</p>
               <button
                 onClick={handleBack}
-                className="bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-6 py-3 rounded-pill font-medium transition-all duration-200 ease-dashboard"
+                className="bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-6 py-3 rounded-pill font-medium transition-all duration-160 ease-dashboard"
               >
                 Go Back
               </button>
@@ -192,7 +192,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
               <div className="flex items-center space-x-4">
                 <button
                   onClick={handleBack}
-                  className="p-2 hover:bg-surface-1 rounded-inner transition-all duration-200 ease-dashboard group"
+                  className="p-2 hover:bg-surface-1 rounded-inner transition-all duration-160 ease-dashboard group"
                   title="Go back"
                 >
                   <ArrowLeft className="w-5 h-5 group-hover:text-brand-primary transition-colors" />
@@ -218,7 +218,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
               <div className="flex items-center gap-3">
                 <Link
                   href={`/device/${device.id}`}
-                  className="px-4 py-2 border border-stroke-subtle hover:border-stroke-strong rounded-pill transition-all duration-200 ease-dashboard text-text-primary"
+                  className="px-4 py-2 border border-stroke-subtle hover:border-stroke-strong rounded-pill transition-all duration-160 ease-dashboard text-text-primary"
                 >
                   View Device
                 </Link>
@@ -237,7 +237,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                   {!isEditing ? (
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="flex items-center gap-2 px-3 py-2 bg-surface-2 hover:bg-surface-2/80 rounded-pill transition-all duration-200 ease-dashboard text-text-primary"
+                      className="flex items-center gap-2 px-3 py-2 bg-surface-2 hover:bg-surface-2/80 rounded-pill transition-all duration-160 ease-dashboard text-text-primary"
                     >
                       <Edit3 size={16} />
                       Edit
@@ -249,7 +249,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                           setIsEditing(false);
                           setFormData(prev => ({ ...prev, deviceName: device.deviceName }));
                         }}
-                        className="flex items-center gap-2 px-3 py-2 bg-surface-2 hover:bg-surface-2/80 rounded-pill transition-all duration-200 ease-dashboard text-text-primary"
+                        className="flex items-center gap-2 px-3 py-2 bg-surface-2 hover:bg-surface-2/80 rounded-pill transition-all duration-160 ease-dashboard text-text-primary"
                       >
                         <X size={16} />
                         Cancel
@@ -257,7 +257,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                       <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="flex items-center gap-2 px-3 py-2 bg-brand-primary hover:bg-brand-primary/90 text-bg-base rounded-pill transition-all duration-200 ease-dashboard disabled:opacity-50"
+                        className="flex items-center gap-2 px-3 py-2 bg-brand-primary hover:bg-brand-primary/90 text-bg-base rounded-pill transition-all duration-160 ease-dashboard disabled:opacity-50"
                       >
                         {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                         Save
@@ -356,7 +356,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                           </p>
                           <Link
                             href="/devices/add"
-                            className="inline-flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 text-bg-base font-medium py-2 px-4 rounded-pill transition-all duration-200 ease-dashboard"
+                            className="inline-flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 text-bg-base font-medium py-2 px-4 rounded-pill transition-all duration-160 ease-dashboard"
                           >
                             Register Device
                           </Link>
@@ -469,7 +469,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                       <button
                         onClick={handleRemoveDevice}
                         disabled={saving}
-                        className="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger/90 text-text-primary rounded-pill transition-all duration-200 ease-dashboard disabled:opacity-50"
+                        className="flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger/90 text-text-primary rounded-pill transition-all duration-160 ease-dashboard disabled:opacity-50"
                       >
                         {saving ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                         Remove Device

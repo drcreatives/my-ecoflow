@@ -539,7 +539,7 @@ function SettingsPage() {
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
                       className={cn(
-                        "w-full flex items-center gap-3 p-3 rounded-inner text-left transition-all duration-200 ease-dashboard",
+                        "w-full flex items-center gap-3 p-3 rounded-inner text-left transition-all duration-160 ease-dashboard",
                         activeTab === tab.id
                           ? "bg-brand-primary text-bg-base font-medium"
                           : "text-text-muted hover:text-text-primary hover:bg-surface-2"
@@ -618,7 +618,7 @@ function SettingsPage() {
                       <button
                         onClick={() => saveSettings('userProfile', userProfile)}
                         disabled={saving}
-                        className="mt-4 flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-200 ease-dashboard"
+                        className="mt-4 flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-160 ease-dashboard"
                       >
                         {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                         Save Profile
@@ -749,7 +749,7 @@ function SettingsPage() {
                         <button
                           onClick={() => saveSettings('notificationSettings', notificationSettings)}
                           disabled={saving}
-                          className="flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-200 ease-dashboard"
+                          className="flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-160 ease-dashboard"
                         >
                           {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                           Save Preferences
@@ -759,7 +759,7 @@ function SettingsPage() {
                           <button
                             onClick={handleTestEmail}
                             disabled={testingEmail || saving}
-                            className="flex items-center gap-2 bg-surface-2 hover:bg-surface-2/80 disabled:opacity-50 text-text-primary font-medium px-4 py-2 rounded-pill border border-stroke-subtle transition-all duration-200 ease-dashboard"
+                            className="flex items-center gap-2 bg-surface-2 hover:bg-surface-2/80 disabled:opacity-50 text-text-primary font-medium px-4 py-2 rounded-pill border border-stroke-subtle transition-all duration-160 ease-dashboard"
                           >
                             {testingEmail ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
                             Test Email
@@ -853,7 +853,7 @@ function SettingsPage() {
                       <button
                         onClick={() => saveSettings('dataSettings', dataSettings)}
                         disabled={saving}
-                        className="mt-4 flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-200 ease-dashboard"
+                        className="mt-4 flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-160 ease-dashboard"
                       >
                         {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                         Save Data Settings
@@ -980,7 +980,7 @@ function SettingsPage() {
                               <button
                                 onClick={handlePasswordChange}
                                 disabled={saving || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
-                                className="flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-200 ease-dashboard"
+                                className="flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-160 ease-dashboard"
                               >
                                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                                 Update Password
@@ -990,7 +990,7 @@ function SettingsPage() {
                                   setShowPasswordForm(false)
                                   setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
                                 }}
-                                className="px-4 py-2 border border-stroke-subtle text-text-muted hover:text-text-primary hover:border-stroke-strong rounded-pill transition-all duration-200 ease-dashboard"
+                                className="px-4 py-2 border border-stroke-subtle text-text-muted hover:text-text-primary hover:border-stroke-strong rounded-pill transition-all duration-160 ease-dashboard"
                               >
                                 Cancel
                               </button>
@@ -1021,7 +1021,7 @@ function SettingsPage() {
                           <button
                             onClick={() => saveSettings('securitySettings', securitySettings)}
                             disabled={saving}
-                            className="flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-200 ease-dashboard"
+                            className="flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-160 ease-dashboard"
                           >
                             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                             Save Security Settings

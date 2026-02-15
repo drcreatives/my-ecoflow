@@ -160,7 +160,7 @@ export default function AuthPage() {
           <div className="flex bg-surface-2 rounded-inner p-1 mb-6 sm:mb-8">
             <button
               onClick={() => setIsLogin(true)}
-              className={`flex-1 py-2 px-4 rounded-inner text-sm font-medium transition-all duration-200 ease-dashboard touch-manipulation ${
+              className={`flex-1 py-2 px-4 rounded-inner text-sm font-medium transition-all duration-160 ease-dashboard touch-manipulation ${
                 isLogin 
                   ? 'bg-brand-primary text-bg-base' 
                   : 'text-text-muted hover:text-text-primary'
@@ -170,7 +170,7 @@ export default function AuthPage() {
             </button>
             <button
               onClick={() => setIsLogin(false)}
-              className={`flex-1 py-2 px-4 rounded-inner text-sm font-medium transition-all duration-200 ease-dashboard touch-manipulation ${
+              className={`flex-1 py-2 px-4 rounded-inner text-sm font-medium transition-all duration-160 ease-dashboard touch-manipulation ${
                 !isLogin 
                   ? 'bg-brand-primary text-bg-base' 
                   : 'text-text-muted hover:text-text-primary'
@@ -291,7 +291,7 @@ export default function AuthPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full h-12 sm:h-14 bg-brand-primary hover:bg-brand-primary/90 text-bg-base font-medium px-4 rounded-pill transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center group touch-manipulation text-base"
+              className="w-full h-12 sm:h-14 bg-brand-primary hover:bg-brand-primary/90 text-bg-base font-medium px-4 rounded-pill transition-all duration-160 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center group touch-manipulation text-base"
             >
               {isLoading ? (
                 <div className="flex items-center">

@@ -241,7 +241,7 @@ export const Sidebar = () => {
         {/* Mobile Sidebar */}
         <div
           className={cn(
-            "fixed top-0 left-0 h-full w-80 bg-surface-1 z-50 transition-transform duration-300 ease-dashboard",
+            "fixed top-0 left-0 h-full w-80 bg-surface-1 z-50 transition-transform duration-[220ms] ease-dashboard",
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
@@ -273,7 +273,7 @@ export const Sidebar = () => {
   return (
     <div
       className={cn(
-        "transition-all duration-300 ease-in-out relative",
+        "transition-all duration-[220ms] ease-in-out relative",
         sidebarOpen ? "w-80" : "w-20"
       )}
     >

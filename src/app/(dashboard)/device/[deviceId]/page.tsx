@@ -148,7 +148,7 @@ export default function DevicePage({ params }: DevicePageProps) {
               <p className="text-text-secondary mb-6">{error}</p>
               <button
                 onClick={handleBack}
-                className="bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-6 py-3 rounded-pill font-medium transition-all duration-200 ease-dashboard"
+                className="bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-6 py-3 rounded-pill font-medium transition-all duration-160 ease-dashboard"
               >
                 Go Back
               </button>
@@ -169,7 +169,7 @@ export default function DevicePage({ params }: DevicePageProps) {
               <p className="text-text-secondary mb-6">The device you&apos;re looking for doesn&apos;t exist.</p>
               <button
                 onClick={handleBack}
-                className="bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-6 py-3 rounded-pill font-medium transition-all duration-200 ease-dashboard"
+                className="bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-6 py-3 rounded-pill font-medium transition-all duration-160 ease-dashboard"
               >
                 Go Back
               </button>
@@ -196,7 +196,7 @@ export default function DevicePage({ params }: DevicePageProps) {
               <div className="flex items-center space-x-4">
                 <button
                   onClick={handleBack}
-                  className="p-2 hover:bg-surface-1 rounded-inner transition-all duration-200 ease-dashboard group"
+                  className="p-2 hover:bg-surface-1 rounded-inner transition-all duration-160 ease-dashboard group"
                   title="Go back"
                 >
                   <ArrowLeft className="w-5 h-5 group-hover:text-brand-primary transition-colors" />
@@ -221,7 +221,7 @@ export default function DevicePage({ params }: DevicePageProps) {
           
           <Link
             href={`/device/${device.id}/settings`}
-            className="p-2 hover:bg-surface-1 rounded-inner transition-all duration-200 ease-dashboard group"
+            className="p-2 hover:bg-surface-1 rounded-inner transition-all duration-160 ease-dashboard group"
             title="Device Settings"
           >
             <Settings className="w-6 h-6 group-hover:text-brand-primary transition-colors" />
@@ -263,7 +263,7 @@ export default function DevicePage({ params }: DevicePageProps) {
                         }).then(() => window.location.reload())
                       }
                     }}
-                    className="px-4 py-2 border border-danger text-danger hover:bg-danger hover:text-text-primary rounded-pill transition-all duration-200 ease-dashboard text-sm font-medium"
+                    className="px-4 py-2 border border-danger text-danger hover:bg-danger hover:text-text-primary rounded-pill transition-all duration-160 ease-dashboard text-sm font-medium"
                   >
                     Disable Analytics
                   </button>
@@ -276,7 +276,7 @@ export default function DevicePage({ params }: DevicePageProps) {
                         body: JSON.stringify({ deviceSn: device.deviceSn, userId: device.userId })
                       }).then(() => window.location.reload())
                     }}
-                    className="px-4 py-2 border border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-bg-base rounded-pill transition-all duration-200 ease-dashboard text-sm font-medium"
+                    className="px-4 py-2 border border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-bg-base rounded-pill transition-all duration-160 ease-dashboard text-sm font-medium"
                   >
                     Enable Analytics
                   </button>
@@ -289,7 +289,7 @@ export default function DevicePage({ params }: DevicePageProps) {
         {/* Status Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
           {/* Battery Level */}
-          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-200 ease-dashboard">
+          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-160 ease-dashboard">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
                 <Battery className={`w-5 h-5 ${getBatteryColor(reading?.batteryLevel || 0)}`} />
@@ -302,7 +302,7 @@ export default function DevicePage({ params }: DevicePageProps) {
               </div>
               <div className="w-full bg-stroke-strong rounded-full h-2">
                 <div 
-                  className={`h-2 rounded-full transition-all duration-300 ${
+                  className={`h-2 rounded-full transition-all duration-[220ms] ${
                     (reading?.batteryLevel || 0) > 60 ? 'bg-brand-primary' :
                     (reading?.batteryLevel || 0) > 30 ? 'bg-warning' : 'bg-danger'
                   }`}
@@ -313,7 +313,7 @@ export default function DevicePage({ params }: DevicePageProps) {
           </div>
 
           {/* Power Input */}
-          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-200 ease-dashboard">
+          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-160 ease-dashboard">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
                 <TrendingUp className="w-5 h-5 text-brand-tertiary" />
@@ -329,7 +329,7 @@ export default function DevicePage({ params }: DevicePageProps) {
           </div>
 
           {/* Power Output */}
-          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-200 ease-dashboard">
+          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-160 ease-dashboard">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
                 <TrendingDown className="w-5 h-5 text-warning" />
@@ -345,7 +345,7 @@ export default function DevicePage({ params }: DevicePageProps) {
           </div>
 
           {/* Temperature */}
-          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-200 ease-dashboard">
+          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-160 ease-dashboard">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
                 <Thermometer className="w-5 h-5 text-brand-primary" />
@@ -470,17 +470,17 @@ export default function DevicePage({ params }: DevicePageProps) {
               <span>Quick Actions</span>
             </h3>
             <div className="space-y-3">
-              <button className="w-full bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-4 py-3 rounded-pill font-medium transition-all duration-200 ease-dashboard flex items-center justify-center space-x-2">
+              <button className="w-full bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-4 py-3 rounded-pill font-medium transition-all duration-160 ease-dashboard flex items-center justify-center space-x-2">
                 <Zap className="w-4 h-4" />
                 <span>Start Charging</span>
               </button>
-              <button className="w-full bg-bg-base hover:bg-surface-2 text-text-secondary border border-stroke-subtle hover:border-stroke-strong px-4 py-3 rounded-pill font-medium transition-all duration-200 ease-dashboard flex items-center justify-center space-x-2">
+              <button className="w-full bg-bg-base hover:bg-surface-2 text-text-secondary border border-stroke-subtle hover:border-stroke-strong px-4 py-3 rounded-pill font-medium transition-all duration-160 ease-dashboard flex items-center justify-center space-x-2">
                 <Settings className="w-4 h-4" />
                 <span>Device Settings</span>
               </button>
               <button 
                 onClick={fetchDevices}
-                className="w-full bg-brand-tertiary hover:bg-brand-tertiary/80 text-text-primary px-4 py-3 rounded-pill font-medium transition-all duration-200 ease-dashboard flex items-center justify-center space-x-2"
+                className="w-full bg-brand-tertiary hover:bg-brand-tertiary/80 text-text-primary px-4 py-3 rounded-pill font-medium transition-all duration-160 ease-dashboard flex items-center justify-center space-x-2"
               >
                 <Activity className="w-4 h-4" />
                 <span>Refresh Data</span>
