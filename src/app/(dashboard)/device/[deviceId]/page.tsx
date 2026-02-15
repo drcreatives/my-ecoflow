@@ -56,23 +56,23 @@ export default function DevicePage({ params }: DevicePageProps) {
     switch (status.toLowerCase()) {
       case 'connected':
       case 'online':
-        return 'text-accent-green'
+        return 'text-brand-primary'
       case 'charging':
-        return 'text-accent-blue'
+        return 'text-brand-tertiary'
       case 'discharging':
-        return 'text-yellow-400'
+        return 'text-warning'
       case 'offline':
       case 'disconnected':
-        return 'text-red-400'
+        return 'text-danger'
       default:
-        return 'text-accent-gray'
+        return 'text-text-secondary'
     }
   }
 
   const getBatteryColor = (level: number): string => {
-    if (level > 60) return 'text-accent-green'
-    if (level > 30) return 'text-yellow-400'
-    return 'text-red-400'
+    if (level > 60) return 'text-brand-primary'
+    if (level > 30) return 'text-warning'
+    return 'text-danger'
   }
 
   // Show loading while fetching devices or if device hasn't loaded yet
@@ -80,14 +80,14 @@ export default function DevicePage({ params }: DevicePageProps) {
     return (
       
         
-          <div className="min-h-screen bg-primary-black text-accent-gray">
+          <div className="min-h-screen text-text-secondary">
             <div className="container mx-auto px-4 py-8">
               {/* Back button skeleton */}
               <div className="flex items-center space-x-4 mb-8">
-                <div className="w-9 h-9 bg-primary-dark rounded-lg animate-pulse"></div>
+                <div className="w-9 h-9 bg-surface-1 rounded-inner animate-pulse"></div>
                 <div>
-                  <div className="h-8 w-48 bg-primary-dark rounded animate-pulse mb-2"></div>
-                  <div className="h-4 w-32 bg-primary-dark rounded animate-pulse"></div>
+                  <div className="h-8 w-48 bg-surface-1 rounded animate-pulse mb-2"></div>
+                  <div className="h-4 w-32 bg-surface-1 rounded animate-pulse"></div>
                 </div>
               </div>
 
@@ -101,17 +101,17 @@ export default function DevicePage({ params }: DevicePageProps) {
               {/* Content skeleton */}
               <div className="space-y-6">
                 {/* Analytics card skeleton */}
-                <div className="bg-primary-dark rounded-lg p-6 animate-pulse">
-                  <div className="h-6 w-40 bg-gray-800 rounded mb-2"></div>
-                  <div className="h-4 w-64 bg-gray-800 rounded"></div>
+                <div className="bg-surface-1 rounded-card p-6 animate-pulse">
+                  <div className="h-6 w-40 bg-surface-2 rounded mb-2"></div>
+                  <div className="h-4 w-64 bg-surface-2 rounded"></div>
                 </div>
 
                 {/* Metrics grid skeleton */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {[...Array(4)].map((_, i) => (
-                    <div key={i} className="bg-primary-dark rounded-lg p-6 animate-pulse">
-                      <div className="h-6 w-24 bg-gray-800 rounded mb-2"></div>
-                      <div className="h-8 w-16 bg-gray-800 rounded"></div>
+                    <div key={i} className="bg-surface-1 rounded-card p-6 animate-pulse">
+                      <div className="h-6 w-24 bg-surface-2 rounded mb-2"></div>
+                      <div className="h-8 w-16 bg-surface-2 rounded"></div>
                     </div>
                   ))}
                 </div>
@@ -119,12 +119,12 @@ export default function DevicePage({ params }: DevicePageProps) {
                 {/* Large cards skeleton */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {[...Array(2)].map((_, i) => (
-                    <div key={i} className="bg-primary-dark rounded-lg p-6 animate-pulse">
-                      <div className="h-6 w-32 bg-gray-800 rounded mb-4"></div>
+                    <div key={i} className="bg-surface-1 rounded-card p-6 animate-pulse">
+                      <div className="h-6 w-32 bg-surface-2 rounded mb-4"></div>
                       <div className="space-y-2">
-                        <div className="h-4 w-full bg-gray-800 rounded"></div>
-                        <div className="h-4 w-3/4 bg-gray-800 rounded"></div>
-                        <div className="h-4 w-1/2 bg-gray-800 rounded"></div>
+                        <div className="h-4 w-full bg-surface-2 rounded"></div>
+                        <div className="h-4 w-3/4 bg-surface-2 rounded"></div>
+                        <div className="h-4 w-1/2 bg-surface-2 rounded"></div>
                       </div>
                     </div>
                   ))}
@@ -141,14 +141,14 @@ export default function DevicePage({ params }: DevicePageProps) {
     return (
       
         
-          <div className="min-h-screen bg-primary-black text-accent-gray flex items-center justify-center">
+          <div className="min-h-screen text-text-secondary flex items-center justify-center">
             <div className="text-center">
-              <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold text-white mb-2">Error Loading Device</h1>
-              <p className="text-accent-gray mb-6">{error}</p>
+              <AlertTriangle className="w-16 h-16 text-danger mx-auto mb-4" />
+              <h1 className="text-2xl font-bold text-text-primary mb-2">Error Loading Device</h1>
+              <p className="text-text-secondary mb-6">{error}</p>
               <button
                 onClick={handleBack}
-                className="bg-accent-green hover:bg-accent-green/80 text-primary-black px-6 py-3 rounded-lg font-medium transition-colors"
+                className="bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-6 py-3 rounded-pill font-medium transition-all duration-200 ease-dashboard"
               >
                 Go Back
               </button>
@@ -163,13 +163,13 @@ export default function DevicePage({ params }: DevicePageProps) {
     return (
       
         
-          <div className="min-h-screen bg-primary-black text-accent-gray flex items-center justify-center">
+          <div className="min-h-screen text-text-secondary flex items-center justify-center">
             <div className="text-center">
-              <h1 className="text-2xl font-bold text-white mb-2">Device Not Found</h1>
-              <p className="text-accent-gray mb-6">The device you&apos;re looking for doesn&apos;t exist.</p>
+              <h1 className="text-2xl font-bold text-text-primary mb-2">Device Not Found</h1>
+              <p className="text-text-secondary mb-6">The device you&apos;re looking for doesn&apos;t exist.</p>
               <button
                 onClick={handleBack}
-                className="bg-accent-green hover:bg-accent-green/80 text-primary-black px-6 py-3 rounded-lg font-medium transition-colors"
+                className="bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-6 py-3 rounded-pill font-medium transition-all duration-200 ease-dashboard"
               >
                 Go Back
               </button>
@@ -190,29 +190,29 @@ export default function DevicePage({ params }: DevicePageProps) {
   return (
     
       
-        <div className="min-h-screen bg-primary-black text-accent-gray">
+        <div className="min-h-screen text-text-secondary">
           <div className="container mx-auto px-4 py-8">
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center space-x-4">
                 <button
                   onClick={handleBack}
-                  className="p-2 hover:bg-primary-dark rounded-lg transition-colors group"
+                  className="p-2 hover:bg-surface-1 rounded-inner transition-all duration-200 ease-dashboard group"
                   title="Go back"
                 >
-                  <ArrowLeft className="w-5 h-5 group-hover:text-accent-green transition-colors" />
+                  <ArrowLeft className="w-5 h-5 group-hover:text-brand-primary transition-colors" />
                 </button>
                 <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold text-white">{device.deviceName}</h1>
+                  <h1 className="text-page-title font-medium text-text-primary">{device.deviceName}</h1>
               <div className="flex items-center space-x-3 mt-1">
-                <span className="text-accent-gray text-sm">SN: {device.deviceSn}</span>
+                <span className="text-text-secondary text-sm">SN: {device.deviceSn}</span>
                 <div className="flex items-center space-x-1">
                   {device.online ? (
-                    <Wifi className="w-4 h-4 text-accent-green" />
+                    <Wifi className="w-4 h-4 text-brand-primary" />
                   ) : (
-                    <WifiOff className="w-4 h-4 text-red-400" />
+                    <WifiOff className="w-4 h-4 text-danger" />
                   )}
-                  <span className={`text-sm font-medium ${device.online ? 'text-accent-green' : 'text-red-400'}`}>
+                  <span className={`text-sm font-medium ${device.online ? 'text-brand-primary' : 'text-danger'}`}>
                     {device.online ? 'Online' : 'Offline'}
                   </span>
                 </div>
@@ -222,28 +222,28 @@ export default function DevicePage({ params }: DevicePageProps) {
           
           <Link
             href={`/device/${device.id}/settings`}
-            className="p-2 hover:bg-primary-dark rounded-lg transition-colors group"
+            className="p-2 hover:bg-surface-1 rounded-inner transition-all duration-200 ease-dashboard group"
             title="Device Settings"
           >
-            <Settings className="w-6 h-6 group-hover:text-accent-green transition-colors" />
+            <Settings className="w-6 h-6 group-hover:text-brand-primary transition-colors" />
           </Link>
         </div>
 
         {/* Analytics Registration Status */}
         <div className="mb-6">
-          <div className="bg-primary-dark border border-accent-green/20 rounded-lg p-4 sm:p-6">
+          <div className="bg-surface-1 border border-brand-primary/20 rounded-card shadow-card p-4 sm:p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 {!device.id.startsWith('temp-') ? (
-                  <Activity className="w-5 h-5 text-accent-green" />
+                  <Activity className="w-5 h-5 text-brand-primary" />
                 ) : (
-                  <Activity className="w-5 h-5 text-gray-400" />
+                  <Activity className="w-5 h-5 text-text-muted" />
                 )}
                 <div>
-                  <h3 className={`font-semibold ${!device.id.startsWith('temp-') ? 'text-accent-green' : 'text-gray-400'}`}>
+                  <h3 className={`font-semibold ${!device.id.startsWith('temp-') ? 'text-brand-primary' : 'text-text-muted'}`}>
                     {!device.id.startsWith('temp-') ? 'Analytics Enabled' : 'Analytics Disabled'}
                   </h3>
-                  <p className="text-sm text-accent-gray">
+                  <p className="text-sm text-text-secondary">
                     {!device.id.startsWith('temp-') 
                       ? 'This device is registered for data collection, analytics, and history tracking.' 
                       : 'Register this device to enable data collection, analytics, and history tracking.'
@@ -264,7 +264,7 @@ export default function DevicePage({ params }: DevicePageProps) {
                         }).then(() => window.location.reload())
                       }
                     }}
-                    className="px-4 py-2 border border-red-400 text-red-400 hover:bg-red-400 hover:text-white rounded-lg transition-colors text-sm font-medium"
+                    className="px-4 py-2 border border-danger text-danger hover:bg-danger hover:text-text-primary rounded-pill transition-all duration-200 ease-dashboard text-sm font-medium"
                   >
                     Disable Analytics
                   </button>
@@ -277,7 +277,7 @@ export default function DevicePage({ params }: DevicePageProps) {
                         body: JSON.stringify({ deviceSn: device.deviceSn, userId: device.userId })
                       }).then(() => window.location.reload())
                     }}
-                    className="px-4 py-2 border border-accent-green text-accent-green hover:bg-accent-green hover:text-black rounded-lg transition-colors text-sm font-medium"
+                    className="px-4 py-2 border border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-bg-base rounded-pill transition-all duration-200 ease-dashboard text-sm font-medium"
                   >
                     Enable Analytics
                   </button>
@@ -290,22 +290,22 @@ export default function DevicePage({ params }: DevicePageProps) {
         {/* Status Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
           {/* Battery Level */}
-          <div className="bg-primary-dark border border-accent-green/20 rounded-lg p-4 sm:p-6 hover:border-accent-green/40 transition-colors">
+          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-200 ease-dashboard">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
                 <Battery className={`w-5 h-5 ${getBatteryColor(reading?.batteryLevel || 0)}`} />
-                <span className="text-accent-gray text-sm font-medium">Battery</span>
+                <span className="text-text-secondary text-sm font-medium">Battery</span>
               </div>
             </div>
             <div className="space-y-2">
               <div className={`text-2xl font-bold ${getBatteryColor(reading?.batteryLevel || 0)}`}>
                 {reading?.batteryLevel || 0}%
               </div>
-              <div className="w-full bg-gray-700 rounded-full h-2">
+              <div className="w-full bg-stroke-strong rounded-full h-2">
                 <div 
                   className={`h-2 rounded-full transition-all duration-300 ${
-                    (reading?.batteryLevel || 0) > 60 ? 'bg-accent-green' :
-                    (reading?.batteryLevel || 0) > 30 ? 'bg-yellow-400' : 'bg-red-400'
+                    (reading?.batteryLevel || 0) > 60 ? 'bg-brand-primary' :
+                    (reading?.batteryLevel || 0) > 30 ? 'bg-warning' : 'bg-danger'
                   }`}
                   style={{ width: `${reading?.batteryLevel || 0}%` }}
                 ></div>
@@ -314,114 +314,114 @@ export default function DevicePage({ params }: DevicePageProps) {
           </div>
 
           {/* Power Input */}
-          <div className="bg-primary-dark border border-accent-green/20 rounded-lg p-4 sm:p-6 hover:border-accent-green/40 transition-colors">
+          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-200 ease-dashboard">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
-                <TrendingUp className="w-5 h-5 text-accent-blue" />
-                <span className="text-accent-gray text-sm font-medium">Power In</span>
+                <TrendingUp className="w-5 h-5 text-brand-tertiary" />
+                <span className="text-text-secondary text-sm font-medium">Power In</span>
               </div>
             </div>
-            <div className="text-2xl font-bold text-accent-blue">
+            <div className="text-2xl font-bold text-brand-tertiary">
               {reading?.inputWatts || 0}W
             </div>
-            <div className="text-xs text-accent-gray mt-1">
+            <div className="text-xs text-text-muted mt-1">
               {(reading?.inputWatts || 0) > 0 ? 'Charging' : 'Not charging'}
             </div>
           </div>
 
           {/* Power Output */}
-          <div className="bg-primary-dark border border-accent-green/20 rounded-lg p-4 sm:p-6 hover:border-accent-green/40 transition-colors">
+          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-200 ease-dashboard">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
-                <TrendingDown className="w-5 h-5 text-yellow-400" />
-                <span className="text-accent-gray text-sm font-medium">Power Out</span>
+                <TrendingDown className="w-5 h-5 text-warning" />
+                <span className="text-text-secondary text-sm font-medium">Power Out</span>
               </div>
             </div>
-            <div className="text-2xl font-bold text-yellow-400">
+            <div className="text-2xl font-bold text-warning">
               {reading?.outputWatts || 0}W
             </div>
-            <div className="text-xs text-accent-gray mt-1">
+            <div className="text-xs text-text-muted mt-1">
               {(reading?.outputWatts || 0) > 0 ? 'In use' : 'Standby'}
             </div>
           </div>
 
           {/* Temperature */}
-          <div className="bg-primary-dark border border-accent-green/20 rounded-lg p-4 sm:p-6 hover:border-accent-green/40 transition-colors">
+          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-200 ease-dashboard">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
-                <Thermometer className="w-5 h-5 text-accent-green" />
-                <span className="text-accent-gray text-sm font-medium">Temperature</span>
+                <Thermometer className="w-5 h-5 text-brand-primary" />
+                <span className="text-text-secondary text-sm font-medium">Temperature</span>
               </div>
             </div>
-            <div className="text-2xl font-bold text-accent-green">
+            <div className="text-2xl font-bold text-brand-primary">
               {reading?.temperature || 20}°C
             </div>
-            <div className="text-xs text-accent-gray mt-1">
+            <div className="text-xs text-text-muted mt-1">
               {(reading?.temperature || 20) < 45 ? 'Normal' : 'High'}
             </div>
           </div>
         </div>
 
         {/* Power Output Breakdown */}
-        <div className="bg-primary-dark border border-gray-700 rounded-lg p-6 mb-8">
+        <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 mb-8">
           <div className="flex items-center gap-2 mb-4">
-            <Zap className="w-5 h-5 text-yellow-400" />
-            <h3 className="text-lg font-semibold text-white">Power Output Breakdown</h3>
+            <Zap className="w-5 h-5 text-warning" />
+            <h3 className="text-lg font-medium text-text-primary">Power Output Breakdown</h3>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             {/* AC Output */}
-            <div className="bg-gray-800 rounded-lg p-4">
+            <div className="bg-surface-2 rounded-inner p-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                  <span className="text-sm font-medium text-gray-300">AC Output</span>
+                  <div className="w-3 h-3 bg-brand-tertiary rounded"></div>
+                  <span className="text-sm font-medium text-text-secondary">AC Output</span>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-blue-400">
+              <div className="text-2xl font-bold text-brand-tertiary">
                 {reading?.acOutputWatts?.toFixed(0) || '0'}W
               </div>
-              <div className="text-xs text-gray-500">Alternating Current</div>
+              <div className="text-xs text-text-muted">Alternating Current</div>
             </div>
 
             {/* DC Output */}
-            <div className="bg-gray-800 rounded-lg p-4">
+            <div className="bg-surface-2 rounded-inner p-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-                  <span className="text-sm font-medium text-gray-300">DC Output</span>
+                  <div className="w-3 h-3 bg-warning rounded"></div>
+                  <span className="text-sm font-medium text-text-secondary">DC Output</span>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-yellow-400">
+              <div className="text-2xl font-bold text-warning">
                 {reading?.dcOutputWatts?.toFixed(0) || '0'}W
               </div>
-              <div className="text-xs text-gray-500">Direct Current</div>
+              <div className="text-xs text-text-muted">Direct Current</div>
             </div>
 
             {/* USB Output */}
-            <div className="bg-gray-800 rounded-lg p-4">
+            <div className="bg-surface-2 rounded-inner p-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-green-500 rounded"></div>
-                  <span className="text-sm font-medium text-gray-300">USB Output</span>
+                  <div className="w-3 h-3 bg-success rounded"></div>
+                  <span className="text-sm font-medium text-text-secondary">USB Output</span>
                 </div>
               </div>
-              <div className="text-2xl font-bold text-green-400">
+              <div className="text-2xl font-bold text-success">
                 {reading?.usbOutputWatts?.toFixed(0) || '0'}W
               </div>
-              <div className="text-xs text-gray-500">USB Ports</div>
+              <div className="text-xs text-text-muted">USB Ports</div>
             </div>
           </div>
 
           {/* Total Power Summary */}
-          <div className="bg-gray-800/50 rounded-lg p-4">
+          <div className="bg-surface-2/50 rounded-inner p-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-300">Total Output</span>
-              <div className="text-xl font-bold text-white">
+              <span className="text-sm font-medium text-text-secondary">Total Output</span>
+              <div className="text-xl font-bold text-text-primary">
                 {reading?.outputWatts?.toFixed(0) || '0'}W
               </div>
             </div>
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-text-muted mt-1">
               Combined AC + DC + USB power output
             </div>
           </div>
@@ -430,32 +430,32 @@ export default function DevicePage({ params }: DevicePageProps) {
         {/* Additional Info Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           {/* Device Status */}
-          <div className="bg-primary-dark border border-accent-green/20 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
-              <Activity className="w-5 h-5 text-accent-green" />
+          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6">
+            <h3 className="text-lg font-medium text-text-primary mb-4 flex items-center space-x-2">
+              <Activity className="w-5 h-5 text-brand-primary" />
               <span>Device Status</span>
             </h3>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-accent-gray">Status</span>
+                <span className="text-text-secondary">Status</span>
                 <span className={`font-medium capitalize ${getStatusColor(reading?.status || device.status)}`}>
                   {reading?.status || device.status}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-accent-gray">Device Type</span>
-                <span className="text-white font-medium">{device.deviceType}</span>
+                <span className="text-text-secondary">Device Type</span>
+                <span className="text-text-primary font-medium">{device.deviceType}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-accent-gray">Active</span>
-                <span className={`font-medium ${device.isActive ? 'text-accent-green' : 'text-red-400'}`}>
+                <span className="text-text-secondary">Active</span>
+                <span className={`font-medium ${device.isActive ? 'text-brand-primary' : 'text-danger'}`}>
                   {device.isActive ? 'Yes' : 'No'}
                 </span>
               </div>
               {reading?.remainingTime && (
                 <div className="flex justify-between items-center">
-                  <span className="text-accent-gray">Remaining Time</span>
-                  <span className="text-white font-medium flex items-center space-x-1">
+                  <span className="text-text-secondary">Remaining Time</span>
+                  <span className="text-text-primary font-medium flex items-center space-x-1">
                     <Clock className="w-4 h-4" />
                     <span>{formatRemainingTime(reading.remainingTime)}</span>
                   </span>
@@ -465,23 +465,23 @@ export default function DevicePage({ params }: DevicePageProps) {
           </div>
 
           {/* Quick Actions */}
-          <div className="bg-primary-dark border border-accent-green/20 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
-              <Power className="w-5 h-5 text-accent-green" />
+          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6">
+            <h3 className="text-lg font-medium text-text-primary mb-4 flex items-center space-x-2">
+              <Power className="w-5 h-5 text-brand-primary" />
               <span>Quick Actions</span>
             </h3>
             <div className="space-y-3">
-              <button className="w-full bg-accent-green hover:bg-accent-green/80 text-primary-black px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2">
+              <button className="w-full bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-4 py-3 rounded-pill font-medium transition-all duration-200 ease-dashboard flex items-center justify-center space-x-2">
                 <Zap className="w-4 h-4" />
                 <span>Start Charging</span>
               </button>
-              <button className="w-full bg-primary-black hover:bg-gray-800 text-accent-gray border border-accent-gray/30 hover:border-accent-gray/50 px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2">
+              <button className="w-full bg-bg-base hover:bg-surface-2 text-text-secondary border border-stroke-subtle hover:border-stroke-strong px-4 py-3 rounded-pill font-medium transition-all duration-200 ease-dashboard flex items-center justify-center space-x-2">
                 <Settings className="w-4 h-4" />
                 <span>Device Settings</span>
               </button>
               <button 
                 onClick={fetchDevices}
-                className="w-full bg-accent-blue hover:bg-accent-blue/80 text-white px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
+                className="w-full bg-brand-tertiary hover:bg-brand-tertiary/80 text-text-primary px-4 py-3 rounded-pill font-medium transition-all duration-200 ease-dashboard flex items-center justify-center space-x-2"
               >
                 <Activity className="w-4 h-4" />
                 <span>Refresh Data</span>
@@ -491,39 +491,39 @@ export default function DevicePage({ params }: DevicePageProps) {
         </div>
 
         {/* Device Info Footer */}
-        <div className="bg-primary-dark border border-accent-green/20 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Device Information</h3>
+        <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6">
+          <h3 className="text-lg font-medium text-text-primary mb-4">Device Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-accent-gray">Serial Number:</span>
-                <span className="text-white font-mono">{device.deviceSn}</span>
+                <span className="text-text-secondary">Serial Number:</span>
+                <span className="text-text-primary font-mono">{device.deviceSn}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-accent-gray">Device Name:</span>
-                <span className="text-white">{device.deviceName}</span>
+                <span className="text-text-secondary">Device Name:</span>
+                <span className="text-text-primary">{device.deviceName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-accent-gray">Type:</span>
-                <span className="text-white">{device.deviceType}</span>
+                <span className="text-text-secondary">Type:</span>
+                <span className="text-text-primary">{device.deviceType}</span>
               </div>
             </div>
             <div className="space-y-2">
               {device.createdAt && (
                 <div className="flex justify-between">
-                  <span className="text-accent-gray">Added:</span>
-                  <span className="text-white">{new Date(device.createdAt).toLocaleDateString()}</span>
+                  <span className="text-text-secondary">Added:</span>
+                  <span className="text-text-primary">{new Date(device.createdAt).toLocaleDateString()}</span>
                 </div>
               )}
               {device.updatedAt && (
                 <div className="flex justify-between">
-                  <span className="text-accent-gray">Last Updated:</span>
-                  <span className="text-white">{new Date(device.updatedAt).toLocaleDateString()}</span>
+                  <span className="text-text-secondary">Last Updated:</span>
+                  <span className="text-text-primary">{new Date(device.updatedAt).toLocaleDateString()}</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-accent-gray">Connection:</span>
-                <span className={`font-medium ${device.online ? 'text-accent-green' : 'text-red-400'}`}>
+                <span className="text-text-secondary">Connection:</span>
+                <span className={`font-medium ${device.online ? 'text-brand-primary' : 'text-danger'}`}>
                   {device.online ? 'Connected' : 'Disconnected'}
                 </span>
               </div>
