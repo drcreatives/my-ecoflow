@@ -123,8 +123,8 @@ function AnalyticsPage() {
 				<div className="p-6">
 					<div className="flex items-center justify-center h-64">
 						<div className="text-center">
-							<Loader2 className="w-8 h-8 text-accent-green animate-spin mx-auto mb-4" />
-							<p className="text-gray-400">Loading devices...</p>
+							<Loader2 className="w-8 h-8 text-brand-primary animate-spin mx-auto mb-4" />
+							<p className="text-text-secondary">Loading devices...</p>
 						</div>
 					</div>
 				</div>
@@ -139,17 +139,17 @@ function AnalyticsPage() {
 					{/* Header */}
 					<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 						<div className="flex items-center gap-3">
-							<BarChart3 size={28} className="text-accent-green" />
-							<h1 className="text-2xl sm:text-3xl font-bold">Analytics & Trends</h1>
+							<BarChart3 size={28} className="text-brand-primary" />
+							<h1 className="text-page-title text-text-primary font-medium">Analytics & Trends</h1>
 						</div>
 						
 						<div className="flex items-center gap-2">
 							{lastUpdated && (
-								<span className="text-xs text-gray-500">Last updated: {lastUpdated.toLocaleString()}</span>
+								<span className="text-xs text-text-muted">Last updated: {lastUpdated.toLocaleString()}</span>
 							)}
 							<button
 								onClick={() => setShowFilters(!showFilters)}
-								className="flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-lg text-white transition-colors"
+								className="flex items-center gap-2 px-3 py-2 bg-surface-2 hover:bg-surface-2/80 border border-stroke-subtle rounded-pill text-text-primary transition-all duration-160 text-sm"
 							>
 								<Filter size={16} />
 								Filters
@@ -157,7 +157,7 @@ function AnalyticsPage() {
 							<button
 								onClick={fetchAnalyticsData}
 								disabled={isLoading}
-								className="flex items-center gap-2 px-3 py-2 bg-accent-green hover:bg-accent-green/90 disabled:opacity-50 disabled:cursor-not-allowed text-black font-medium rounded-lg transition-colors"
+								className="flex items-center gap-2 px-3 py-2 bg-brand-primary hover:bg-brand-secondary disabled:opacity-50 disabled:cursor-not-allowed text-bg-base font-medium rounded-pill transition-all duration-160 text-sm"
 							>
 								<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
 								Refresh
@@ -167,20 +167,20 @@ function AnalyticsPage() {
 
 					{/* Filters Panel */}
 					{showFilters && (
-						<div className="bg-primary-dark border border-gray-700 rounded-lg p-6">
-							<h3 className="text-lg font-semibold text-white mb-4">Data Filters</h3>
+						<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
+							<h3 className="text-section-title font-medium text-text-primary mb-4">Data Filters</h3>
 							
 							<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 								{/* Device Selection */}
 								<div>
-									<label className="block text-sm font-medium text-gray-300 mb-2">
+									<label className="block text-sm font-medium text-text-secondary mb-2">
 										Device
 									</label>
 									<div className="relative">
 										<select
 											value={filters.deviceId}
 											onChange={(e) => setFilters(prev => ({ ...prev, deviceId: e.target.value }))}
-											className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green appearance-none pr-10"
+											className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 appearance-none pr-10"
 										>
 											{deviceOptions.map(device => (
 												<option key={device.id} value={device.id}>
@@ -188,20 +188,20 @@ function AnalyticsPage() {
 												</option>
 											))}
 										</select>
-										<ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+										<ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted w-4 h-4 pointer-events-none" />
 									</div>
 								</div>
 
 								{/* Time Range */}
 								<div>
-									<label className="block text-sm font-medium text-gray-300 mb-2">
+									<label className="block text-sm font-medium text-text-secondary mb-2">
 										Time Range
 									</label>
 									<div className="relative">
 										<select
 											value={filters.timeRange}
 											onChange={(e) => setFilters(prev => ({ ...prev, timeRange: e.target.value as any }))}
-											className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green appearance-none pr-10"
+											className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 appearance-none pr-10"
 										>
 											<option value="1h">Last Hour</option>
 											<option value="6h">Last 6 Hours</option>
@@ -210,27 +210,27 @@ function AnalyticsPage() {
 											<option value="30d">Last 30 Days</option>
 											<option value="custom">Custom Range</option>
 										</select>
-										<ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+										<ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted w-4 h-4 pointer-events-none" />
 									</div>
 								</div>
 
 								{/* Data Aggregation */}
 								<div>
-									<label className="block text-sm font-medium text-gray-300 mb-2">
+									<label className="block text-sm font-medium text-text-secondary mb-2">
 										Data Points
 									</label>
 									<div className="relative">
 										<select
 											value={filters.aggregation}
 											onChange={(e) => setFilters(prev => ({ ...prev, aggregation: e.target.value as any }))}
-											className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green appearance-none pr-10"
+											className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 appearance-none pr-10"
 										>
 											<option value="raw">Raw Data</option>
 											<option value="5m">5 Minute Average</option>
 											<option value="1h">Hourly Average</option>
 											<option value="1d">Daily Average</option>
 										</select>
-										<ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+										<ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted w-4 h-4 pointer-events-none" />
 									</div>
 								</div>
 							</div>
@@ -238,25 +238,25 @@ function AnalyticsPage() {
 							{filters.timeRange === 'custom' && (
 								<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
 									<div>
-										<label className="block text-sm font-medium text-gray-300 mb-2">
+										<label className="block text-sm font-medium text-text-secondary mb-2">
 											Start Date
 										</label>
 										<input
 											type="datetime-local"
 											value={filters.customStartDate || ''}
 											onChange={(e) => setFilters(prev => ({ ...prev, customStartDate: e.target.value }))}
-											className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green"
+											className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
 										/>
 									</div>
 									<div>
-										<label className="block text-sm font-medium text-gray-300 mb-2">
+										<label className="block text-sm font-medium text-text-secondary mb-2">
 											End Date
 										</label>
 										<input
 											type="datetime-local"
 											value={filters.customEndDate || ''}
 											onChange={(e) => setFilters(prev => ({ ...prev, customEndDate: e.target.value }))}
-											className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green"
+											className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
 										/>
 									</div>
 								</div>
@@ -266,77 +266,77 @@ function AnalyticsPage() {
 
 					{/* Error Display */}
 					{error && (
-						<div className="bg-red-900/20 border border-red-600 rounded-lg p-4">
-							<p className="text-red-300">{error}</p>
+						<div className="bg-danger/5 border border-danger/15 rounded-card p-4">
+							<p className="text-danger">{error}</p>
 						</div>
 					)}
 
 					{/* Summary Cards */}
 					{summary && (
-						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-							<div className="bg-primary-dark border border-blue-500/20 rounded-lg p-4">
+						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[18px]">
+							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
 								<div className="flex items-center justify-between mb-2">
-									<BarChart3 className="w-5 h-5 text-blue-400" />
-									<span className="text-xs text-gray-400">{summary.timeSpan || "0 hours"}</span>
+									<BarChart3 className="w-5 h-5 text-brand-tertiary" />
+									<span className="text-xs text-text-muted">{summary.timeSpan || "0 hours"}</span>
 								</div>
-								<div className="text-2xl font-bold text-white mb-1">
+								<div className="text-2xl font-medium text-text-primary mb-1">
 									{(summary.totalReadings || 0).toLocaleString()}
 								</div>
-								<div className="text-sm text-gray-400">Data Points</div>
+								<div className="text-sm text-text-secondary">Data Points</div>
 							</div>
-							<div className="bg-primary-dark border border-green-500/20 rounded-lg p-4">
+							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
 								<div className="flex items-center justify-between mb-2">
-									<Battery className="w-5 h-5 text-green-400" />
-									<span className="text-xs text-gray-400">Average</span>
+									<Battery className="w-5 h-5 text-brand-primary" />
+									<span className="text-xs text-text-muted">Average</span>
 								</div>
-								<div className="text-2xl font-bold text-white mb-1">
+								<div className="text-2xl font-medium text-text-primary mb-1">
 									{formatValue(summary.avgBatteryLevel, "%")}
 								</div>
-								<div className="text-sm text-gray-400">Battery Level</div>
+								<div className="text-sm text-text-secondary">Battery Level</div>
 							</div>
-							<div className="bg-primary-dark border border-yellow-500/20 rounded-lg p-4">
+							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
 								<div className="flex items-center justify-between mb-2">
-									<BarChart3 className="w-5 h-5 text-yellow-400" />
-									<span className="text-xs text-gray-400">Peak: {formatValue(summary.peakPowerOutput, "W")}</span>
+									<BarChart3 className="w-5 h-5 text-warning" />
+									<span className="text-xs text-text-muted">Peak: {formatValue(summary.peakPowerOutput, "W")}</span>
 								</div>
-								<div className="text-2xl font-bold text-white mb-1">
+								<div className="text-2xl font-medium text-text-primary mb-1">
 									{formatValue(summary.avgPowerOutput, "W")}
 								</div>
-								<div className="text-sm text-gray-400">Avg Power Output</div>
+								<div className="text-sm text-text-secondary">Avg Power Output</div>
 							</div>
-							<div className="bg-primary-dark border border-red-500/20 rounded-lg p-4">
+							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
 								<div className="flex items-center justify-between mb-2">
-									<Thermometer className="w-5 h-5 text-red-400" />
-									<span className="text-xs text-gray-400">Max: {formatValue(summary.highestTemperature, "°C")}</span>
+									<Thermometer className="w-5 h-5 text-danger" />
+									<span className="text-xs text-text-muted">Max: {formatValue(summary.highestTemperature, "°C")}</span>
 								</div>
-								<div className="text-2xl font-bold text-white mb-1">
+								<div className="text-2xl font-medium text-text-primary mb-1">
 									{formatValue(summary.avgTemperature, "°C")}
 								</div>
-								<div className="text-sm text-gray-400">Avg Temperature</div>
+								<div className="text-sm text-text-secondary">Avg Temperature</div>
 							</div>
 						</div>
 					)}
 
 					{/* Charts Section */}
-					<div className="bg-primary-dark border border-gray-700 rounded-lg p-6 mt-6">
-						<h3 className="text-xl font-semibold text-white mb-6">Power Usage Trends</h3>
+					<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px] mt-6">
+						<h3 className="text-section-title font-medium text-text-primary mb-6">Power Usage Trends</h3>
 						{isLoading ? (
 							<div className="flex items-center justify-center h-64">
 								<div className="text-center">
-									<Loader2 className="w-8 h-8 text-accent-green animate-spin mx-auto mb-4" />
-									<p className="text-gray-400">Loading chart data...</p>
+									<Loader2 className="w-8 h-8 text-brand-primary animate-spin mx-auto mb-4" />
+									<p className="text-text-secondary">Loading chart data...</p>
 								</div>
 							</div>
 						) : readings.length === 0 ? (
 							<div className="flex flex-col items-center justify-center h-64 text-center">
-								<BarChart3 className="w-16 h-16 text-gray-600 mb-4" />
-								<h3 className="text-lg font-semibold text-gray-400 mb-2">No Analytics Data</h3>
-								<p className="text-gray-500 mb-4">
+								<BarChart3 className="w-16 h-16 text-text-muted mb-4" />
+								<h3 className="text-lg font-medium text-text-secondary mb-2">No Analytics Data</h3>
+								<p className="text-text-muted mb-4">
 									No data available for analytics.
 								</p>
 								<Link
 									href="/devices"
-									className="flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 text-black font-medium py-2 px-4 rounded-lg transition-colors"
+									className="flex items-center gap-2 bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium py-2 px-4 rounded-pill transition-all duration-160 text-sm"
 								>
 									<ExternalLink size={16} />
 									Manage Devices
@@ -353,12 +353,12 @@ function AnalyticsPage() {
 
 					{/* Additional Chart Views */}
 					{readings.length > 0 && (
-						<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+						<div className="grid grid-cols-1 lg:grid-cols-2 gap-[18px] mt-6">
 							{/* Battery Level Chart */}
-							<div className="bg-primary-dark border border-gray-700 rounded-lg p-6">
+							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
 								<div className="flex items-center gap-2 mb-4">
-									<Battery className="w-5 h-5 text-green-400" />
-									<h3 className="text-lg font-semibold text-white">Battery Level</h3>
+									<Battery className="w-5 h-5 text-brand-primary" />
+									<h3 className="text-section-title font-medium text-text-primary">Battery Level</h3>
 								</div>
 								<BatteryLevelChart
 									data={transformReadingsToChartData(readings)}
@@ -367,10 +367,10 @@ function AnalyticsPage() {
 							</div>
 
 							{/* Temperature Chart */}
-							<div className="bg-primary-dark border border-gray-700 rounded-lg p-6">
+							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
 								<div className="flex items-center gap-2 mb-4">
-									<Thermometer className="w-5 h-5 text-red-400" />
-									<h3 className="text-lg font-semibold text-white">Temperature</h3>
+									<Thermometer className="w-5 h-5 text-danger" />
+									<h3 className="text-section-title font-medium text-text-primary">Temperature</h3>
 								</div>
 								<TemperatureChart
 									data={transformReadingsToChartData(readings)}
