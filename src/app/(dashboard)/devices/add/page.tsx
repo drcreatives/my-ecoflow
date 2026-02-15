@@ -301,7 +301,6 @@ const AddDevicePage = () => {
                 </button>
               </div>
             )}
-          </div>
     </div>
   );
 };
