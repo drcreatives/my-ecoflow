@@ -56,11 +56,15 @@ This is a full-stack Next.js dashboard for monitoring EcoFlow Delta 2 power stat
 
 ### Core Technologies
 - **Framework**: Next.js 15.5.3 with App Router and Turbopack
+- **UI**: React 19
 - **Styling**: Tailwind CSS + Chakra UI v2 (dark theme only)
 - **State Management**: Zustand
 - **Forms**: Formik + Yup validation
-- **Animations**: GSAP
+- **Animations**: GSAP + Framer Motion (simple transitions)
+- **Charts**: Recharts
 - **Icons**: Lucide React
+- **Notifications**: Sonner
+- **Email**: Resend + React Email
 - **Database**: Supabase (PostgreSQL) with direct pg library connection (Prisma ORM bypassed for production stability)
 - **Authentication**: Supabase Auth (fully implemented)
 - **API Integration**: EcoFlow API (fully working)
@@ -68,6 +72,7 @@ This is a full-stack Next.js dashboard for monitoring EcoFlow Delta 2 power stat
 
 ### Current Project Structure
 ```
+middleware.ts                      # Supabase auth session refresh + route protection ✅
 src/
 ├── app/                           # Next.js App Router pages
 │   ├── (dashboard)/              # SPA Route Group with persistent layout ✅
@@ -84,27 +89,54 @@ src/
 │       ├── auth/                 # Authentication endpoints ✅
 │       ├── devices/              # Device management APIs ✅
 │       │   ├── route.ts         # Device CRUD operations ✅
-│       │   ├── discover/        # EcoFlow device discovery ✅
-│       │   ├── register/        # Device registration ✅
-│       │   └── collect-readings/ # Reading collection (partial) ⚠️
+│       │   ├── collect-readings/ # Reading collection (interval-aware) ✅
+│       │   ├── latest-readings/  # Fetch latest readings per device ✅
+│       │   ├── monitor/          # Live device monitoring ✅
+│       │   └── [deviceId]/       # Single-device operations ✅
+│       ├── cron/                 # Cron-triggered background jobs ✅
+│       │   └── collect-readings/ # Scheduled reading collection ✅
+│       ├── history/              # Historical data queries ✅
+│       ├── readings/             # Reading management ✅
+│       ├── register-device/      # Device registration ✅
+│       ├── unregister-device/    # Device removal ✅
+│       ├── monitor-readings/     # Reading monitor endpoint ✅
+│       ├── email/                # Email sending ✅
+│       ├── user/                 # User management ✅
+│       ├── logout/               # Logout endpoint ✅
 │       └── test-*/               # Comprehensive testing suite ✅
 ├── components/                    # Reusable UI components
-│   ├── ui/                       # Base UI components
-│   ├── forms/                    # Form components
-│   ├── charts/                   # Chart components
-│   ├── layout/                   # Layout components with logout ✅
+│   ├── charts/                   # Chart components (HistoryCharts) ✅
+│   ├── controls/                 # Device control panel & status card ✅
+│   ├── layout/                   # AppLayout, Header, Sidebar ✅
 │   ├── AuthWrapper.tsx           # Route protection with state persistence ✅
-│   └── LogoutButton.tsx          # Auth controls ✅
+│   ├── LogoutButton.tsx          # Auth controls ✅
+│   ├── ReadingCollector.tsx      # Client-side reading collector ✅
+│   ├── CronStatusWidget.tsx      # Cron job status display ✅
+│   └── DatabaseSetupButton.tsx   # DB setup utility ✅
+├── hooks/                         # Custom React hooks
+│   ├── useAutomaticReadingCollection.ts  # Auto reading collection ✅
+│   ├── useClientSideReadingCollection.ts # Client-side collection ✅
+│   └── useBreakpoint.ts                  # Responsive breakpoints ✅
 ├── lib/                          # Utility functions and configs
 │   ├── ecoflow-api.ts           # Working EcoFlow API wrapper ✅
 │   ├── database.ts              # Direct PostgreSQL connection ✅
 │   ├── supabase.ts              # Supabase client ✅
 │   ├── supabase-server.ts       # Server-side Supabase ✅
 │   ├── data-utils.ts            # Data formatting utilities ✅
+│   ├── email.ts                 # Email service (Resend + React Email) ✅
+│   ├── email-simple.ts          # Lightweight email helper ✅
 │   ├── utils.ts                 # General utilities ✅
+│   ├── prisma.ts                # Prisma client (legacy, prefer database.ts) ⚠️
 │   └── env-validation.ts        # Environment validation ✅
 ├── stores/                       # Zustand stores
+│   ├── index.ts                 # Store exports ✅
+│   ├── authStore.ts             # Authentication state ✅
+│   ├── deviceStore.ts           # Device list & selection ✅
+│   ├── readingsStore.ts         # Device readings cache ✅
+│   ├── uiStore.ts               # UI state (sidebar, notifications) ✅
+│   └── userStore.ts             # User profile state ✅
 ├── types/                        # TypeScript type definitions
+│   └── index.ts                 # All application types & enums ✅
 └── prisma/                       # Database schema ✅
     └── schema.prisma            # Complete database structure ✅
 ```
@@ -134,6 +166,12 @@ const colors = {
 - **Interactive Elements**: Smooth transitions and hover states
 - **Form Validation**: Real-time validation with clear error states
 - **Responsive Design**: Mobile-first approach with proper breakpoints
+
+### Middleware (Auth Session Refresh)
+The root `middleware.ts` uses `@supabase/ssr` to refresh Supabase sessions on every request and enforce route protection:
+- Unauthenticated users hitting `/dashboard*` are redirected to `/login`
+- Authenticated users hitting `/login` are redirected to `/dashboard`
+- Runs on all paths except static assets
 
 ## Current Working Features
 
@@ -193,11 +231,6 @@ model Device {
   alerts       DeviceAlert[]
 }
 ```
-    blue: '#3a6fe3',
-    gray: '#ebebeb',
-  }
-}
-```
 
 ### Component Naming Conventions
 - **UI Components**: PascalCase (e.g., `StatusCard`, `PowerGauge`)
@@ -210,24 +243,35 @@ model Device {
 
 ### TypeScript Best Practices
 ```typescript
-// Always define proper interfaces for API responses
+// Always define proper interfaces for API responses (see src/types/index.ts)
 interface DeviceReading {
   id: string;
   deviceId: string;
-  batteryLevel: number;
-  inputWatts: number;
-  outputWatts: number;
-  temperature: number;
-  status: DeviceStatus;
+  batteryLevel?: number;
+  inputWatts?: number;
+  outputWatts?: number;       // Total output (AC + DC) from pd.wattsOutSum
+  remainingTime?: number;     // Minutes: positive = until full, negative = until empty
+  temperature?: number;
+  status?: string;
+  rawData?: Record<string, unknown>;
   recordedAt: Date;
 }
 
-// Use enums for constants
-enum DeviceStatus {
-  ONLINE = 'online',
-  OFFLINE = 'offline',
-  CHARGING = 'charging',
-  DISCHARGING = 'discharging',
+// Use enums for constants (defined in src/types/index.ts)
+enum AlertType {
+  BATTERY_LOW = 'BATTERY_LOW',
+  TEMPERATURE_HIGH = 'TEMPERATURE_HIGH',
+  DEVICE_OFFLINE = 'DEVICE_OFFLINE',
+  POWER_OVERLOAD = 'POWER_OVERLOAD',
+  CHARGING_ERROR = 'CHARGING_ERROR',
+  SYSTEM_ERROR = 'SYSTEM_ERROR',
+}
+
+enum AlertSeverity {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  CRITICAL = 'CRITICAL',
 }
 
 // Use generic types for reusable components
@@ -317,17 +361,17 @@ const signature = crypto
 
 ### Required Environment Variables
 ```bash
-# EcoFlow API (Working credentials configured)
-ECOFLOW_ACCESS_KEY=2JDaLtMwMX2tE3WEEfddALhSJGbHjdeL
-ECOFLOW_SECRET_KEY=GIgLC5YyTtGFfSrcFpUYKOdhJ9bsJoJ3pFKKw86JiUw
+# EcoFlow API
+ECOFLOW_ACCESS_KEY=your_access_key
+ECOFLOW_SECRET_KEY=your_secret_key
 
-# Supabase (Fully configured)
-NEXT_PUBLIC_SUPABASE_URL=https://hzjdlprkyofqtgllgfhm.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
-# Database (Working connection)
-DATABASE_URL=postgresql://postgres.hzjdlprkyofqtgllgfhm:[YOUR-PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres
+# Database
+DATABASE_URL=postgresql://<user>:<password>@<host>:<port>/<db>
 ```
 
 ### Error Handling
@@ -512,7 +556,7 @@ const animateCard = (element: HTMLElement) => {
 - **SSL Certificate Issues**: Fixed with proper Supabase SSL configuration
 - **Serverless Compatibility**: Optimized for Vercel deployment environment
 - **API Endpoints**: All critical endpoints (monitor-readings, devices, collect-readings) functional
-- **Database Permissions**: Minor permissions issue identified in collect-readings endpoint
+- **Database Permissions**: Collect-readings endpoint fully functional with interval-aware collection
 
 #### 🎨 **UI/UX Implementation**:
 - **Complete Devices Management**: Full-featured /devices page with search, filtering, and device cards
@@ -571,7 +615,7 @@ curl http://localhost:3000/api/devices               # Protected device manageme
 - ✅ `src/lib/database.ts` - Direct PostgreSQL connection (COMPLETED)
 - ✅ `prisma/schema.prisma` - Database schema (COMPLETED)
 - ✅ `.env.local` - All credentials configured (COMPLETED)
-- ⚠️ `src/app/api/devices/collect-readings/route.ts` - Database permissions issue
+- ✅ `src/app/api/devices/collect-readings/route.ts` - Interval-aware reading collection
 
 ## Future Development Notes
 
@@ -596,8 +640,8 @@ curl http://localhost:3000/api/devices               # Protected device manageme
 11. **Custom UI Components** - Dark-themed dropdowns and responsive design
 12. **Multiple Navigation Paths** - Header buttons, grid cards, floating FAB
 
-#### ⚠️ **Minor Issues**:
-- Database permissions for collect-readings endpoint (identified, needs service role auth)
+#### ⚠️ **Minor Issues / Risks**:
+- Collection jobs may require service role permissions in production depending on DB policies
 
 The core infrastructure is complete. Future enhancements could include:
 - Real-time device monitoring dashboards
@@ -608,6 +652,12 @@ The core infrastructure is complete. Future enhancements could include:
 - Device sharing and management
 
 Remember: This is a dashboard for monitoring critical infrastructure, so prioritize reliability, accuracy, and user experience. Always validate data from external APIs and provide meaningful error messages to users.
+
+### Reading Collection System
+The dashboard includes two reading collection strategies:
+- **Server-side / Cron**: `POST /api/devices/collect-readings` and `/api/cron/collect-readings` — interval-aware background collection that respects each user's `collection_interval_minutes` setting. Can target a single user (`?userId=`) or run globally. Skips users whose last collection is within their interval unless `?force=true`.
+- **Client-side hooks**: `useAutomaticReadingCollection` and `useClientSideReadingCollection` trigger collection via the API while the user has the dashboard open, with configurable polling intervals.
+- **Data flow**: EcoFlow API → `ecoflowAPI.getDeviceQuota()` → `transformQuotaToReading()` → INSERT into `device_readings` table (stores AC, DC, USB output breakdowns, battery level, temperature, remaining time, and raw JSON).
 
 ### Data Fetching
 ```typescript
