@@ -137,9 +137,9 @@ body {
   }
 }
 
-/* Focus styles (legacy — global focus-visible in step 32) */
-.focus-green:focus {
-  outline: 2px solid var(--brand-primary);
+/* Global focus-visible ring */
+*:focus-visible {
+  outline: 2px solid rgba(68, 175, 33, 0.4);
   outline-offset: 2px;
 }
 
