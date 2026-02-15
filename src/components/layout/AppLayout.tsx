@@ -13,7 +13,7 @@ export const AppLayout = ({ children, title }: AppLayoutProps) => {
   const { sidebarOpen } = useUIStore()
 
   return (
-    <div className="flex h-screen bg-primary-black">
+    <div className="flex h-screen bg-bg-base">
       {/* Sidebar */}
       <Sidebar />
       
@@ -23,7 +23,7 @@ export const AppLayout = ({ children, title }: AppLayoutProps) => {
         <Header title={title} />
         
         {/* Page Content */}
-        <main className="flex-1 overflow-auto bg-primary-black p-6">
+        <main className="flex-1 overflow-auto bg-bg-base p-5">
           {children}
         </main>
       </div>
