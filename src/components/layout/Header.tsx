@@ -32,23 +32,15 @@ export const Header = ({ title }: HeaderProps) => {
   const isOnline = true
 
   return (
-    <header className="bg-primary-dark border-b border-gray-700 px-4 sm:px-6 py-4 sticky top-0 z-50">
-      <div className="flex items-center justify-between">
+    <header className="h-14 bg-surface-1 border-b border-stroke-subtle px-4 sm:px-6 flex items-center sticky top-0 z-50">
+      <div className="flex items-center justify-between w-full">
         {/* Left side */}
         <div className="flex items-center gap-2 sm:gap-4">
-          {/* <button
-            onClick={toggleSidebar}
-            className="p-2 text-accent-gray hover:bg-gray-700 rounded-md transition-colors touch-manipulation"
-            aria-label="Toggle navigation menu"
-          >
-            <Menu size={20} />
-          </button> */}
-          
-          <div className="flex flex-col gap-1">
-            <h1 className="text-lg sm:text-xl font-bold text-accent-gray">
+          <div className="flex flex-col gap-0.5">
+            <h1 className="text-base sm:text-lg font-medium text-text-primary">
               {title || 'Dashboard'}
             </h1>
-            <p className="text-xs sm:text-sm text-gray-400 hidden sm:block">
+            <p className="text-xs text-text-secondary hidden sm:block">
               Welcome back, {user?.email?.split('@')[0]}
             </p>
           </div>
@@ -62,10 +54,10 @@ export const Header = ({ title }: HeaderProps) => {
               <div 
                 className={cn(
                   "w-2 h-2 rounded-full",
-                  isOnline ? "bg-accent-green" : "bg-red-400"
+                  isOnline ? "bg-brand-primary" : "bg-danger"
                 )}
               />
-              <span className="text-sm text-accent-gray">
+              <span className="text-sm text-text-secondary">
                 {activeDevices}/{totalDevices} devices active
               </span>
             </div>
@@ -74,14 +66,14 @@ export const Header = ({ title }: HeaderProps) => {
           {/* Connection Status - Simplified on mobile */}
           <div className="flex items-center gap-2">
             {isOnline ? (
-              <Wifi size={isMobile ? 18 : 16} className="text-accent-green" />
+              <Wifi size={16} className="text-icon" />
             ) : (
-              <WifiOff size={isMobile ? 18 : 16} className="text-red-400" />
+              <WifiOff size={16} className="text-icon" />
             )}
             {!isMobile && (
               <span className={cn(
                 "text-sm",
-                isOnline ? "text-accent-green" : "text-red-400"
+                isOnline ? "text-brand-primary" : "text-danger"
               )}>
                 {isOnline ? 'Connected' : 'Offline'}
               </span>
@@ -90,12 +82,12 @@ export const Header = ({ title }: HeaderProps) => {
 
           {/* Notifications */}
           <button 
-            className="relative p-2 text-accent-gray hover:bg-gray-700 rounded-md transition-colors touch-manipulation"
+            className="relative p-2 text-icon hover:text-text-primary hover:bg-surface-2 rounded-inner transition-all duration-160 touch-manipulation"
             aria-label={`Notifications ${unreadNotifications > 0 ? `(${unreadNotifications} unread)` : ''}`}
           >
-            <Bell size={isMobile ? 18 : 20} />
+            <Bell size={16} />
             {unreadNotifications > 0 && (
-              <span className="absolute -top-1 -right-1 bg-accent-green text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 bg-brand-primary text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center">
                 {unreadNotifications > 9 ? '9+' : unreadNotifications}
               </span>
             )}
@@ -104,10 +96,10 @@ export const Header = ({ title }: HeaderProps) => {
           {/* Settings - Hidden on mobile */}
           {!isMobile && (
             <button 
-              className="p-2 text-accent-gray hover:bg-gray-700 rounded-md transition-colors"
+              className="p-2 text-icon hover:text-text-primary hover:bg-surface-2 rounded-inner transition-all duration-160"
               aria-label="Settings"
             >
-              <Settings size={20} />
+              <Settings size={16} />
             </button>
           )}
 
