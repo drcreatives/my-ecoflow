@@ -57,7 +57,7 @@ This is a full-stack Next.js dashboard for monitoring EcoFlow Delta 2 power stat
 ### Core Technologies
 - **Framework**: Next.js 15.5.3 with App Router and Turbopack
 - **UI**: React 19
-- **Styling**: Tailwind CSS + Chakra UI v2 (dark theme only)
+- **Styling**: Tailwind CSS v4 (dark theme only)
 - **State Management**: Zustand
 - **Forms**: Formik + Yup validation
 - **Animations**: GSAP + Framer Motion (simple transitions)
@@ -143,28 +143,45 @@ src/
 
 ## Design System
 
-### Color Palette (Dark Theme Only)
+### Design System — Dark Modular Energy Dashboard
 ```typescript
+// Tailwind tokens defined in tailwind.config.ts
 const colors = {
-  primary: {
-    black: '#000000',
-    dark: '#2b2b2b',
-  },
-  accent: {
-    green: '#44af21',       // Primary brand color
-    greenSecondary: '#00c356',
-    greenLight: '#00e16e',
-    blue: '#3a6fe3',
-    gray: '#ebebeb',
-  }
+  'bg-base': '#151615',         // Page background
+  'surface-1': '#1f201f',       // Card surfaces
+  'surface-2': '#242624',       // Input backgrounds, nested elements
+  'stroke-subtle': 'rgba(255,255,255,0.08)',
+  'stroke-strong': 'rgba(255,255,255,0.15)',
+  'text-primary': 'rgba(255,255,255,0.92)',
+  'text-secondary': 'rgba(255,255,255,0.65)',
+  'text-muted': 'rgba(255,255,255,0.45)',
+  'icon': 'rgba(255,255,255,0.55)',
+  'brand-primary': '#44af21',   // Main accent (buttons, indicators)
+  'brand-secondary': '#00c356',
+  'brand-tertiary': '#3a6fe3',  // Blue accent (links, info)
+  'success': '#00e16e',
+  'warning': '#ffa500',
+  'danger': '#ff4444',
 }
+// borderRadius: card 18px, pill 999px, inner 12px
+// boxShadow: card, card-hover
+// Font: Neue Montreal (loaded from public/fonts/)
+// Motion: 160ms hover, 220ms chart/panel, ease-dashboard cubic-bezier(0.2,0.8,0.2,1)
 ```
 
+### UI Components (src/components/ui/)
+- **Card**: `bg-surface-1 border-stroke-subtle rounded-card shadow-card` — variants: default, accent, hero
+- **PillButton**: `rounded-pill` — variants: primary (filled), filled, ghost, danger
+- **Toggle**: `w-12 h-6` — on: `bg-brand-primary`, off: `bg-stroke-strong`
+- **MetricDisplay**: `text-metric` (44px) with unit label and optional trend
+- **ChipSelector**: Pill chips with active state highlight
+- **KebabMenu**: Three-dot dropdown menu
+
 ### Authentication UI Design
-- **Modern Gradient Backgrounds**: Subtle green/blue gradients with blur effects
-- **Glassmorphism**: Semi-transparent cards with backdrop blur
-- **Interactive Elements**: Smooth transitions and hover states
-- **Form Validation**: Real-time validation with clear error states
+- **Solid matte background**: `bg-bg-base` (no gradients, no glassmorphism)
+- **Card container**: `bg-surface-1 border border-stroke-subtle rounded-card shadow-card`
+- **Interactive Elements**: 160ms transitions with dashboard easing
+- **Form Validation**: Real-time validation with `text-danger` error states
 - **Responsive Design**: Mobile-first approach with proper breakpoints
 
 ### Middleware (Auth Session Refresh)
@@ -286,7 +303,6 @@ interface DataCardProps<T> {
 ```typescript
 // Preferred component structure
 import { FC } from 'react';
-import { Box, Text } from '@chakra-ui/react';
 
 interface ComponentProps {
   // Props interface first
@@ -298,9 +314,9 @@ export const Component: FC<ComponentProps> = ({ prop1, prop2 }) => {
   // Render logic
   
   return (
-    <Box>
+    <div className="bg-surface-1 border border-stroke-subtle rounded-card p-6">
       {/* JSX content */}
-    </Box>
+    </div>
   );
 };
 ```
@@ -445,46 +461,20 @@ const data = await executeQuery<Device[]>(
 
 ## UI/UX Guidelines
 
-### Tailwind CSS & Custom Components
+### Tailwind CSS & Design Tokens
 ```typescript
-// Use Tailwind CSS with consistent dark theme classes
-<div className="bg-primary-dark border border-gray-700 rounded-lg p-4">
-  <h3 className="text-white font-semibold mb-2">Device Status</h3>
-  <p className="text-gray-400 text-sm">Battery Level</p>
-  <p className="text-accent-green text-2xl font-bold">{batteryLevel}%</p>
+// Use Tailwind CSS with design system tokens
+<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6">
+  <h3 className="text-text-primary font-semibold mb-2">Device Status</h3>
+  <p className="text-text-secondary text-sm">Battery Level</p>
+  <p className="text-brand-primary text-metric font-bold">{batteryLevel}%</p>
 </div>
 
-// Custom dropdown components for dark theme consistency
-const CustomDropdown = ({ options, value, onChange }) => {
-  return (
-    <div className="relative">
-      <button className="bg-primary-dark border border-gray-700 rounded-lg px-3 py-2 text-white">
-        {value}
-        <ChevronDown className="ml-2" />
-      </button>
-      {/* Custom dropdown menu with dark styling */}
-    </div>
-  );
-};
-```
-
-### Chakra UI Usage
-```typescript
-// Use Chakra UI components with consistent props
-<Box
-  bg="primary.dark"
-  p={4}
-  borderRadius="md"
-  border="1px solid"
-  borderColor="accent.green"
->
-  <Text color="accent.gray" fontSize="sm" fontWeight="medium">
-    Battery Level
-  </Text>
-  <Text color="accent.green" fontSize="2xl" fontWeight="bold">
-    {batteryLevel}%
-  </Text>
-</Box>
+// Pill buttons for actions
+<button className="bg-brand-primary text-bg-base rounded-pill px-6 py-2 font-semibold
+  hover:brightness-110 transition-all duration-160 ease-dashboard">
+  Start Monitoring
+</button>
 ```
 
 ### Animation Guidelines
@@ -506,7 +496,7 @@ const animateCard = (element: HTMLElement) => {
 ```typescript
 // Use Tailwind CSS responsive classes
 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-  <div className="bg-primary-dark rounded-lg p-6">
+  <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6">
     {/* Device card content */}
   </div>
 </div>
@@ -514,7 +504,7 @@ const animateCard = (element: HTMLElement) => {
 // Mobile-first approach with floating action buttons
 <Link
   href="/devices/add"
-  className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-accent-green rounded-full flex items-center justify-center"
+  className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-brand-primary rounded-full shadow-card flex items-center justify-center"
 >
   <Plus size={24} />
 </Link>
