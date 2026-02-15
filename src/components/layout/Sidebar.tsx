@@ -80,11 +80,11 @@ const SidebarContent = ({ onClose }: SidebarProps) => {
             <Link key={item.href} href={item.href} onClick={onClose}>
               <button
                 className={cn(
-                  'w-full flex items-start gap-3 p-4 rounded-md text-left transition-colors touch-manipulation',
-                  'min-h-[60px]', // Better touch target size
+                  'w-full flex items-start gap-3 p-4 rounded-inner text-left transition-all duration-160 ease-dashboard touch-manipulation',
+                  'min-h-[60px]',
                   isActive 
-                    ? 'bg-accent-green text-white' 
-                    : 'text-accent-gray hover:bg-gray-700 active:bg-gray-600'
+                    ? 'bg-brand-primary/10 text-brand-primary border-l-2 border-brand-primary' 
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-2 active:bg-surface-2'
                 )}
               >
                 <Icon size={isMobile ? 22 : 20} className="flex-shrink-0 mt-1" />
@@ -109,24 +109,24 @@ const SidebarContent = ({ onClose }: SidebarProps) => {
       </nav>
 
       {/* User Profile & Logout */}
-      <div className="p-4 border-t border-gray-700">
+      <div className="p-4 border-t border-stroke-subtle">
         {user && (
           <div className="flex items-center gap-3 mb-4">
             <div className={cn(
-              "bg-accent-green rounded-full flex items-center justify-center font-bold text-white",
+              "bg-surface-2 border border-stroke-subtle rounded-full flex items-center justify-center font-bold text-text-primary",
               isMobile ? "w-10 h-10 text-base" : "w-8 h-8 text-sm"
             )}>
               {user.email?.[0]?.toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
               <div className={cn(
-                "font-medium text-accent-gray truncate",
+                "font-medium text-text-primary truncate",
                 isMobile ? "text-base" : "text-sm"
               )}>
                 {user.email}
               </div>
               <div className={cn(
-                "text-gray-400",
+                "text-text-muted",
                 isMobile ? "text-sm" : "text-xs"
               )}>
                 Online
@@ -138,7 +138,7 @@ const SidebarContent = ({ onClose }: SidebarProps) => {
         <button
           onClick={handleLogout}
           className={cn(
-            'w-full flex items-center gap-3 text-gray-400 hover:text-accent-gray hover:bg-gray-700 active:bg-gray-600 rounded-md transition-colors touch-manipulation',
+            'w-full flex items-center gap-3 text-danger/70 hover:text-danger hover:bg-danger/10 rounded-inner transition-all duration-160 touch-manipulation',
             isMobile ? 'p-4 text-base' : 'p-2'
           )}
         >
@@ -165,15 +165,15 @@ const CollapsedSidebar = () => {
   }
 
   return (
-    <div className="w-20 h-full bg-primary-dark border-r border-gray-700 flex flex-col">
+    <div className="w-20 h-full bg-surface-1 border-r border-stroke-subtle flex flex-col">
       {/* Logo and toggle */}
-      <div className="flex flex-col items-center gap-4 pt-4 pb-4 border-b border-gray-700">
-        <div className="w-8 h-8 bg-accent-green rounded-md flex items-center justify-center">
-          <Zap size={20} className="text-white" />
+      <div className="flex flex-col items-center gap-4 pt-4 pb-4 border-b border-stroke-subtle">
+        <div className="w-8 h-8 bg-surface-2 rounded-inner flex items-center justify-center text-brand-primary">
+          <Zap size={20} />
         </div>
         <button
           onClick={toggleSidebar}
-          className="p-2 text-accent-gray hover:text-white transition-colors"
+          className="p-2 text-icon hover:text-text-primary transition-all duration-160"
           title="Expand sidebar"
         >
           <Menu size={20} />
@@ -190,11 +190,10 @@ const CollapsedSidebar = () => {
             <Link key={item.href} href={item.href} title={item.label}>
               <button
                 className={cn(
-                  'p-3 rounded-md transition-colors w-12 h-12 flex items-center justify-center',
-                  'hover:scale-105 active:scale-95 transform transition-transform',
+                  'p-3 rounded-inner transition-all duration-160 w-12 h-12 flex items-center justify-center',
                   isActive 
-                    ? 'bg-accent-green text-white shadow-lg' 
-                    : 'text-accent-gray hover:bg-gray-700 hover:text-white'
+                    ? 'bg-brand-primary/10 text-brand-primary' 
+                    : 'text-text-secondary hover:bg-surface-2 hover:text-text-primary'
                 )}
               >
                 <Icon size={20} />
@@ -205,15 +204,15 @@ const CollapsedSidebar = () => {
       </nav>
 
       {/* User profile collapsed */}
-      <div className="p-4 border-t border-gray-700 flex flex-col items-center gap-2">
+      <div className="p-4 border-t border-stroke-subtle flex flex-col items-center gap-2">
         {user && (
-          <div className="w-8 h-8 bg-accent-green rounded-full flex items-center justify-center font-bold text-white text-sm" title={user.email}>
+          <div className="w-8 h-8 bg-surface-2 border border-stroke-subtle rounded-full flex items-center justify-center font-bold text-text-primary text-sm" title={user.email}>
             {user.email?.[0]?.toUpperCase()}
           </div>
         )}
         <button
           onClick={handleLogout}
-          className="p-2 text-gray-400 hover:text-accent-gray hover:bg-gray-700 rounded-md transition-colors"
+          className="p-2 text-danger/70 hover:text-danger hover:bg-danger/10 rounded-inner transition-all duration-160"
           title="Sign out"
         >
           <LogOut size={18} />
@@ -234,7 +233,7 @@ export const Sidebar = () => {
         {/* Mobile Sidebar Overlay */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
             onClick={toggleSidebar}
           />
         )}
@@ -242,23 +241,23 @@ export const Sidebar = () => {
         {/* Mobile Sidebar */}
         <div
           className={cn(
-            "fixed top-0 left-0 h-full w-80 bg-primary-dark z-50 transition-transform duration-300 ease-out",
+            "fixed top-0 left-0 h-full w-80 bg-surface-1 z-50 transition-transform duration-300 ease-dashboard",
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
           {/* Mobile Header */}
-          <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700">
+          <div className="h-16 flex items-center justify-between px-4 border-b border-stroke-subtle">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-accent-green rounded-md flex items-center justify-center">
-                <Zap size={20} className="text-white" />
+              <div className="w-8 h-8 bg-surface-2 rounded-inner flex items-center justify-center text-brand-primary">
+                <Zap size={20} />
               </div>
-              <span className="text-lg font-bold text-accent-gray">
+              <span className="text-lg font-bold text-text-primary">
                 EcoFlow
               </span>
             </div>
             <button
               onClick={toggleSidebar}
-              className="p-2 text-accent-gray hover:bg-gray-700 rounded-md transition-colors touch-manipulation"
+              className="p-2 text-icon hover:bg-surface-2 rounded-inner transition-all duration-160 touch-manipulation"
               aria-label="Close navigation menu"
             >
               <Menu size={20} />
@@ -279,20 +278,20 @@ export const Sidebar = () => {
       )}
     >
       {sidebarOpen ? (
-        <div className="w-80 h-full bg-primary-dark border-r border-gray-700 flex flex-col">
+        <div className="w-80 h-full bg-surface-1 border-r border-stroke-subtle flex flex-col">
           {/* Desktop Header */}
-          <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700">
+          <div className="h-16 flex items-center justify-between px-4 border-b border-stroke-subtle">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-accent-green rounded-md flex items-center justify-center">
-                <Zap size={20} className="text-white" />
+              <div className="w-8 h-8 bg-surface-2 rounded-inner flex items-center justify-center text-brand-primary">
+                <Zap size={20} />
               </div>
-              <span className="text-lg font-bold text-accent-gray">
+              <span className="text-lg font-bold text-text-primary">
                 EcoFlow
               </span>
             </div>
             <button
               onClick={toggleSidebar}
-              className="p-2 text-accent-gray hover:bg-gray-700 rounded-md transition-colors"
+              className="p-2 text-icon hover:bg-surface-2 rounded-inner transition-all duration-160"
               aria-label="Collapse navigation menu"
               title="Collapse sidebar"
             >
