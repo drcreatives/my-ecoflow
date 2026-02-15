@@ -58,15 +58,15 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
   // Determine status color and text
   const getStatusInfo = () => {
     if (!device.online) {
-      return { color: 'text-gray-400', bg: 'bg-gray-900', text: 'Offline' }
+      return { color: 'text-text-muted', bg: 'bg-surface-2', text: 'Offline' }
     }
     if (inputWatts > 10) {
-      return { color: 'text-green-400', bg: 'bg-green-900', text: 'Charging' }
+      return { color: 'text-brand-primary', bg: 'bg-brand-primary/10', text: 'Charging' }
     }
     if (outputWatts > 10) {
-      return { color: 'text-blue-400', bg: 'bg-blue-900', text: 'Discharging' }
+      return { color: 'text-brand-tertiary', bg: 'bg-brand-tertiary/10', text: 'Discharging' }
     }
-    return { color: 'text-accent-green', bg: 'bg-accent-green/10', text: 'Standby' }
+    return { color: 'text-brand-primary', bg: 'bg-brand-primary/10', text: 'Standby' }
   }
 
   const handleRegisterDevice = async () => {
@@ -129,19 +129,19 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
 
   return (
     <div className={cn(
-      "bg-primary-dark rounded-lg border border-gray-700 hover:border-accent-green transition-all duration-200 group relative",
+      "bg-surface-1 rounded-card border border-stroke-subtle hover:border-brand-primary/30 shadow-card transition-all duration-160 ease-dashboard group relative",
       isCompact ? "p-4" : "p-6"
     )}>
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1 min-w-0">
           <h3 className={cn(
-            "font-bold text-accent-gray truncate",
+            "font-bold text-text-primary truncate",
             isCompact ? "text-base" : "text-lg"
           )}>
             {device.deviceName || device.deviceType || 'EcoFlow Device'}
           </h3>
-          <p className="text-xs text-gray-400 truncate mt-1">
+          <p className="text-xs text-text-muted truncate mt-1">
             {device.deviceSn}
           </p>
         </div>
@@ -149,14 +149,14 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
         {/* Online Status */}
         <div className="flex items-center gap-2 ml-3">
           {device.online ? (
-            <Wifi size={16} className="text-accent-green" />
+            <Wifi size={16} className="text-brand-primary" />
           ) : (
-            <WifiOff size={16} className="text-gray-400" />
+            <WifiOff size={16} className="text-text-muted" />
           )}
           {!isCompact && (
             <ArrowRight 
               size={16} 
-              className="text-gray-400 group-hover:text-accent-green transition-colors opacity-0 group-hover:opacity-100" 
+              className="text-text-muted group-hover:text-brand-primary transition-colors opacity-0 group-hover:opacity-100" 
             />
           )}
         </div>
@@ -165,7 +165,7 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
       {/* Status Badge */}
       <div className="flex items-center gap-2 mb-4">
         <div className={cn(
-          "px-2 py-1 rounded-md text-xs font-medium border",
+          "px-2 py-1 rounded-pill text-xs font-medium border",
           statusInfo.bg,
           statusInfo.color,
           statusInfo.color.replace('text-', 'border-')
@@ -173,27 +173,27 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
           {statusInfo.text}
         </div>
         {device.isActive && (
-          <div className="w-2 h-2 bg-accent-green rounded-full animate-pulse" />
+          <div className="w-2 h-2 bg-brand-primary rounded-full animate-pulse" />
         )}
       </div>
 
       {/* Analytics Registration Status */}
-      <div className="mb-4 p-3 rounded-lg border border-gray-600 bg-gray-800/50">
+      <div className="mb-4 p-3 rounded-inner border border-stroke-subtle bg-surface-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {isRegistered ? (
-              <DatabaseZap size={16} className="text-accent-green" />
+              <DatabaseZap size={16} className="text-brand-primary" />
             ) : (
-              <Database size={16} className="text-gray-400" />
+              <Database size={16} className="text-text-muted" />
             )}
             <div className="flex flex-col">
               <span className={cn(
                 "text-sm font-medium",
-                isRegistered ? "text-accent-green" : "text-gray-400"
+                isRegistered ? "text-brand-primary" : "text-text-muted"
               )}>
                 {isRegistered ? "Analytics Enabled" : "Analytics Disabled"}
               </span>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-text-muted">
                 {isRegistered 
                   ? "Device data is being collected for history and analytics" 
                   : "Register device to enable data collection and analytics"
@@ -208,7 +208,7 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
               <button
                 onClick={handleUnregisterDevice}
                 disabled={isUnregistering}
-                className="flex items-center gap-1 px-2 py-1 text-xs border border-red-400 text-red-400 hover:bg-red-400 hover:text-white rounded transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 px-2 py-1 text-xs border border-danger text-danger hover:bg-danger hover:text-bg-base rounded-pill transition-colors disabled:opacity-50"
               >
                 {isUnregistering ? (
                   <>
@@ -226,7 +226,7 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
               <button
                 onClick={handleRegisterDevice}
                 disabled={isRegistering}
-                className="flex items-center gap-1 px-2 py-1 text-xs border border-accent-green text-accent-green hover:bg-accent-green hover:text-black rounded transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 px-2 py-1 text-xs border border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-bg-base rounded-pill transition-colors disabled:opacity-50"
               >
                 {isRegistering ? (
                   <>
@@ -255,19 +255,19 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
           <Battery 
             size={isCompact ? 16 : 18} 
             className={cn(
-              batteryLevel > 20 ? "text-accent-green" : "text-red-400"
+              batteryLevel > 20 ? "text-brand-primary" : "text-danger"
             )} 
           />
           <div className="flex flex-col">
             <span className={cn(
               "font-semibold",
               isCompact ? "text-sm" : "text-base",
-              batteryLevel > 20 ? "text-accent-green" : "text-red-400"
+              batteryLevel > 20 ? "text-brand-primary" : "text-danger"
             )}>
               {batteryLevel}%
             </span>
             {!isCompact && (
-              <span className="text-xs text-gray-400">Battery</span>
+              <span className="text-xs text-text-muted">Battery</span>
             )}
           </div>
         </div>
@@ -276,18 +276,18 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
         <div className="flex items-center gap-2">
           <Zap 
             size={isCompact ? 16 : 18} 
-            className={inputWatts > 0 ? "text-green-400" : "text-gray-400"} 
+            className={inputWatts > 0 ? "text-brand-primary" : "text-text-muted"} 
           />
           <div className="flex flex-col">
             <span className={cn(
               "font-semibold",
               isCompact ? "text-sm" : "text-base",
-              inputWatts > 0 ? "text-green-400" : "text-gray-400"
+              inputWatts > 0 ? "text-brand-primary" : "text-text-muted"
             )}>
               {inputWatts}W
             </span>
             {!isCompact && (
-              <span className="text-xs text-gray-400">Input</span>
+              <span className="text-xs text-text-muted">Input</span>
             )}
           </div>
         </div>
@@ -296,18 +296,18 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
         <div className="flex items-center gap-2">
           <Power 
             size={isCompact ? 16 : 18} 
-            className={outputWatts > 0 ? "text-blue-400" : "text-gray-400"} 
+            className={outputWatts > 0 ? "text-brand-tertiary" : "text-text-muted"} 
           />
           <div className="flex flex-col">
             <span className={cn(
               "font-semibold",
               isCompact ? "text-sm" : "text-base",
-              outputWatts > 0 ? "text-blue-400" : "text-gray-400"
+              outputWatts > 0 ? "text-brand-tertiary" : "text-text-muted"
             )}>
               {outputWatts}W
             </span>
             {!isCompact && (
-              <span className="text-xs text-gray-400">Output</span>
+              <span className="text-xs text-text-muted">Output</span>
             )}
           </div>
         </div>
@@ -316,18 +316,18 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
         <div className="flex items-center gap-2">
           <Thermometer 
             size={isCompact ? 16 : 18} 
-            className={temperature > 40 ? "text-orange-400" : "text-gray-400"} 
+            className={temperature > 40 ? "text-warning" : "text-text-muted"} 
           />
           <div className="flex flex-col">
             <span className={cn(
               "font-semibold",
               isCompact ? "text-sm" : "text-base",
-              temperature > 40 ? "text-orange-400" : "text-accent-gray"
+              temperature > 40 ? "text-warning" : "text-text-primary"
             )}>
               {temperature}°C
             </span>
             {!isCompact && (
-              <span className="text-xs text-gray-400">Temp</span>
+              <span className="text-xs text-text-muted">Temp</span>
             )}
           </div>
         </div>
@@ -335,9 +335,9 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
 
       {/* Additional Info for non-compact view */}
       {!isCompact && remainingTime && remainingTime !== 0 && (
-        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-700">
-          <Clock size={16} className="text-accent-green" />
-          <span className="text-sm text-accent-gray">
+        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-stroke-subtle">
+          <Clock size={16} className="text-brand-primary" />
+          <span className="text-sm text-text-secondary">
             {formatRemainingTime(remainingTime)}
           </span>
         </div>
@@ -345,10 +345,10 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
 
       {/* Offline Overlay */}
       {!device.online && (
-        <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center">
+        <div className="absolute inset-0 bg-bg-base/60 rounded-card flex items-center justify-center">
           <div className="text-center">
-            <WifiOff size={24} className="text-gray-400 mx-auto mb-2" />
-            <span className="text-sm text-gray-400">Device Offline</span>
+            <WifiOff size={24} className="text-text-muted mx-auto mb-2" />
+            <span className="text-sm text-text-muted">Device Offline</span>
           </div>
         </div>
       )}
