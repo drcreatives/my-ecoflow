@@ -100,28 +100,28 @@ const AddDevicePage = () => {
     const isRegistered = device.isRegistered;
 
     return (
-      <div className="bg-primary-dark rounded-lg border border-gray-800 hover:border-accent-green/50 transition-all duration-200 p-6">
+      <div className="bg-surface-1 rounded-card border border-stroke-subtle hover:border-brand-primary/30 shadow-card transition-all duration-160 ease-dashboard p-[18px]">
         <div className="flex justify-between items-start mb-4">
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
-              <h3 className="text-lg font-semibold text-white">
+              <h3 className="text-lg font-medium text-text-primary">
                 {device.deviceName}
               </h3>
               {isOnline ? (
-                <Wifi size={16} className="text-accent-green" />
+                <Wifi size={16} className="text-brand-primary" />
               ) : (
-                <WifiOff size={16} className="text-red-400" />
+                <WifiOff size={16} className="text-danger" />
               )}
             </div>
-            <p className="text-sm text-gray-400 mb-1">
+            <p className="text-sm text-text-secondary mb-1">
               Serial: {device.sn}
             </p>
-            <p className="text-sm text-gray-400 mb-2">
+            <p className="text-sm text-text-secondary mb-2">
               Type: {device.deviceType || 'DELTA 2'}
             </p>
             <p className={cn(
               "text-xs font-medium",
-              isOnline ? "text-accent-green" : "text-red-400"
+              isOnline ? "text-brand-primary" : "text-danger"
             )}>
               {isOnline ? 'Online' : 'Offline'}
             </p>
@@ -130,16 +130,16 @@ const AddDevicePage = () => {
 
         {/* Status Messages */}
         {isRegistered && (
-          <div className="flex items-center gap-2 mb-4 p-3 bg-green-900/20 border border-green-900/30 rounded-md">
-            <CheckCircle size={16} className="text-green-400" />
-            <p className="text-green-400 text-sm font-medium">Device registered successfully!</p>
+          <div className="flex items-center gap-2 mb-4 p-3 bg-success/5 border border-success/15 rounded-inner">
+            <CheckCircle size={16} className="text-success" />
+            <p className="text-success text-sm font-medium">Device registered successfully!</p>
           </div>
         )}
 
         {!isOnline && !isRegistered && (
-          <div className="flex items-center gap-2 mb-4 p-3 bg-yellow-900/20 border border-yellow-900/30 rounded-md">
-            <AlertTriangle size={16} className="text-yellow-400" />
-            <p className="text-yellow-400 text-sm">
+          <div className="flex items-center gap-2 mb-4 p-3 bg-warning/5 border border-warning/15 rounded-inner">
+            <AlertTriangle size={16} className="text-warning" />
+            <p className="text-warning text-sm">
               Device is offline. You can still register it for future monitoring.
             </p>
           </div>
@@ -150,7 +150,7 @@ const AddDevicePage = () => {
           {isRegistered ? (
             <Link 
               href="/devices"
-              className="flex-1 bg-accent-green hover:bg-accent-green/90 text-black font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="flex-1 bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium py-2 px-4 rounded-pill transition-all duration-160 flex items-center justify-center gap-2 text-sm"
             >
               Go to Devices
               <ExternalLink size={16} />
@@ -159,7 +159,7 @@ const AddDevicePage = () => {
             <button
               onClick={() => registerDevice(device.sn, device.deviceName)}
               disabled={isRegistering}
-              className="flex-1 bg-accent-green hover:bg-accent-green/90 disabled:bg-gray-700 disabled:text-gray-400 text-black font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="flex-1 bg-brand-primary hover:bg-brand-secondary disabled:bg-surface-2 disabled:text-text-muted text-bg-base font-medium py-2 px-4 rounded-pill transition-all duration-160 flex items-center justify-center gap-2 text-sm"
             >
               {isRegistering ? (
                 <>
@@ -180,31 +180,30 @@ const AddDevicePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-primary-black text-accent-gray">
-      <div className="container mx-auto px-4 py-8">
+    <div className="p-4 sm:p-6 text-text-primary">
             {/* Header */}
             <div className="flex items-center gap-4 mb-8">
               <Link 
                 href="/devices"
-                className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                className="p-2 hover:bg-surface-2 rounded-inner transition-all duration-160"
               >
-                <ArrowLeft size={20} className="text-gray-400" />
+                <ArrowLeft size={20} className="text-text-secondary" />
               </Link>
               <div>
-                <h1 className="text-3xl font-bold text-white mb-2">Add Device</h1>
-                <p className="text-gray-400">
+                <h1 className="text-page-title text-text-primary font-medium mb-2">Add Device</h1>
+                <p className="text-text-secondary">
                   Discover and register your EcoFlow devices
                 </p>
               </div>
             </div>
 
             {/* Info Section */}
-            <div className="bg-blue-900/20 border border-blue-900/30 rounded-lg p-4 mb-8">
+            <div className="bg-brand-tertiary/5 border border-brand-tertiary/15 rounded-card p-4 mb-8">
               <div className="flex items-start gap-3">
-                <Info size={20} className="text-blue-400 mt-0.5" />
+                <Info size={20} className="text-brand-tertiary mt-0.5" />
                 <div>
-                  <h3 className="text-blue-400 font-medium mb-2">How it works</h3>
-                  <ul className="text-gray-300 text-sm space-y-1">
+                  <h3 className="text-brand-tertiary font-medium mb-2">How it works</h3>
+                  <ul className="text-text-secondary text-sm space-y-1">
                     <li>• We&apos;ll search for devices associated with your EcoFlow account</li>
                     <li>• Select devices you want to monitor in this dashboard</li>
                     <li>• Registered devices will appear in your devices list</li>
@@ -215,16 +214,16 @@ const AddDevicePage = () => {
             </div>
 
             {/* Search Section */}
-            <div className="bg-primary-dark rounded-lg border border-gray-800 p-6 mb-8">
-              <h2 className="text-xl font-semibold text-white mb-4">Discover Devices</h2>
-              <p className="text-gray-400 mb-6">
+            <div className="bg-surface-1 rounded-card border border-stroke-subtle shadow-card p-[18px] mb-8">
+              <h2 className="text-section-title font-medium text-text-primary mb-4">Discover Devices</h2>
+              <p className="text-text-secondary mb-6">
                 Search for EcoFlow devices associated with your account.
               </p>
               
               <button
                 onClick={searchDevices}
                 disabled={loading}
-                className="bg-accent-green hover:bg-accent-green/90 disabled:bg-gray-700 disabled:text-gray-400 text-black font-medium py-3 px-6 rounded-lg transition-colors flex items-center gap-3"
+                className="bg-brand-primary hover:bg-brand-secondary disabled:bg-surface-2 disabled:text-text-muted text-bg-base font-medium py-3 px-6 rounded-pill transition-all duration-160 flex items-center gap-3 text-sm"
               >
                 {loading ? (
                   <>
@@ -242,15 +241,15 @@ const AddDevicePage = () => {
 
             {/* Error State */}
             {error && (
-              <div className="bg-red-900/20 border border-red-900/30 rounded-lg p-4 mb-6">
+              <div className="bg-danger/5 border border-danger/15 rounded-card p-4 mb-6">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle size={20} className="text-red-400" />
-                  <p className="text-red-400 font-medium">Error discovering devices</p>
+                  <AlertTriangle size={20} className="text-danger" />
+                  <p className="text-danger font-medium">Error discovering devices</p>
                 </div>
-                <p className="text-gray-400 text-sm mt-1">{error}</p>
+                <p className="text-text-secondary text-sm mt-1">{error}</p>
                 <button
                   onClick={searchDevices}
-                  className="mt-3 text-accent-green hover:text-accent-green/80 text-sm font-medium transition-colors"
+                  className="mt-3 text-brand-primary hover:text-brand-secondary text-sm font-medium transition-all duration-160"
                 >
                   Try again
                 </button>
@@ -260,24 +259,24 @@ const AddDevicePage = () => {
             {/* Results */}
             {searchPerformed && !loading && !error && (
               <div>
-                <h2 className="text-xl font-semibold text-white mb-6">
+                <h2 className="text-section-title font-medium text-text-primary mb-6">
                   Discovered Devices ({devices.length})
                 </h2>
                 
                 {devices.length > 0 ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[18px]">
                     {devices.map((device) => (
                       <DeviceDiscoveryCard key={device.sn} device={device} />
                     ))}
                   </div>
                 ) : (
                   <div className="text-center py-12">
-                    <Search size={48} className="mx-auto text-gray-600 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-400 mb-2">No devices found</h3>
-                    <p className="text-gray-500 mb-6">
+                    <Search size={48} className="mx-auto text-text-muted mb-4" />
+                    <h3 className="text-lg font-medium text-text-secondary mb-2">No devices found</h3>
+                    <p className="text-text-muted mb-6">
                       Make sure your devices are connected to your EcoFlow account
                     </p>
-                    <div className="space-y-2 text-sm text-gray-400">
+                    <div className="space-y-2 text-sm text-text-secondary">
                       <p>• Check your EcoFlow app to ensure devices are properly connected</p>
                       <p>• Verify your account credentials are correct</p>
                       <p>• Try searching again in a few moments</p>
@@ -289,21 +288,20 @@ const AddDevicePage = () => {
 
             {/* Manual Entry Option */}
             {searchPerformed && devices.length === 0 && !loading && (
-              <div className="mt-8 bg-primary-dark rounded-lg border border-gray-800 p-6">
-                <h3 className="text-lg font-semibold text-white mb-3">Manual Device Entry</h3>
-                <p className="text-gray-400 mb-4">
+              <div className="mt-8 bg-surface-1 rounded-card border border-stroke-subtle shadow-card p-[18px]">
+                <h3 className="text-section-title font-medium text-text-primary mb-3">Manual Device Entry</h3>
+                <p className="text-text-secondary mb-4">
                   If your device isn&apos;t appearing in the search results, you can manually add it by serial number.
                 </p>
                 <button 
-                  className="bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                  className="bg-surface-2 hover:bg-surface-2/80 text-text-primary font-medium py-2 px-4 rounded-pill border border-stroke-subtle transition-all duration-160 text-sm"
                   onClick={() => alert('Manual entry feature coming soon!')}
                 >
                   Add Manually
                 </button>
               </div>
             )}
-          </div>
-        </div>
+    </div>
   );
 };
 

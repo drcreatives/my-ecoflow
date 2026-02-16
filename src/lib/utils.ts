@@ -9,62 +9,66 @@ export function cn(...inputs: ClassValue[]) {
 export const ecoflowStyles = {
   // Backgrounds
   bg: {
-    primary: 'bg-primary-black',
-    primaryDark: 'bg-primary-dark',
-    card: 'bg-gray-900/50 backdrop-blur-sm',
-    input: 'bg-gray-800/50',
+    primary: 'bg-bg-base',
+    primaryDark: 'bg-surface-1',
+    card: 'bg-surface-1',
+    input: 'bg-surface-2',
   },
   
   // Text colors
   text: {
-    primary: 'text-accent-gray',
-    secondary: 'text-gray-400',
-    accent: 'text-accent-green',
-    error: 'text-red-400',
-    warning: 'text-status-warning',
+    primary: 'text-text-primary',
+    secondary: 'text-text-secondary',
+    muted: 'text-text-muted',
+    accent: 'text-brand-primary',
+    error: 'text-danger',
+    warning: 'text-warning',
   },
   
   // Borders
   border: {
-    default: 'border border-gray-700',
-    accent: 'border border-accent-green',
-    error: 'border border-red-500',
-    success: 'border border-accent-green',
+    default: 'border border-stroke-subtle',
+    strong: 'border border-stroke-strong',
+    accent: 'border border-brand-primary',
+    error: 'border border-danger',
+    success: 'border border-brand-primary',
   },
   
   // Buttons
   button: {
-    primary: 'bg-accent-green hover:bg-accent-green-secondary text-black font-medium py-2 px-4 rounded-lg transition-colors',
-    secondary: 'bg-gray-800 hover:bg-gray-700 text-accent-gray border border-gray-600 py-2 px-4 rounded-lg transition-colors',
-    ghost: 'hover:bg-gray-800/50 text-accent-gray py-2 px-4 rounded-lg transition-colors',
+    primary: 'bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium py-2 px-4 rounded-pill transition-all duration-160',
+    secondary: 'bg-surface-2 hover:bg-surface-1 text-text-primary border border-stroke-strong py-2 px-4 rounded-pill transition-all duration-160',
+    ghost: 'hover:bg-surface-2 text-text-secondary hover:text-text-primary py-2 px-4 rounded-pill transition-all duration-160',
+    pill: 'rounded-pill border border-stroke-strong px-4 py-2 text-text-primary hover:bg-surface-2 text-xs font-medium transition-all duration-160',
   },
   
   // Inputs
   input: {
     default: cn(
-      'w-full h-12 px-4 py-3 bg-gray-800/50 border border-gray-700',
-      'text-white placeholder-gray-500 rounded-lg',
-      'focus:outline-none focus:ring-2 focus:ring-accent-green/20 focus:border-accent-green',
-      'transition-all'
+      'w-full h-12 px-4 py-3 bg-surface-2 border border-stroke-subtle',
+      'text-text-primary placeholder-text-muted rounded-inner',
+      'focus:outline-none focus:ring-1 focus:ring-brand-primary/40 focus:border-brand-primary',
+      'transition-all duration-160'
     ),
     error: cn(
-      'w-full h-12 px-4 py-3 bg-gray-800/50 border border-red-500',
-      'text-white placeholder-gray-500 rounded-lg',
-      'focus:outline-none focus:ring-2 focus:ring-red-500/20',
-      'transition-all'
+      'w-full h-12 px-4 py-3 bg-surface-2 border border-danger',
+      'text-text-primary placeholder-text-muted rounded-inner',
+      'focus:outline-none focus:ring-1 focus:ring-danger/40',
+      'transition-all duration-160'
     ),
   },
   
   // Cards
   card: {
-    default: 'bg-gray-900/50 backdrop-blur-sm border border-gray-800/50 rounded-2xl p-6 shadow-2xl',
-    accent: 'bg-gray-900/50 backdrop-blur-sm border border-accent-green/30 rounded-2xl p-6 shadow-2xl',
+    default: 'bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]',
+    accent: 'bg-surface-1 border border-brand-primary/20 rounded-card shadow-card p-[18px]',
+    hero: 'bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px] col-span-2',
   },
   
   // Layout
   layout: {
     container: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8',
-    page: 'min-h-screen bg-primary-black text-accent-gray',
+    page: 'min-h-screen bg-bg-base text-text-primary',
     section: 'py-8 md:py-12',
   },
   
@@ -129,9 +133,18 @@ export function calculateEfficiency(inputWatts: number, outputWatts: number): nu
  * Get battery status color based on level
  */
 export function getBatteryStatusColor(level: number): string {
-  if (level > 50) return '#44af21' // Green
-  if (level > 20) return '#ffa500' // Orange
-  return '#ff4444' // Red
+  if (level > 50) return '#44af21' // brand-primary
+  if (level > 20) return '#ffa500' // warning
+  return '#ff4444' // danger
+}
+
+/**
+ * Get battery status Tailwind class based on level
+ */
+export function getBatteryStatusClass(level: number): string {
+  if (level > 50) return 'text-brand-primary'
+  if (level > 20) return 'text-warning'
+  return 'text-danger'
 }
 
 /**
@@ -141,15 +154,34 @@ export function getDeviceStatusColor(status: string): string {
   switch (status.toLowerCase()) {
     case 'online':
     case 'charging':
-      return '#44af21' // Green
+      return '#44af21' // brand-primary
     case 'discharging':
-      return '#00c356' // Green secondary
+      return '#00c356' // brand-secondary
     case 'offline':
-      return '#666666' // Gray
+      return '#666666' // muted
     case 'error':
-      return '#ff4444' // Red
+      return '#ff4444' // danger
     default:
-      return '#3a6fe3' // Blue
+      return '#3a6fe3' // brand-tertiary
+  }
+}
+
+/**
+ * Get device status Tailwind class based on status
+ */
+export function getDeviceStatusClass(status: string): string {
+  switch (status.toLowerCase()) {
+    case 'online':
+    case 'charging':
+      return 'text-brand-primary'
+    case 'discharging':
+      return 'text-brand-secondary'
+    case 'offline':
+      return 'text-text-muted'
+    case 'error':
+      return 'text-danger'
+    default:
+      return 'text-brand-tertiary'
   }
 }
 

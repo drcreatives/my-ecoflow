@@ -508,8 +508,8 @@ function SettingsPage() {
       
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <Loader2 className="w-8 h-8 text-accent-green animate-spin mx-auto mb-4" />
-            <p className="text-gray-400">Loading settings...</p>
+            <Loader2 className="w-8 h-8 text-brand-primary animate-spin mx-auto mb-4" />
+            <p className="text-text-muted">Loading settings...</p>
           </div>
         </div>
       
@@ -519,20 +519,19 @@ function SettingsPage() {
   return (
     
       <div className="p-4 sm:p-6">
-        <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="flex items-center gap-3 mb-8">
-            <Settings size={28} className="text-accent-green" />
+            <Settings size={28} className="text-brand-primary" />
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">Settings</h1>
-              <p className="text-gray-400">Manage your account and app preferences</p>
+              <h1 className="text-page-title font-medium text-text-primary">Settings</h1>
+              <p className="text-text-muted">Manage your account and app preferences</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Sidebar Navigation */}
             <div className="lg:col-span-1">
-              <div className="bg-primary-dark border border-gray-700 rounded-lg p-1">
+              <div className="bg-surface-1 border border-stroke-subtle rounded-card p-1">
                 {tabs.map((tab) => {
                   const Icon = tab.icon
                   return (
@@ -540,10 +539,10 @@ function SettingsPage() {
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
                       className={cn(
-                        "w-full flex items-center gap-3 p-3 rounded-md text-left transition-colors",
+                        "w-full flex items-center gap-3 p-3 rounded-inner text-left transition-all duration-160 ease-dashboard",
                         activeTab === tab.id
-                          ? "bg-accent-green text-black font-medium"
-                          : "text-gray-400 hover:text-white hover:bg-gray-700"
+                          ? "bg-brand-primary text-bg-base font-medium"
+                          : "text-text-muted hover:text-text-primary hover:bg-surface-2"
                       )}
                     >
                       <Icon size={20} />
@@ -560,58 +559,58 @@ function SettingsPage() {
 
             {/* Main Content */}
             <div className="lg:col-span-3">
-              <div className="bg-primary-dark border border-gray-700 rounded-lg p-6">
+              <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
                 
                 {/* Profile Tab */}
                 {activeTab === 'profile' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-xl font-semibold text-white mb-4">Profile Information</h2>
+                      <h2 className="text-section-title font-medium text-text-primary mb-4">Profile Information</h2>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                          <label className="block text-sm font-medium text-text-secondary mb-2">
                             Email Address
                           </label>
                           <input
                             type="email"
                             value={userProfile.email}
                             disabled
-                            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green disabled:opacity-60"
+                            className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 disabled:opacity-60"
                           />
-                          <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                          <p className="text-xs text-text-muted mt-1">Email cannot be changed</p>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                          <label className="block text-sm font-medium text-text-secondary mb-2">
                             Member Since
                           </label>
                           <input
                             type="text"
                             value={userProfile.createdAt ? new Date(userProfile.createdAt).toLocaleDateString() : 'Loading...'}
                             disabled
-                            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green disabled:opacity-60"
+                            className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 disabled:opacity-60"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                          <label className="block text-sm font-medium text-text-secondary mb-2">
                             First Name
                           </label>
                           <input
                             type="text"
                             value={userProfile.firstName}
                             onChange={(e) => setUserProfile(prev => ({ ...prev, firstName: e.target.value }))}
-                            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green"
+                            className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
                             placeholder="Enter first name"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                          <label className="block text-sm font-medium text-text-secondary mb-2">
                             Last Name
                           </label>
                           <input
                             type="text"
                             value={userProfile.lastName}
                             onChange={(e) => setUserProfile(prev => ({ ...prev, lastName: e.target.value }))}
-                            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green"
+                            className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
                             placeholder="Enter last name"
                           />
                         </div>
@@ -619,7 +618,7 @@ function SettingsPage() {
                       <button
                         onClick={() => saveSettings('userProfile', userProfile)}
                         disabled={saving}
-                        className="mt-4 flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 disabled:opacity-50 text-black font-medium px-4 py-2 rounded-lg transition-colors"
+                        className="mt-4 flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-160 ease-dashboard"
                       >
                         {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                         Save Profile
@@ -627,20 +626,20 @@ function SettingsPage() {
                     </div>
 
                     {/* Account Actions */}
-                    <div className="border-t border-gray-700 pt-6">
-                      <h3 className="text-lg font-semibold text-white mb-4">Account Actions</h3>
+                    <div className="border-t border-stroke-subtle pt-6">
+                      <h3 className="text-lg font-medium text-text-primary mb-4">Account Actions</h3>
                       <div className="space-y-3">
                         <button
                           onClick={() => exportData('json')}
                           disabled={saving}
-                          className="flex items-center gap-2 text-accent-green hover:text-accent-green/80 transition-colors"
+                          className="flex items-center gap-2 text-brand-primary hover:text-brand-primary/80 transition-colors"
                         >
                           <Download size={16} />
                           Export Account Data
                         </button>
                         <button
                           onClick={() => logout()}
-                          className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors"
+                          className="flex items-center gap-2 text-danger hover:text-danger/80 transition-colors"
                         >
                           <RefreshCw size={16} />
                           Sign Out of All Devices
@@ -654,22 +653,22 @@ function SettingsPage() {
                 {activeTab === 'notifications' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-xl font-semibold text-white mb-4">Notification Preferences</h2>
+                      <h2 className="text-section-title font-medium text-text-primary mb-4">Notification Preferences</h2>
                       
                       <div className="space-y-4">
-                        <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                        <div className="flex items-center justify-between p-4 bg-surface-2 rounded-inner">
                           <div className="flex items-center gap-3">
-                            <AlertTriangle className="text-red-400" size={20} />
+                            <AlertTriangle className="text-danger" size={20} />
                             <div>
-                              <div className="font-medium text-white">Device Alerts</div>
-                              <div className="text-sm text-gray-400">Critical device status notifications</div>
+                              <div className="font-medium text-text-primary">Device Alerts</div>
+                              <div className="text-sm text-text-muted">Critical device status notifications</div>
                             </div>
                           </div>
                           <button
                             onClick={() => setNotificationSettings(prev => ({ ...prev, deviceAlerts: !prev.deviceAlerts }))}
                             className={cn(
                               "w-12 h-6 rounded-full transition-colors",
-                              notificationSettings.deviceAlerts ? "bg-accent-green" : "bg-gray-600"
+                              notificationSettings.deviceAlerts ? "bg-brand-primary" : "bg-stroke-strong"
                             )}
                           >
                             <div className={cn(
@@ -679,19 +678,19 @@ function SettingsPage() {
                           </button>
                         </div>
 
-                        <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                        <div className="flex items-center justify-between p-4 bg-surface-2 rounded-inner">
                           <div className="flex items-center gap-3">
-                            <Zap className="text-yellow-400" size={20} />
+                            <Zap className="text-warning" size={20} />
                             <div>
-                              <div className="font-medium text-white">Low Battery Alerts</div>
-                              <div className="text-sm text-gray-400">When battery level drops below 20%</div>
+                              <div className="font-medium text-text-primary">Low Battery Alerts</div>
+                              <div className="text-sm text-text-muted">When battery level drops below 20%</div>
                             </div>
                           </div>
                           <button
                             onClick={() => setNotificationSettings(prev => ({ ...prev, lowBattery: !prev.lowBattery }))}
                             className={cn(
                               "w-12 h-6 rounded-full transition-colors",
-                              notificationSettings.lowBattery ? "bg-accent-green" : "bg-gray-600"
+                              notificationSettings.lowBattery ? "bg-brand-primary" : "bg-stroke-strong"
                             )}
                           >
                             <div className={cn(
@@ -701,19 +700,19 @@ function SettingsPage() {
                           </button>
                         </div>
 
-                        <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                        <div className="flex items-center justify-between p-4 bg-surface-2 rounded-inner">
                           <div className="flex items-center gap-3">
-                            <Bell className="text-blue-400" size={20} />
+                            <Bell className="text-brand-tertiary" size={20} />
                             <div>
-                              <div className="font-medium text-white">Power Threshold Alerts</div>
-                              <div className="text-sm text-gray-400">High power consumption warnings</div>
+                              <div className="font-medium text-text-primary">Power Threshold Alerts</div>
+                              <div className="text-sm text-text-muted">High power consumption warnings</div>
                             </div>
                           </div>
                           <button
                             onClick={() => setNotificationSettings(prev => ({ ...prev, powerThreshold: !prev.powerThreshold }))}
                             className={cn(
                               "w-12 h-6 rounded-full transition-colors",
-                              notificationSettings.powerThreshold ? "bg-accent-green" : "bg-gray-600"
+                              notificationSettings.powerThreshold ? "bg-brand-primary" : "bg-stroke-strong"
                             )}
                           >
                             <div className={cn(
@@ -723,19 +722,19 @@ function SettingsPage() {
                           </button>
                         </div>
 
-                        <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                        <div className="flex items-center justify-between p-4 bg-surface-2 rounded-inner">
                           <div className="flex items-center gap-3">
-                            <Mail className="text-green-400" size={20} />
+                            <Mail className="text-success" size={20} />
                             <div>
-                              <div className="font-medium text-white">Email Notifications</div>
-                              <div className="text-sm text-gray-400">Receive notifications via email</div>
+                              <div className="font-medium text-text-primary">Email Notifications</div>
+                              <div className="text-sm text-text-muted">Receive notifications via email</div>
                             </div>
                           </div>
                           <button
                             onClick={() => setNotificationSettings(prev => ({ ...prev, emailNotifications: !prev.emailNotifications }))}
                             className={cn(
                               "w-12 h-6 rounded-full transition-colors",
-                              notificationSettings.emailNotifications ? "bg-accent-green" : "bg-gray-600"
+                              notificationSettings.emailNotifications ? "bg-brand-primary" : "bg-stroke-strong"
                             )}
                           >
                             <div className={cn(
@@ -750,7 +749,7 @@ function SettingsPage() {
                         <button
                           onClick={() => saveSettings('notificationSettings', notificationSettings)}
                           disabled={saving}
-                          className="flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 disabled:opacity-50 text-black font-medium px-4 py-2 rounded-lg transition-colors"
+                          className="flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-160 ease-dashboard"
                         >
                           {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                           Save Preferences
@@ -760,7 +759,7 @@ function SettingsPage() {
                           <button
                             onClick={handleTestEmail}
                             disabled={testingEmail || saving}
-                            className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+                            className="flex items-center gap-2 bg-surface-2 hover:bg-surface-2/80 disabled:opacity-50 text-text-primary font-medium px-4 py-2 rounded-pill border border-stroke-subtle transition-all duration-160 ease-dashboard"
                           >
                             {testingEmail ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
                             Test Email
@@ -770,16 +769,16 @@ function SettingsPage() {
                     </div>
 
                     {/* Clear Notifications */}
-                    <div className="border-t border-gray-700 pt-6">
-                      <h3 className="text-lg font-semibold text-white mb-4">Notification History</h3>
+                    <div className="border-t border-stroke-subtle pt-6">
+                      <h3 className="text-lg font-medium text-text-primary mb-4">Notification History</h3>
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="text-white">Current notifications: {notifications.length}</div>
-                          <div className="text-sm text-gray-400">Clear notification history</div>
+                          <div className="text-text-primary">Current notifications: {notifications.length}</div>
+                          <div className="text-sm text-text-muted">Clear notification history</div>
                         </div>
                         <button
                           onClick={clearAllNotifications}
-                          className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors"
+                          className="flex items-center gap-2 text-danger hover:text-danger/80 transition-colors"
                         >
                           <Trash2 size={16} />
                           Clear All
@@ -793,17 +792,17 @@ function SettingsPage() {
                 {activeTab === 'data' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-xl font-semibold text-white mb-4">Data Management</h2>
+                      <h2 className="text-section-title font-medium text-text-primary mb-4">Data Management</h2>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                          <label className="block text-sm font-medium text-text-secondary mb-2">
                             Data Retention Period
                           </label>
                           <select
                             value={dataSettings.retentionPeriod}
                             onChange={(e) => setDataSettings(prev => ({ ...prev, retentionPeriod: parseInt(e.target.value) }))}
-                            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green"
+                            className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
                           >
                             <option value={30}>30 days</option>
                             <option value={90}>90 days</option>
@@ -813,13 +812,13 @@ function SettingsPage() {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                          <label className="block text-sm font-medium text-text-secondary mb-2">
                             Data Collection Interval
                           </label>
                           <select
                             value={dataSettings.collectInterval}
                             onChange={(e) => setDataSettings(prev => ({ ...prev, collectInterval: parseInt(e.target.value) }))}
-                            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green"
+                            className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
                           >
                             <option value={1}>1 minute</option>
                             <option value={5}>5 minutes</option>
@@ -831,16 +830,16 @@ function SettingsPage() {
                       </div>
 
                       <div className="space-y-4">
-                        <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                        <div className="flex items-center justify-between p-4 bg-surface-2 rounded-inner">
                           <div>
-                            <div className="font-medium text-white">Automatic Backup</div>
-                            <div className="text-sm text-gray-400">Daily backup of device readings and settings</div>
+                            <div className="font-medium text-text-primary">Automatic Backup</div>
+                            <div className="text-sm text-text-muted">Daily backup of device readings and settings</div>
                           </div>
                           <button
                             onClick={() => setDataSettings(prev => ({ ...prev, autoBackup: !prev.autoBackup }))}
                             className={cn(
                               "w-12 h-6 rounded-full transition-colors",
-                              dataSettings.autoBackup ? "bg-accent-green" : "bg-gray-600"
+                              dataSettings.autoBackup ? "bg-brand-primary" : "bg-stroke-strong"
                             )}
                           >
                             <div className={cn(
@@ -854,7 +853,7 @@ function SettingsPage() {
                       <button
                         onClick={() => saveSettings('dataSettings', dataSettings)}
                         disabled={saving}
-                        className="mt-4 flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 disabled:opacity-50 text-black font-medium px-4 py-2 rounded-lg transition-colors"
+                        className="mt-4 flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-160 ease-dashboard"
                       >
                         {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                         Save Data Settings
@@ -862,13 +861,13 @@ function SettingsPage() {
                     </div>
 
                     {/* Data Export */}
-                    <div className="border-t border-gray-700 pt-6">
-                      <h3 className="text-lg font-semibold text-white mb-4">Data Export</h3>
+                    <div className="border-t border-stroke-subtle pt-6">
+                      <h3 className="text-lg font-medium text-text-primary mb-4">Data Export</h3>
                       <div className="space-y-3">
                         <button
                           onClick={() => exportData('json')}
                           disabled={saving}
-                          className="flex items-center gap-2 text-accent-green hover:text-accent-green/80 transition-colors"
+                          className="flex items-center gap-2 text-brand-primary hover:text-brand-primary/80 transition-colors"
                         >
                           <Download size={16} />
                           Export All Data (JSON)
@@ -876,12 +875,12 @@ function SettingsPage() {
                         <button
                           onClick={() => exportData('csv')}
                           disabled={saving}
-                          className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors"
+                          className="flex items-center gap-2 text-brand-tertiary hover:text-brand-tertiary/80 transition-colors"
                         >
                           <Download size={16} />
                           Export Readings (CSV)
                         </button>
-                        <div className="text-sm text-gray-400">
+                        <div className="text-sm text-text-muted">
                           Download a complete copy of your data including device readings, settings, and profile information.
                         </div>
                       </div>
@@ -893,29 +892,29 @@ function SettingsPage() {
                 {activeTab === 'security' && (
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-xl font-semibold text-white mb-4">Security Settings</h2>
+                      <h2 className="text-section-title font-medium text-text-primary mb-4">Security Settings</h2>
                       
                       {/* Password Section */}
-                      <div className="p-4 bg-gray-800 rounded-lg mb-6">
+                      <div className="p-4 bg-surface-2 rounded-inner mb-6">
                         <div className="flex items-center justify-between mb-4">
                           <div>
-                            <div className="font-medium text-white">Password</div>
-                            <div className="text-sm text-gray-400">
+                            <div className="font-medium text-text-primary">Password</div>
+                            <div className="text-sm text-text-muted">
                               Last changed: {new Date(securitySettings.passwordLastChanged).toLocaleDateString()}
                             </div>
                           </div>
                           <button
                             onClick={() => setShowPasswordForm(!showPasswordForm)}
-                            className="text-accent-green hover:text-accent-green/80 transition-colors"
+                            className="text-brand-primary hover:text-brand-primary/80 transition-colors"
                           >
                             Change Password
                           </button>
                         </div>
 
                         {showPasswordForm && (
-                          <div className="space-y-4 border-t border-gray-700 pt-4">
+                          <div className="space-y-4 border-t border-stroke-subtle pt-4">
                             <div>
-                              <label className="block text-sm font-medium text-gray-300 mb-2">
+                              <label className="block text-sm font-medium text-text-secondary mb-2">
                                 Current Password
                               </label>
                               <div className="relative">
@@ -923,20 +922,20 @@ function SettingsPage() {
                                   type={showPasswords.current ? "text" : "password"}
                                   value={passwordForm.currentPassword}
                                   onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
-                                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 pr-10 text-white focus:outline-none focus:border-accent-green"
+                                  className="w-full bg-bg-base border border-stroke-subtle rounded-inner px-3 py-2 pr-10 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
                                   placeholder="Enter current password"
                                 />
                                 <button
                                   type="button"
                                   onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
-                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted hover:text-text-primary"
                                 >
                                   {showPasswords.current ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
                               </div>
                             </div>
                             <div>
-                              <label className="block text-sm font-medium text-gray-300 mb-2">
+                              <label className="block text-sm font-medium text-text-secondary mb-2">
                                 New Password
                               </label>
                               <div className="relative">
@@ -944,20 +943,20 @@ function SettingsPage() {
                                   type={showPasswords.new ? "text" : "password"}
                                   value={passwordForm.newPassword}
                                   onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
-                                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 pr-10 text-white focus:outline-none focus:border-accent-green"
+                                  className="w-full bg-bg-base border border-stroke-subtle rounded-inner px-3 py-2 pr-10 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
                                   placeholder="Enter new password"
                                 />
                                 <button
                                   type="button"
                                   onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
-                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted hover:text-text-primary"
                                 >
                                   {showPasswords.new ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
                               </div>
                             </div>
                             <div>
-                              <label className="block text-sm font-medium text-gray-300 mb-2">
+                              <label className="block text-sm font-medium text-text-secondary mb-2">
                                 Confirm New Password
                               </label>
                               <div className="relative">
@@ -965,13 +964,13 @@ function SettingsPage() {
                                   type={showPasswords.confirm ? "text" : "password"}
                                   value={passwordForm.confirmPassword}
                                   onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 pr-10 text-white focus:outline-none focus:border-accent-green"
+                                  className="w-full bg-bg-base border border-stroke-subtle rounded-inner px-3 py-2 pr-10 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
                                   placeholder="Confirm new password"
                                 />
                                 <button
                                   type="button"
                                   onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
-                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted hover:text-text-primary"
                                 >
                                   {showPasswords.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
@@ -981,7 +980,7 @@ function SettingsPage() {
                               <button
                                 onClick={handlePasswordChange}
                                 disabled={saving || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
-                                className="flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 disabled:opacity-50 text-black font-medium px-4 py-2 rounded-lg transition-colors"
+                                className="flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-160 ease-dashboard"
                               >
                                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                                 Update Password
@@ -991,7 +990,7 @@ function SettingsPage() {
                                   setShowPasswordForm(false)
                                   setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
                                 }}
-                                className="px-4 py-2 border border-gray-600 text-gray-400 hover:text-white hover:border-gray-500 rounded-lg transition-colors"
+                                className="px-4 py-2 border border-stroke-subtle text-text-muted hover:text-text-primary hover:border-stroke-strong rounded-pill transition-all duration-160 ease-dashboard"
                               >
                                 Cancel
                               </button>
@@ -1003,13 +1002,13 @@ function SettingsPage() {
                       {/* Session Settings */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                          <label className="block text-sm font-medium text-text-secondary mb-2">
                             Session Timeout
                           </label>
                           <select
                             value={securitySettings.sessionTimeout}
                             onChange={(e) => setSecuritySettings(prev => ({ ...prev, sessionTimeout: parseInt(e.target.value) }))}
-                            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green"
+                            className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
                           >
                             <option value={15}>15 minutes</option>
                             <option value={30}>30 minutes</option>
@@ -1022,7 +1021,7 @@ function SettingsPage() {
                           <button
                             onClick={() => saveSettings('securitySettings', securitySettings)}
                             disabled={saving}
-                            className="flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 disabled:opacity-50 text-black font-medium px-4 py-2 rounded-lg transition-colors"
+                            className="flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-160 ease-dashboard"
                           >
                             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                             Save Security Settings
@@ -1035,7 +1034,6 @@ function SettingsPage() {
               </div>
             </div>
           </div>
-        </div>
       </div>
     
   )

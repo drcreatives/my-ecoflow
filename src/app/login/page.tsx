@@ -133,47 +133,47 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center p-4">
+    <div className="min-h-screen bg-bg-base flex items-center justify-center p-4">
       {/* Background decorative elements */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-green-500/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-brand-primary/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-brand-tertiary/5 rounded-full blur-3xl"></div>
       </div>
 
       <div className="relative w-full max-w-md">
         {/* Logo/Brand Section */}
         <div className="text-center mb-6 sm:mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-r from-green-500 to-green-400 rounded-xl mb-3 sm:mb-4">
-            <Power className="w-7 h-7 sm:w-8 sm:h-8 text-black" />
+          <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-brand-primary rounded-card mb-3 sm:mb-4">
+            <Power className="w-7 h-7 sm:w-8 sm:h-8 text-bg-base" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+          <h1 className="text-page-title font-medium text-text-primary mb-2">
             EcoFlow Dashboard
           </h1>
-          <p className="text-gray-400 text-sm sm:text-base">
+          <p className="text-text-muted text-sm sm:text-base">
             Monitor and control your EcoFlow devices
           </p>
         </div>
 
         {/* Auth Form */}
-        <div className="bg-gray-900/60 backdrop-blur-lg border border-gray-700/50 rounded-2xl p-6 sm:p-8 shadow-2xl">
+        <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 sm:p-8">
           {/* Mode Toggle */}
-          <div className="flex bg-gray-800/50 rounded-lg p-1 mb-6 sm:mb-8">
+          <div className="flex bg-surface-2 rounded-inner p-1 mb-6 sm:mb-8">
             <button
               onClick={() => setIsLogin(true)}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all touch-manipulation ${
+              className={`flex-1 py-2 px-4 rounded-inner text-sm font-medium transition-all duration-160 ease-dashboard touch-manipulation ${
                 isLogin 
-                  ? 'bg-green-500 text-black shadow-lg' 
-                  : 'text-gray-400 hover:text-white'
+                  ? 'bg-brand-primary text-bg-base' 
+                  : 'text-text-muted hover:text-text-primary'
               }`}
             >
               Sign In
             </button>
             <button
               onClick={() => setIsLogin(false)}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all touch-manipulation ${
+              className={`flex-1 py-2 px-4 rounded-inner text-sm font-medium transition-all duration-160 ease-dashboard touch-manipulation ${
                 !isLogin 
-                  ? 'bg-green-500 text-black shadow-lg' 
-                  : 'text-gray-400 hover:text-white'
+                  ? 'bg-brand-primary text-bg-base' 
+                  : 'text-text-muted hover:text-text-primary'
               }`}
             >
               Sign Up
@@ -184,19 +184,19 @@ export default function AuthPage() {
           <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
             {/* Email Field */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-text-secondary mb-2">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 z-10" />
+                <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-text-muted z-10" />
                 <input
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  className={`w-full h-12 sm:h-14 pl-12 pr-4 py-3 bg-gray-800/50 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-all text-base ${
+                  className={`w-full h-12 sm:h-14 pl-12 pr-4 py-3 bg-surface-2 border rounded-inner text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 transition-all text-base ${
                     errors.email 
-                      ? 'border-red-500 focus:ring-red-500/20' 
-                      : 'border-gray-700 focus:border-green-500 focus:ring-green-500/20'
+                      ? 'border-danger focus:ring-danger/20' 
+                      : 'border-stroke-subtle focus:border-brand-primary focus:ring-brand-primary/20'
                   }`}
                   placeholder="Enter your email"
                   autoComplete="email"
@@ -204,25 +204,25 @@ export default function AuthPage() {
                 />
               </div>
               {errors.email && (
-                <p className="mt-2 text-sm text-red-400">{errors.email}</p>
+                <p className="mt-2 text-sm text-danger">{errors.email}</p>
               )}
             </div>
 
             {/* Password Field */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-text-secondary mb-2">
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 z-10" />
+                <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-text-muted z-10" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
-                  className={`w-full h-12 sm:h-14 pl-12 pr-12 py-3 bg-gray-800/50 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-all text-base ${
+                  className={`w-full h-12 sm:h-14 pl-12 pr-12 py-3 bg-surface-2 border rounded-inner text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 transition-all text-base ${
                     errors.password 
-                      ? 'border-red-500 focus:ring-red-500/20' 
-                      : 'border-gray-700 focus:border-green-500 focus:ring-green-500/20'
+                      ? 'border-danger focus:ring-danger/20' 
+                      : 'border-stroke-subtle focus:border-brand-primary focus:ring-brand-primary/20'
                   }`}
                   placeholder="Enter your password"
                   autoComplete={isLogin ? "current-password" : "new-password"}
@@ -230,33 +230,33 @@ export default function AuthPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors z-10 touch-manipulation p-1"
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors z-10 touch-manipulation p-1"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
               {errors.password && (
-                <p className="mt-2 text-sm text-red-400">{errors.password}</p>
+                <p className="mt-2 text-sm text-danger">{errors.password}</p>
               )}
             </div>
 
             {/* Confirm Password Field (Signup only) */}
             {!isLogin && (
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-text-secondary mb-2">
                   Confirm Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 z-10" />
+                  <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-text-muted z-10" />
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={formData.confirmPassword || ''}
                     onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                    className={`w-full h-12 sm:h-14 pl-12 pr-12 py-3 bg-gray-800/50 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-all text-base ${
+                    className={`w-full h-12 sm:h-14 pl-12 pr-12 py-3 bg-surface-2 border rounded-inner text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 transition-all text-base ${
                       errors.confirmPassword 
-                        ? 'border-red-500 focus:ring-red-500/20' 
-                        : 'border-gray-700 focus:border-green-500 focus:ring-green-500/20'
+                        ? 'border-danger focus:ring-danger/20' 
+                        : 'border-stroke-subtle focus:border-brand-primary focus:ring-brand-primary/20'
                     }`}
                     placeholder="Confirm your password"
                     autoComplete="new-password"
@@ -264,24 +264,24 @@ export default function AuthPage() {
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors z-10 touch-manipulation p-1"
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors z-10 touch-manipulation p-1"
                     aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
                   >
                     {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
                 {errors.confirmPassword && (
-                  <p className="mt-2 text-sm text-red-400">{errors.confirmPassword}</p>
+                  <p className="mt-2 text-sm text-danger">{errors.confirmPassword}</p>
                 )}
               </div>
             )}
 
             {/* General Error */}
             {errors.general && (
-              <div className={`p-3 sm:p-4 rounded-lg ${
+              <div className={`p-3 sm:p-4 rounded-inner ${
                 errors.general.includes('Check your email') 
-                  ? 'bg-green-500/10 border border-green-500/20 text-green-400'
-                  : 'bg-red-500/10 border border-red-500/20 text-red-400'
+                  ? 'bg-brand-primary/10 border border-brand-primary/20 text-brand-primary'
+                  : 'bg-danger/10 border border-danger/20 text-danger'
               }`}>
                 <p className="text-sm">{errors.general}</p>
               </div>
@@ -291,7 +291,7 @@ export default function AuthPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full h-12 sm:h-14 bg-gradient-to-r from-green-500 to-green-400 hover:from-green-600 hover:to-green-500 text-black font-medium px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center group touch-manipulation text-base"
+              className="w-full h-12 sm:h-14 bg-brand-primary hover:bg-brand-primary/90 text-bg-base font-medium px-4 rounded-pill transition-all duration-160 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center group touch-manipulation text-base"
             >
               {isLoading ? (
                 <div className="flex items-center">
@@ -308,12 +308,12 @@ export default function AuthPage() {
           </form>
 
           {/* Footer */}
-          <div className="mt-8 pt-6 border-t border-gray-800">
-            <p className="text-center text-gray-400 text-sm">
+          <div className="mt-8 pt-6 border-t border-stroke-subtle">
+            <p className="text-center text-text-muted text-sm">
               {isLogin ? "Don't have an account? " : "Already have an account? "}
               <button
                 onClick={toggleMode}
-                className="text-green-400 hover:text-green-300 font-medium transition-colors"
+                className="text-brand-primary hover:text-brand-primary/80 font-medium transition-colors"
               >
                 {isLogin ? 'Sign up' : 'Sign in'}
               </button>
@@ -323,18 +323,18 @@ export default function AuthPage() {
 
         {/* Quick Test Links */}
         <div className="mt-8 text-center">
-          <p className="text-gray-400 text-sm mb-4">Development Tools</p>
+          <p className="text-text-muted text-sm mb-4">Development Tools</p>
           <div className="flex space-x-4 justify-center">
             <a 
               href="/api/test-ecoflow" 
               target="_blank"
-              className="text-blue-400 hover:text-blue-300 text-sm transition-colors"
+              className="text-brand-tertiary hover:text-brand-tertiary/80 text-sm transition-colors"
             >
               Test API
             </a>
             <Link 
               href="/" 
-              className="text-gray-400 hover:text-gray-300 text-sm transition-colors"
+              className="text-text-muted hover:text-text-secondary text-sm transition-colors"
             >
               Home
             </Link>

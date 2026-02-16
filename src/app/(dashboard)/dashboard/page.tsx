@@ -8,6 +8,7 @@ import { useReadingsStore } from '@/stores/readingsStore';
 import { DeviceStatusCard } from '@/components/controls';
 import CollectionStatusControl from '@/components/ReadingCollector';
 import { cn } from '@/lib/utils';
+import { Card } from '@/components/ui';
 import { ReactElement } from 'react';
 
 export default function DashboardPage() {
@@ -128,31 +129,34 @@ export default function DashboardPage() {
   }, [fetchDevices]);
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="p-4 sm:p-5">
       <div className="flex flex-col gap-6 sm:gap-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
           <div className="flex flex-col gap-1">
-            <h1 className="text-2xl sm:text-3xl font-bold text-accent-gray">
+            <h1 className="text-page-title text-text-primary font-medium">
               Dashboard
             </h1>
-            <p className="text-accent-gray opacity-70">
+            <p className="text-text-secondary text-sm">
               Monitor and control your EcoFlow devices
             </p>
           </div>
           
-          <button className="bg-accent-green hover:bg-accent-green-secondary text-black font-medium px-4 sm:px-6 py-3 rounded-lg flex items-center justify-center gap-2 transition-colors touch-manipulation">
+          <Link
+            href="/devices/add"
+            className="bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium px-4 sm:px-6 py-2.5 rounded-pill flex items-center justify-center gap-2 transition-all duration-160 ease-dashboard text-sm touch-manipulation"
+          >
             <Plus size={16} />
             <span className="sm:inline">Add Device</span>
-          </button>
+          </Link>
         </div>
 
         {/* Stats Grid */}
         <div>
-          <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-accent-green">
+          <h2 className="text-section-title font-medium mb-3 sm:mb-4 text-text-primary">
             Overview
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[18px]">
             {stats.map((stat, index) => (
               <StatCard key={index} stat={stat} />
             ))}
@@ -163,11 +167,11 @@ export default function DashboardPage() {
         {/* Devices Section */}
         <div>
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 sm:mb-4 gap-2">
-            <h2 className="text-lg sm:text-xl font-bold text-accent-green">
+            <h2 className="text-section-title font-medium text-text-primary">
               Your Devices
             </h2>
             {devices.length > 0 && (
-              <p className="text-sm text-accent-gray opacity-70">
+              <p className="text-sm text-text-secondary">
                 {devices.length} device{devices.length !== 1 ? 's' : ''} connected
               </p>
             )}
@@ -175,46 +179,49 @@ export default function DashboardPage() {
 
           {isLoading ? (
             <div className="flex flex-col justify-center items-center min-h-[30vh] sm:min-h-[40vh] gap-4">
-              <Loader2 size={48} className="text-accent-green animate-spin" />
-              <p className="text-accent-gray">Loading devices...</p>
+              <Loader2 size={48} className="text-brand-primary animate-spin" />
+              <p className="text-text-secondary">Loading devices...</p>
             </div>
           ) : error ? (
-            <div className="p-6 sm:p-8 bg-red-900 rounded-lg border border-red-600">
-              <div className="flex flex-col gap-4 items-center text-center">
-                <p className="text-red-400 text-base sm:text-lg">
+            <Card variant="default" hover={false}>
+              <div className="flex flex-col gap-4 items-center text-center p-4">
+                <p className="text-danger text-base sm:text-lg">
                   Error loading devices: {error}
                 </p>
                 <button 
                   onClick={() => fetchDevices()} 
-                  className="border border-red-400 text-red-400 hover:bg-red-400 hover:text-white px-4 py-2 rounded-md transition-colors touch-manipulation"
+                  className="border border-danger text-danger hover:bg-danger/10 px-4 py-2 rounded-pill text-sm transition-all duration-160 touch-manipulation"
                 >
                   Try Again
                 </button>
               </div>
-            </div>
+            </Card>
           ) : devices.length === 0 ? (
-            <div className="p-8 sm:p-12 bg-primary-dark rounded-lg border-2 border-dashed border-accent-green opacity-60">
+            <div className="p-8 sm:p-12 bg-surface-1 rounded-card border-2 border-dashed border-stroke-subtle">
               <div className="flex flex-col gap-4 items-center text-center">
-                <Zap size={40} className="sm:size-12 text-current" />
+                <Zap size={40} className="text-text-muted" />
                 <div className="flex flex-col gap-2 items-center">
-                  <h3 className="text-lg font-bold text-accent-gray">
+                  <h3 className="text-lg font-medium text-text-primary">
                     No devices found
                   </h3>
-                  <p className="text-accent-gray opacity-70 text-sm sm:text-base">
+                  <p className="text-text-secondary text-sm sm:text-base">
                     Connect your first EcoFlow device to start monitoring
                   </p>
                 </div>
-                <button className="bg-accent-green hover:bg-accent-green-secondary text-black font-medium px-4 sm:px-6 py-3 rounded-lg flex items-center gap-2 transition-colors touch-manipulation">
+                <Link
+                  href="/devices/add"
+                  className="bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium px-4 sm:px-6 py-2.5 rounded-pill flex items-center gap-2 text-sm transition-all duration-160 touch-manipulation"
+                >
                   <Plus size={16} />
                   Add Your First Device
-                </button>
+                </Link>
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[18px]">
               {devices.map((device) => (
                 <Link key={device.id} href={`/device/${device.id}`}>
-                  <div className="cursor-pointer transition-transform duration-200 hover:-translate-y-1 touch-manipulation">
+                  <div className="cursor-pointer touch-manipulation">
                     <DeviceStatusCard device={device} isCompact />
                   </div>
                 </Link>
@@ -236,20 +243,20 @@ interface StatItem {
 }
 
 const StatCard = ({ stat }: { stat: StatItem }) => (
-  <div className="p-4 sm:p-6 bg-primary-dark rounded-lg border border-accent-green touch-manipulation">
+  <Card hover={true} className="p-4 sm:p-5">
     <div className="flex flex-col gap-3 sm:gap-4">
       <div className="flex justify-between items-start">
-        <div className="text-accent-green">
+        <div className="text-brand-primary">
           {stat.icon}
         </div>
         <div
           className={cn(
-            "px-2 py-1 rounded-md border text-xs font-medium shrink-0",
+            "px-2 py-1 rounded-pill text-xs font-medium shrink-0",
             stat.changeType === 'positive' 
-              ? "bg-green-900 border-green-600 text-green-400" 
+              ? "bg-brand-primary/10 text-brand-primary" 
               : stat.changeType === 'negative'
-              ? "bg-red-900 border-red-600 text-red-400"
-              : "bg-gray-800 border-gray-600 text-gray-400"
+              ? "bg-danger/10 text-danger"
+              : "bg-surface-2 text-text-muted"
           )}
         >
           {stat.change}
@@ -257,13 +264,13 @@ const StatCard = ({ stat }: { stat: StatItem }) => (
       </div>
       
       <div className="flex flex-col gap-1">
-        <div className="text-xl sm:text-2xl font-bold text-accent-gray">
+        <div className="text-xl sm:text-2xl font-medium text-text-primary">
           {stat.value}
         </div>
-        <div className="text-sm text-accent-gray opacity-70">
+        <div className="text-sm text-text-secondary">
           {stat.label}
         </div>
       </div>
     </div>
-  </div>
+  </Card>
 );

@@ -33,8 +33,8 @@ export default function LogoutButton({ isMobile = false }: LogoutButtonProps) {
       disabled={isLoading}
       className={cn(
         'inline-flex items-center gap-2 text-sm font-medium',
-        'text-red-400 hover:text-red-300 hover:bg-red-500/10',
-        'rounded-md transition-colors duration-200 touch-manipulation',
+        'text-text-muted hover:text-danger hover:bg-danger/10',
+        'rounded-inner transition-colors duration-160 touch-manipulation',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         isMobile ? 'p-2' : 'px-3 py-2'
       )}

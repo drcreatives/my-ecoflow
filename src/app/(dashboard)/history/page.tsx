@@ -341,8 +341,8 @@ function HistoryPage() {
         <div className="p-6">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <Loader2 className="w-8 h-8 text-accent-green animate-spin mx-auto mb-4" />
-              <p className="text-gray-400">Loading devices...</p>
+              <Loader2 className="w-8 h-8 text-brand-primary animate-spin mx-auto mb-4" />
+              <p className="text-text-secondary">Loading devices...</p>
             </div>
           </div>
         </div>
@@ -358,16 +358,16 @@ function HistoryPage() {
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-accent-green">
+                <div className="flex items-center gap-2 text-brand-primary">
                   <BarChart3 size={28} />
-                  <h1 className="text-2xl sm:text-3xl font-bold">Historical Data</h1>
+                  <h1 className="text-page-title text-text-primary font-medium">Historical Data</h1>
                 </div>
               </div>
-              <p className="text-gray-400">
+              <p className="text-text-secondary">
                 Detailed device readings and power consumption data
               </p>
               {lastUpdated && (
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-text-muted">
                   Last updated: {lastUpdated.toLocaleString()}
                 </p>
               )}
@@ -377,10 +377,10 @@ function HistoryPage() {
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors",
+                  "flex items-center gap-2 px-4 py-2 rounded-pill border transition-all duration-160 text-sm",
                   showFilters 
-                    ? "bg-accent-green text-black border-accent-green" 
-                    : "bg-primary-dark text-gray-300 border-gray-600 hover:border-gray-500"
+                    ? "bg-brand-primary text-bg-base border-brand-primary" 
+                    : "bg-surface-2 text-text-secondary border-stroke-subtle hover:border-stroke-strong"
                 )}
               >
                 <Filter size={16} />
@@ -390,7 +390,7 @@ function HistoryPage() {
               <button
                 onClick={handleExportData}
                 disabled={isExporting || readings.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:opacity-50 text-white rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-brand-tertiary hover:bg-brand-tertiary/90 disabled:bg-surface-2 disabled:opacity-50 text-bg-base rounded-pill transition-all duration-160 text-sm"
               >
                 {isExporting ? (
                   <Loader2 size={16} className="animate-spin" />
@@ -403,7 +403,7 @@ function HistoryPage() {
               <button
                 onClick={fetchHistoryData}
                 disabled={isLoading}
-                className="flex items-center gap-2 px-4 py-2 bg-primary-dark border border-gray-600 hover:border-gray-500 text-gray-300 rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-surface-2 border border-stroke-subtle hover:border-stroke-strong text-text-secondary rounded-pill transition-all duration-160 text-sm"
               >
                 <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
                 Refresh
@@ -413,20 +413,20 @@ function HistoryPage() {
 
           {/* Filters Panel */}
           {showFilters && (
-            <div className="bg-primary-dark border border-gray-700 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Data Filters</h3>
+            <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
+              <h3 className="text-section-title font-medium text-text-primary mb-4">Data Filters</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Device Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
                     Device
                   </label>
                   <div className="relative">
                     <select
                       value={filters.deviceId}
                       onChange={(e) => setFilters(prev => ({ ...prev, deviceId: e.target.value }))}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green appearance-none pr-10"
+                      className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 appearance-none pr-10"
                     >
                       {deviceOptions.map(device => (
                         <option key={device.id} value={device.id}>
@@ -434,20 +434,20 @@ function HistoryPage() {
                         </option>
                       ))}
                     </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted w-4 h-4 pointer-events-none" />
                   </div>
                 </div>
 
                 {/* Time Range */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
                     Time Range
                   </label>
                   <div className="relative">
                     <select
                       value={filters.timeRange}
                       onChange={(e) => setFilters(prev => ({ ...prev, timeRange: e.target.value as any }))}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green appearance-none pr-10"
+                      className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 appearance-none pr-10"
                     >
                       <option value="1h">Last Hour</option>
                       <option value="6h">Last 6 Hours</option>
@@ -456,27 +456,27 @@ function HistoryPage() {
                       <option value="30d">Last 30 Days</option>
                       <option value="custom">Custom Range</option>
                     </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted w-4 h-4 pointer-events-none" />
                   </div>
                 </div>
 
                 {/* Data Aggregation */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
                     Data Points
                   </label>
                   <div className="relative">
                     <select
                       value={filters.aggregation}
                       onChange={(e) => setFilters(prev => ({ ...prev, aggregation: e.target.value as any }))}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green appearance-none pr-10"
+                      className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 appearance-none pr-10"
                     >
                       <option value="raw">Raw Data</option>
                       <option value="5m">5 Minute Average</option>
                       <option value="1h">Hourly Average</option>
                       <option value="1d">Daily Average</option>
                     </select>
-                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-muted w-4 h-4 pointer-events-none" />
                   </div>
                 </div>
               </div>
@@ -484,25 +484,25 @@ function HistoryPage() {
               {filters.timeRange === 'custom' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-text-secondary mb-2">
                       Start Date
                     </label>
                     <input
                       type="datetime-local"
                       value={filters.customStartDate || ''}
                       onChange={(e) => setFilters(prev => ({ ...prev, customStartDate: e.target.value }))}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green"
+                      className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-text-secondary mb-2">
                       End Date
                     </label>
                     <input
                       type="datetime-local"
                       value={filters.customEndDate || ''}
                       onChange={(e) => setFilters(prev => ({ ...prev, customEndDate: e.target.value }))}
-                      className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-accent-green"
+                      className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
                     />
                   </div>
                 </div>
@@ -512,70 +512,70 @@ function HistoryPage() {
 
           {/* Error Display */}
           {error && (
-            <div className="bg-red-900/20 border border-red-600 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-red-400">
+            <div className="bg-danger/5 border border-danger/15 rounded-card p-4">
+              <div className="flex items-center gap-2 text-danger">
                 <AlertTriangle size={16} />
                 <span className="font-medium">Error</span>
               </div>
-              <p className="text-red-300 mt-1">{error}</p>
+              <p className="text-danger/80 mt-1">{error}</p>
             </div>
           )}
 
           {/* Summary Cards */}
           {summary && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-primary-dark border border-blue-500/20 rounded-lg p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[18px]">
+              <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
                 <div className="flex items-center justify-between mb-2">
-                  <Activity className="w-5 h-5 text-blue-400" />
-                  <span className="text-xs text-gray-400">{summary.timeSpan || '0 hours'}</span>
+                  <Activity className="w-5 h-5 text-brand-tertiary" />
+                  <span className="text-xs text-text-muted">{summary.timeSpan || '0 hours'}</span>
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">
+                <div className="text-2xl font-medium text-text-primary mb-1">
                   {(summary.totalReadings || 0).toLocaleString()}
                 </div>
-                <div className="text-sm text-gray-400">Data Points</div>
+                <div className="text-sm text-text-secondary">Data Points</div>
               </div>
 
-              <div className="bg-primary-dark border border-green-500/20 rounded-lg p-4">
+              <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
                 <div className="flex items-center justify-between mb-2">
-                  <Battery className="w-5 h-5 text-green-400" />
-                  <span className="text-xs text-gray-400">Average</span>
+                  <Battery className="w-5 h-5 text-brand-primary" />
+                  <span className="text-xs text-text-muted">Average</span>
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">
+                <div className="text-2xl font-medium text-text-primary mb-1">
                   {formatValue(summary.avgBatteryLevel, '%')}
                 </div>
-                <div className="text-sm text-gray-400">Battery Level</div>
+                <div className="text-sm text-text-secondary">Battery Level</div>
               </div>
 
-              <div className="bg-primary-dark border border-yellow-500/20 rounded-lg p-4">
+              <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
                 <div className="flex items-center justify-between mb-2">
-                  <Zap className="w-5 h-5 text-yellow-400" />
-                  <span className="text-xs text-gray-400">Peak: {formatValue(summary.peakPowerOutput, 'W')}</span>
+                  <Zap className="w-5 h-5 text-warning" />
+                  <span className="text-xs text-text-muted">Peak: {formatValue(summary.peakPowerOutput, 'W')}</span>
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">
+                <div className="text-2xl font-medium text-text-primary mb-1">
                   {formatValue(summary.avgPowerOutput, 'W')}
                 </div>
-                <div className="text-sm text-gray-400">Avg Power Output</div>
+                <div className="text-sm text-text-secondary">Avg Power Output</div>
               </div>
 
-              <div className="bg-primary-dark border border-red-500/20 rounded-lg p-4">
+              <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
                 <div className="flex items-center justify-between mb-2">
-                  <Thermometer className="w-5 h-5 text-red-400" />
-                  <span className="text-xs text-gray-400">Max: {formatValue(summary.highestTemperature, '°C')}</span>
+                  <Thermometer className="w-5 h-5 text-danger" />
+                  <span className="text-xs text-text-muted">Max: {formatValue(summary.highestTemperature, '°C')}</span>
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">
+                <div className="text-2xl font-medium text-text-primary mb-1">
                   {formatValue(summary.avgTemperature, '°C')}
                 </div>
-                <div className="text-sm text-gray-400">Avg Temperature</div>
+                <div className="text-sm text-text-secondary">Avg Temperature</div>
               </div>
             </div>
           )}
 
           {/* Data Table Section */}
-          <div className="bg-primary-dark border border-gray-700 rounded-lg">
-            <div className="p-6 border-b border-gray-700">
+          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card">
+            <div className="p-[18px] border-b border-stroke-subtle">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-semibold text-white">Device Readings History</h3>
-                <div className="text-sm text-gray-400">
+                <h3 className="text-section-title font-medium text-text-primary">Device Readings History</h3>
+                <div className="text-sm text-text-muted">
                   Showing {getTimeRangeLabel(filters.timeRange)} • {selectedDevice?.name}
                 </div>
               </div>
@@ -584,15 +584,15 @@ function HistoryPage() {
             {isLoading ? (
               <div className="flex items-center justify-center h-64">
                 <div className="text-center">
-                  <Loader2 className="w-8 h-8 text-accent-green animate-spin mx-auto mb-4" />
-                  <p className="text-gray-400">Loading historical data...</p>
+                  <Loader2 className="w-8 h-8 text-brand-primary animate-spin mx-auto mb-4" />
+                  <p className="text-text-secondary">Loading historical data...</p>
                 </div>
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center h-64 text-center p-6">
-                <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
-                <h3 className="text-lg font-semibold text-gray-400 mb-2">Error Loading Data</h3>
-                <p className="text-gray-500 mb-4">
+                <AlertTriangle className="w-16 h-16 text-danger mb-4" />
+                <h3 className="text-lg font-medium text-text-secondary mb-2">Error Loading Data</h3>
+                <p className="text-text-muted mb-4">
                   {error}
                 </p>
                 <button
@@ -600,7 +600,7 @@ function HistoryPage() {
                     console.log('Retrying data fetch...')
                     fetchHistoryData()
                   }}
-                  className="flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 text-black font-medium py-2 px-4 rounded-lg transition-colors"
+                  className="flex items-center gap-2 bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium py-2 px-4 rounded-pill transition-all duration-160 text-sm"
                 >
                   <RefreshCw size={16} />
                   Retry
@@ -608,14 +608,14 @@ function HistoryPage() {
               </div>
             ) : readings.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-center p-6">
-                <BarChart3 className="w-16 h-16 text-gray-600 mb-4" />
-                <h3 className="text-lg font-semibold text-gray-400 mb-2">No Historical Data</h3>
-                <p className="text-gray-500 mb-4">
+                <BarChart3 className="w-16 h-16 text-text-muted mb-4" />
+                <h3 className="text-lg font-medium text-text-secondary mb-2">No Historical Data</h3>
+                <p className="text-text-muted mb-4">
                   No data available for the selected device and time range.
                 </p>
                 <Link
                   href="/devices"
-                  className="flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 text-black font-medium py-2 px-4 rounded-lg transition-colors"
+                  className="flex items-center gap-2 bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium py-2 px-4 rounded-pill transition-all duration-160 text-sm"
                 >
                   <ExternalLink size={16} />
                   Manage Devices
@@ -624,69 +624,69 @@ function HistoryPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-800/50">
+                  <thead className="bg-surface-2">
                     <tr>
-                      <th className="text-left p-4 text-sm font-medium text-gray-300">Timestamp</th>
-                      <th className="text-left p-4 text-sm font-medium text-gray-300">Device</th>
-                      <th className="text-left p-4 text-sm font-medium text-gray-300">Battery</th>
-                      <th className="text-left p-4 text-sm font-medium text-gray-300">Input Power</th>
-                      <th className="text-left p-4 text-sm font-medium text-gray-300">Output Power</th>
-                      <th className="text-left p-4 text-sm font-medium text-gray-300">AC Output</th>
-                      <th className="text-left p-4 text-sm font-medium text-gray-300">DC Output</th>
-                      <th className="text-left p-4 text-sm font-medium text-gray-300">USB Output</th>
-                      <th className="text-left p-4 text-sm font-medium text-gray-300">Temperature</th>
-                      <th className="text-left p-4 text-sm font-medium text-gray-300">Status</th>
+                      <th className="text-left p-4 text-sm font-medium text-text-secondary">Timestamp</th>
+                      <th className="text-left p-4 text-sm font-medium text-text-secondary">Device</th>
+                      <th className="text-left p-4 text-sm font-medium text-text-secondary">Battery</th>
+                      <th className="text-left p-4 text-sm font-medium text-text-secondary">Input Power</th>
+                      <th className="text-left p-4 text-sm font-medium text-text-secondary">Output Power</th>
+                      <th className="text-left p-4 text-sm font-medium text-text-secondary">AC Output</th>
+                      <th className="text-left p-4 text-sm font-medium text-text-secondary">DC Output</th>
+                      <th className="text-left p-4 text-sm font-medium text-text-secondary">USB Output</th>
+                      <th className="text-left p-4 text-sm font-medium text-text-secondary">Temperature</th>
+                      <th className="text-left p-4 text-sm font-medium text-text-secondary">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-700">
+                  <tbody className="divide-y divide-stroke-subtle">
                     {paginatedReadings.map((reading, index) => {
                       const device = devices.find(d => d.id === reading.deviceId)
                       return (
-                        <tr key={reading.id || index} className="hover:bg-gray-800/30 transition-colors">
-                          <td className="p-4 text-sm text-gray-300">
+                        <tr key={reading.id || index} className="hover:bg-surface-2/50 transition-colors">
+                          <td className="p-4 text-sm text-text-secondary">
                             {reading.recordedAt.toLocaleString()}
                           </td>
-                          <td className="p-4 text-sm text-gray-300">
+                          <td className="p-4 text-sm text-text-secondary">
                             <div className="flex flex-col">
-                              <span className="font-medium">{device?.deviceName || 'Unknown Device'}</span>
-                              <span className="text-xs text-gray-500">{device?.deviceSn || reading.deviceId}</span>
+                              <span className="font-medium text-text-primary">{device?.deviceName || 'Unknown Device'}</span>
+                              <span className="text-xs text-text-muted">{device?.deviceSn || reading.deviceId}</span>
                             </div>
                           </td>
                           <td className="p-4 text-sm">
                             <div className="flex items-center gap-2">
                               <div className={`w-2 h-2 rounded-full ${
-                                (reading.batteryLevel && typeof reading.batteryLevel === 'number' && reading.batteryLevel > 50) ? 'bg-green-400' :
-                                (reading.batteryLevel && typeof reading.batteryLevel === 'number' && reading.batteryLevel > 20) ? 'bg-yellow-400' : 'bg-red-400'
+                                (reading.batteryLevel && typeof reading.batteryLevel === 'number' && reading.batteryLevel > 50) ? 'bg-brand-primary' :
+                                (reading.batteryLevel && typeof reading.batteryLevel === 'number' && reading.batteryLevel > 20) ? 'bg-warning' : 'bg-danger'
                               }`} />
-                              <span className="text-white font-medium">
+                              <span className="text-text-primary font-medium">
                                 {reading.batteryLevel && typeof reading.batteryLevel === 'number' ? reading.batteryLevel.toFixed(1) : '0'}%
                               </span>
                             </div>
                           </td>
-                          <td className="p-4 text-sm text-purple-400 font-medium">
+                          <td className="p-4 text-sm text-brand-tertiary font-medium">
                             {reading.inputWatts && typeof reading.inputWatts === 'number' ? reading.inputWatts.toFixed(0) : '0'}W
                           </td>
-                          <td className="p-4 text-sm text-yellow-400 font-medium">
+                          <td className="p-4 text-sm text-warning font-medium">
                             {reading.outputWatts && typeof reading.outputWatts === 'number' ? reading.outputWatts.toFixed(0) : '0'}W
                           </td>
-                          <td className="p-4 text-sm text-blue-400 font-medium">
+                          <td className="p-4 text-sm text-brand-secondary font-medium">
                             {reading.acOutputWatts && typeof reading.acOutputWatts === 'number' ? reading.acOutputWatts.toFixed(0) : '0'}W
                           </td>
-                          <td className="p-4 text-sm text-orange-400 font-medium">
+                          <td className="p-4 text-sm text-warning font-medium">
                             {reading.dcOutputWatts && typeof reading.dcOutputWatts === 'number' ? reading.dcOutputWatts.toFixed(0) : '0'}W
                           </td>
-                          <td className="p-4 text-sm text-green-400 font-medium">
+                          <td className="p-4 text-sm text-success font-medium">
                             {reading.usbOutputWatts && typeof reading.usbOutputWatts === 'number' ? reading.usbOutputWatts.toFixed(0) : '0'}W
                           </td>
-                          <td className="p-4 text-sm text-red-400 font-medium">
+                          <td className="p-4 text-sm text-danger font-medium">
                             {reading.temperature && typeof reading.temperature === 'number' ? reading.temperature.toFixed(1) : '0'}°C
                           </td>
                           <td className="p-4 text-sm">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              reading.status === 'normal' ? 'bg-green-900/50 text-green-300' :
-                              reading.status === 'charging' ? 'bg-blue-900/50 text-blue-300' :
-                              reading.status === 'discharging' ? 'bg-yellow-900/50 text-yellow-300' :
-                              'bg-gray-900/50 text-gray-300'
+                            <span className={`px-2 py-1 rounded-pill text-xs font-medium ${
+                              reading.status === 'normal' ? 'bg-brand-primary/10 text-brand-primary' :
+                              reading.status === 'charging' ? 'bg-brand-tertiary/10 text-brand-tertiary' :
+                              reading.status === 'discharging' ? 'bg-warning/10 text-warning' :
+                              'bg-surface-2 text-text-muted'
                             }`}>
                               {reading.status || 'unknown'}
                             </span>
@@ -701,15 +701,15 @@ function HistoryPage() {
 
             {/* Pagination */}
             {readings.length > 0 && (
-              <div className="p-4 border-t border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="text-sm text-gray-400">
+              <div className="p-4 border-t border-stroke-subtle flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-sm text-text-muted">
                   Showing {startIndex + 1}-{Math.min(endIndex, readings.length)} of {readings.length} readings
                 </div>
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
-                    className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded border border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 py-1 bg-surface-2 hover:bg-surface-2/80 text-text-secondary rounded-pill border border-stroke-subtle text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-160"
                   >
                     Previous
                   </button>
@@ -721,11 +721,11 @@ function HistoryPage() {
                       <>
                         <button
                           onClick={() => setCurrentPage(1)}
-                          className="w-8 h-8 flex items-center justify-center text-sm text-gray-300 hover:bg-gray-700 rounded border border-gray-600 transition-colors"
+                          className="w-8 h-8 flex items-center justify-center text-sm text-text-secondary hover:bg-surface-2 rounded-pill border border-stroke-subtle transition-all duration-160"
                         >
                           1
                         </button>
-                        {currentPage > 4 && <span className="text-gray-500 px-1">...</span>}
+                        {currentPage > 4 && <span className="text-text-muted px-1">...</span>}
                       </>
                     )}
                     
@@ -738,10 +738,10 @@ function HistoryPage() {
                         <button
                           key={pageNum}
                           onClick={() => setCurrentPage(pageNum)}
-                          className={`w-8 h-8 flex items-center justify-center text-sm rounded border transition-colors ${
+                          className={`w-8 h-8 flex items-center justify-center text-sm rounded-pill border transition-all duration-160 ${
                             pageNum === currentPage
-                              ? 'bg-accent-green text-black border-accent-green'
-                              : 'text-gray-300 hover:bg-gray-700 border-gray-600'
+                              ? 'bg-brand-primary text-bg-base border-brand-primary'
+                              : 'text-text-secondary hover:bg-surface-2 border-stroke-subtle'
                           }`}
                         >
                           {pageNum}
@@ -752,10 +752,10 @@ function HistoryPage() {
                     {/* Last page */}
                     {currentPage < totalPages - 2 && (
                       <>
-                        {currentPage < totalPages - 3 && <span className="text-gray-500 px-1">...</span>}
+                        {currentPage < totalPages - 3 && <span className="text-text-muted px-1">...</span>}
                         <button
                           onClick={() => setCurrentPage(totalPages)}
-                          className="w-8 h-8 flex items-center justify-center text-sm text-gray-300 hover:bg-gray-700 rounded border border-gray-600 transition-colors"
+                          className="w-8 h-8 flex items-center justify-center text-sm text-text-secondary hover:bg-surface-2 rounded-pill border border-stroke-subtle transition-all duration-160"
                         >
                           {totalPages}
                         </button>
@@ -766,7 +766,7 @@ function HistoryPage() {
                   <button 
                     onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                     disabled={currentPage === totalPages}
-                    className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded border border-gray-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 py-1 bg-surface-2 hover:bg-surface-2/80 text-text-secondary rounded-pill border border-stroke-subtle text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-160"
                   >
                     Next
                   </button>
@@ -777,15 +777,15 @@ function HistoryPage() {
 
           {/* No Devices State */}
           {devices.length === 0 && (
-            <div className="bg-primary-dark border border-gray-700 rounded-lg p-8 text-center">
-              <Battery className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-400 mb-2">No Devices Found</h3>
-              <p className="text-gray-500 mb-6">
+            <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-8 text-center">
+              <Battery className="w-16 h-16 text-text-muted mx-auto mb-4" />
+              <h3 className="text-xl font-medium text-text-secondary mb-2">No Devices Found</h3>
+              <p className="text-text-muted mb-6">
                 You need to add and register devices before viewing historical data.
               </p>
               <Link
                 href="/devices/add"
-                className="inline-flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 text-black font-medium py-3 px-6 rounded-lg transition-colors"
+                className="inline-flex items-center gap-2 bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium py-3 px-6 rounded-pill transition-all duration-160 text-sm"
               >
                 <ExternalLink size={16} />
                 Add Your First Device

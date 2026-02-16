@@ -171,7 +171,7 @@ export default function CollectionStatusControl({
     return (
       <button
         onClick={() => setIsVisible(true)}
-        className="fixed bottom-4 right-4 bg-accent-green hover:bg-accent-green-secondary text-primary-black p-3 rounded-full shadow-lg transition-colors z-50"
+        className="fixed bottom-4 right-4 bg-brand-primary hover:bg-brand-secondary text-bg-base p-3 rounded-full shadow-card transition-colors z-50"
         title="Show Collection Status"
       >
         <Activity className="w-5 h-5" />
@@ -180,15 +180,15 @@ export default function CollectionStatusControl({
   }
 
   return (
-    <div className="fixed bottom-4 right-4 bg-primary-dark border border-accent-green/20 rounded-lg p-4 shadow-xl z-50 min-w-80">
+    <div className="fixed bottom-4 right-4 bg-surface-1 border border-stroke-subtle rounded-card p-4 shadow-card z-50 min-w-80">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-          <Activity className="w-4 h-4 text-accent-green" />
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <Activity className="w-4 h-4 text-brand-primary" />
           Collection Status
         </h3>
         <button
           onClick={() => setIsVisible(false)}
-          className="text-accent-gray hover:text-white text-sm"
+          className="text-text-muted hover:text-text-primary text-sm"
         >
           ✕
         </button>
@@ -197,52 +197,52 @@ export default function CollectionStatusControl({
       {/* Collection Status Information */}
       <div className="space-y-2 mb-4">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-accent-gray">Collection Mode:</span>
+          <span className="text-text-muted">Collection Mode:</span>
           <div className="flex items-center gap-1">
             {autoCollect ? (
               <>
-                <div className="w-2 h-2 bg-accent-green rounded-full animate-pulse" />
-                <span className="text-accent-green">Automatic</span>
+                <div className="w-2 h-2 bg-brand-primary rounded-full animate-pulse" />
+                <span className="text-brand-primary">Automatic</span>
               </>
             ) : (
               <>
-                <div className="w-2 h-2 bg-gray-500 rounded-full" />
-                <span className="text-gray-400">Manual</span>
+                <div className="w-2 h-2 bg-text-muted rounded-full" />
+                <span className="text-text-muted">Manual</span>
               </>
             )}
           </div>
         </div>
 
         <div className="flex items-center justify-between text-xs">
-          <span className="text-accent-gray">Interval:</span>
-          <span className="text-white">{status.intervalMinutes} minutes</span>
+          <span className="text-text-muted">Interval:</span>
+          <span className="text-text-primary">{status.intervalMinutes} minutes</span>
         </div>
 
         <div className="flex items-center justify-between text-xs">
-          <span className="text-accent-gray">Last Collection:</span>
-          <span className="text-white">
+          <span className="text-text-muted">Last Collection:</span>
+          <span className="text-text-primary">
             {formatTimeAgo(status.lastCollection)}
           </span>
         </div>
 
         <div className="flex items-center justify-between text-xs">
-          <span className="text-accent-gray">Next Collection:</span>
-          <span className={`${isOverdue() ? 'text-yellow-400' : 'text-white'}`}>
+          <span className="text-text-muted">Next Collection:</span>
+          <span className={`${isOverdue() ? 'text-warning' : 'text-text-primary'}`}>
             {formatTimeUntil(status.nextScheduled)}
             {isOverdue() && ' (overdue)'}
           </span>
         </div>
 
         <div className="flex items-center justify-between text-xs">
-          <span className="text-accent-gray">Success/Errors:</span>
+          <span className="text-text-muted">Success/Errors:</span>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">
-              <CheckCircle className="w-3 h-3 text-accent-green" />
-              <span className="text-accent-green">{status.successCount}</span>
+              <CheckCircle className="w-3 h-3 text-brand-primary" />
+              <span className="text-brand-primary">{status.successCount}</span>
             </div>
             <div className="flex items-center gap-1">
-              <XCircle className="w-3 h-3 text-red-400" />
-              <span className="text-red-400">{status.errorCount}</span>
+              <XCircle className="w-3 h-3 text-danger" />
+              <span className="text-danger">{status.errorCount}</span>
             </div>
           </div>
         </div>
@@ -253,7 +253,7 @@ export default function CollectionStatusControl({
         <button
           onClick={handleManualCollection}
           disabled={status.isCollecting}
-          className="flex-1 bg-accent-green hover:bg-accent-green-secondary disabled:bg-gray-600 disabled:cursor-not-allowed text-primary-black disabled:text-gray-400 px-3 py-2 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1"
+          className="flex-1 bg-brand-primary hover:bg-brand-secondary disabled:bg-surface-2 disabled:cursor-not-allowed text-bg-base disabled:text-text-muted px-3 py-2 rounded-pill text-xs font-medium transition-colors flex items-center justify-center gap-1"
         >
           {status.isCollecting ? (
             <>
@@ -270,7 +270,7 @@ export default function CollectionStatusControl({
         
         <button
           onClick={() => window.location.href = '/settings?tab=data'}
-          className="bg-primary-black hover:bg-gray-800 text-accent-gray border border-accent-gray/30 hover:border-accent-gray/50 px-3 py-2 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1"
+          className="bg-surface-2 hover:bg-surface-2/80 text-text-secondary border border-stroke-subtle px-3 py-2 rounded-pill text-xs font-medium transition-colors flex items-center justify-center gap-1"
           title="Configure collection settings"
         >
           <Settings className="w-3 h-3" />
@@ -279,13 +279,13 @@ export default function CollectionStatusControl({
 
       {/* Status Messages */}
       {autoCollect && (
-        <div className="mt-2 text-xs text-accent-gray">
+        <div className="mt-2 text-xs text-text-muted">
           ℹ️ Automated collection every {status.intervalMinutes} minutes
         </div>
       )}
       
       {isOverdue() && (
-        <div className="mt-2 text-xs text-yellow-400">
+        <div className="mt-2 text-xs text-warning">
           ⚠️ Collection is overdue - check your settings
         </div>
       )}

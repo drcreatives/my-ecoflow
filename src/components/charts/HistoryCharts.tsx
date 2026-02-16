@@ -52,8 +52,8 @@ export const transformReadingsToChartData = (readings: DeviceReading[]): ChartDa
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-lg">
-        <p className="text-gray-300 text-sm mb-2">{label}</p>
+      <div className="bg-surface-2 border border-stroke-subtle rounded-inner p-3 shadow-card">
+        <p className="text-text-muted text-sm mb-2">{label}</p>
         {payload.map((entry: any, index: number) => (
           <p key={index} className="text-sm" style={{ color: entry.color }}>
             {`${entry.name}: ${entry.value}${entry.unit || ''}`}
@@ -76,17 +76,19 @@ export const BatteryLevelChart = ({ data, height = 300 }: BatteryLevelChartProps
     <div className="w-full">
       <ResponsiveContainer width="100%" height={height}>
         <AreaChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#242624" />
           <XAxis 
             dataKey="formattedTime" 
-            stroke="#9CA3AF"
-            fontSize={12}
+            stroke="rgba(255,255,255,0.45)"
+            fontSize={11}
             tickLine={false}
+            axisLine={false}
           />
           <YAxis 
-            stroke="#9CA3AF"
-            fontSize={12}
+            stroke="rgba(255,255,255,0.45)"
+            fontSize={11}
             tickLine={false}
+            axisLine={false}
             domain={[0, 100]}
             tickFormatter={(value) => `${value}%`}
           />
@@ -97,8 +99,8 @@ export const BatteryLevelChart = ({ data, height = 300 }: BatteryLevelChartProps
           <Area
             type="monotone"
             dataKey="batteryLevel"
-            stroke="#10B981"
-            fill="#10B981"
+            stroke="#44af21"
+            fill="#44af21"
             fillOpacity={0.3}
             strokeWidth={2}
           />
@@ -122,17 +124,19 @@ export const PowerUsageChart = ({ data, height = 300, showBreakdown = false }: P
       <div className="w-full">
         <ResponsiveContainer width="100%" height={height}>
           <ComposedChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#242624" />
             <XAxis 
               dataKey="formattedTime" 
-              stroke="#9CA3AF"
-              fontSize={12}
+              stroke="rgba(255,255,255,0.45)"
+              fontSize={11}
               tickLine={false}
+              axisLine={false}
             />
             <YAxis 
-              stroke="#9CA3AF"
-              fontSize={12}
+              stroke="rgba(255,255,255,0.45)"
+              fontSize={11}
               tickLine={false}
+              axisLine={false}
               tickFormatter={(value) => `${value}W`}
             />
             <Tooltip 
@@ -152,7 +156,7 @@ export const PowerUsageChart = ({ data, height = 300, showBreakdown = false }: P
             <Line
               type="monotone"
               dataKey="inputWatts"
-              stroke="#8B5CF6"
+              stroke="#3a6fe3"
               strokeWidth={2}
               dot={false}
               name="Input Power"
@@ -163,8 +167,8 @@ export const PowerUsageChart = ({ data, height = 300, showBreakdown = false }: P
               type="monotone"
               dataKey="acOutputWatts"
               stackId="1"
-              stroke="#3B82F6"
-              fill="#3B82F6"
+              stroke="#00c356"
+              fill="#00c356"
               fillOpacity={0.6}
               name="AC Output"
             />
@@ -172,8 +176,8 @@ export const PowerUsageChart = ({ data, height = 300, showBreakdown = false }: P
               type="monotone"
               dataKey="dcOutputWatts"
               stackId="1"
-              stroke="#F59E0B"
-              fill="#F59E0B"
+              stroke="#ffa500"
+              fill="#ffa500"
               fillOpacity={0.6}
               name="DC Output"
             />
@@ -181,8 +185,8 @@ export const PowerUsageChart = ({ data, height = 300, showBreakdown = false }: P
               type="monotone"
               dataKey="usbOutputWatts"
               stackId="1"
-              stroke="#10B981"
-              fill="#10B981"
+              stroke="#00e16e"
+              fill="#00e16e"
               fillOpacity={0.6}
               name="USB Output"
             />
@@ -197,17 +201,19 @@ export const PowerUsageChart = ({ data, height = 300, showBreakdown = false }: P
     <div className="w-full">
       <ResponsiveContainer width="100%" height={height}>
         <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#242624" />
           <XAxis 
             dataKey="formattedTime" 
-            stroke="#9CA3AF"
-            fontSize={12}
+            stroke="rgba(255,255,255,0.45)"
+            fontSize={11}
             tickLine={false}
+            axisLine={false}
           />
           <YAxis 
-            stroke="#9CA3AF"
-            fontSize={12}
+            stroke="rgba(255,255,255,0.45)"
+            fontSize={11}
             tickLine={false}
+            axisLine={false}
             tickFormatter={(value) => `${value}W`}
           />
           <Tooltip 
@@ -223,7 +229,7 @@ export const PowerUsageChart = ({ data, height = 300, showBreakdown = false }: P
           <Line
             type="monotone"
             dataKey="inputWatts"
-            stroke="#8B5CF6"
+            stroke="#3a6fe3"
             strokeWidth={2}
             dot={false}
             name="Input Power"
@@ -231,7 +237,7 @@ export const PowerUsageChart = ({ data, height = 300, showBreakdown = false }: P
           <Line
             type="monotone"
             dataKey="outputWatts"
-            stroke="#F59E0B"
+            stroke="#ffa500"
             strokeWidth={2}
             dot={false}
             name="Output Power"
@@ -253,17 +259,19 @@ export const TemperatureChart = ({ data, height = 300 }: TemperatureChartProps) 
     <div className="w-full">
       <ResponsiveContainer width="100%" height={height}>
         <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#242624" />
           <XAxis 
             dataKey="formattedTime" 
-            stroke="#9CA3AF"
-            fontSize={12}
+            stroke="rgba(255,255,255,0.45)"
+            fontSize={11}
             tickLine={false}
+            axisLine={false}
           />
           <YAxis 
-            stroke="#9CA3AF"
-            fontSize={12}
+            stroke="rgba(255,255,255,0.45)"
+            fontSize={11}
             tickLine={false}
+            axisLine={false}
             tickFormatter={(value) => `${value}°C`}
           />
           <Tooltip 
@@ -273,7 +281,7 @@ export const TemperatureChart = ({ data, height = 300 }: TemperatureChartProps) 
           <Line
             type="monotone"
             dataKey="temperature"
-            stroke="#EF4444"
+            stroke="#ff4444"
             strokeWidth={2}
             dot={false}
           />
@@ -294,17 +302,19 @@ export const PowerFlowChart = ({ data, height = 300 }: PowerFlowChartProps) => {
     <div className="w-full">
       <ResponsiveContainer width="100%" height={height}>
         <AreaChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#242624" />
           <XAxis 
             dataKey="formattedTime" 
-            stroke="#9CA3AF"
-            fontSize={12}
+            stroke="rgba(255,255,255,0.45)"
+            fontSize={11}
             tickLine={false}
+            axisLine={false}
           />
           <YAxis 
-            stroke="#9CA3AF"
-            fontSize={12}
+            stroke="rgba(255,255,255,0.45)"
+            fontSize={11}
             tickLine={false}
+            axisLine={false}
             tickFormatter={(value) => `${value}W`}
           />
           <Tooltip 
@@ -319,16 +329,16 @@ export const PowerFlowChart = ({ data, height = 300 }: PowerFlowChartProps) => {
           <Area
             type="monotone"
             dataKey="inputWatts"
-            stroke="#8B5CF6"
-            fill="#8B5CF6"
+            stroke="#3a6fe3"
+            fill="#3a6fe3"
             fillOpacity={0.3}
             name="Input Power"
           />
           <Area
             type="monotone"
             dataKey="totalOutput"
-            stroke="#F59E0B"
-            fill="#F59E0B"
+            stroke="#ffa500"
+            fill="#ffa500"
             fillOpacity={0.3}
             name="Total Output"
           />
@@ -357,17 +367,19 @@ export const EfficiencyChart = ({ data, height = 300 }: EfficiencyChartProps) =>
     <div className="w-full">
       <ResponsiveContainer width="100%" height={height}>
         <AreaChart data={dataWithEfficiency} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#242624" />
           <XAxis 
             dataKey="formattedTime" 
-            stroke="#9CA3AF"
-            fontSize={12}
+            stroke="rgba(255,255,255,0.45)"
+            fontSize={11}
             tickLine={false}
+            axisLine={false}
           />
           <YAxis 
-            stroke="#9CA3AF"
-            fontSize={12}
+            stroke="rgba(255,255,255,0.45)"
+            fontSize={11}
             tickLine={false}
+            axisLine={false}
             domain={[0, 100]}
             tickFormatter={(value) => `${value}%`}
           />
@@ -378,8 +390,8 @@ export const EfficiencyChart = ({ data, height = 300 }: EfficiencyChartProps) =>
           <Area
             type="monotone"
             dataKey="efficiency"
-            stroke="#06B6D4"
-            fill="#06B6D4"
+            stroke="#3a6fe3"
+            fill="#3a6fe3"
             fillOpacity={0.3}
           />
         </AreaChart>
@@ -428,10 +440,10 @@ export const CombinedChart = ({ data, height = 400, defaultChart = 'power' }: Co
           <button
             key={tab.id}
             onClick={() => setActiveChart(tab.id as any)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 px-3 py-2 rounded-pill text-sm font-medium transition-colors ${
               activeChart === tab.id
-                ? 'bg-accent-green text-black'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                ? 'bg-brand-primary text-bg-base'
+                : 'bg-surface-2 text-text-secondary hover:bg-surface-2/80'
             }`}
           >
             <span>{tab.icon}</span>

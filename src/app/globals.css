@@ -1,16 +1,30 @@
 @import "tailwindcss";
+@config "../../tailwind.config.ts";
 
 :root {
-  --font-inter: 'Inter', system-ui, sans-serif;
+  --font-neue-montreal: 'Neue Montreal', 'Inter', 'SF Pro Text', 'Segoe UI', 'Roboto', system-ui, sans-serif;
+
+  /* ── Design-system CSS custom properties ── */
+  --bg: #151615;
+  --surface-1: #1f201f;
+  --surface-2: #242624;
+  --stroke-subtle: rgba(255,255,255,0.08);
+  --stroke-strong: rgba(255,255,255,0.14);
+  --text-primary: rgba(255,255,255,0.92);
+  --text-secondary: rgba(255,255,255,0.62);
+  --text-muted: rgba(255,255,255,0.45);
+  --brand-primary: #44af21;
+  --brand-secondary: #00c356;
+  --brand-tertiary: #3a6fe3;
 }
 
 /* Dark theme only - matching our design system */
 html,
 body {
-  background: #000000; /* primary.black */
-  color: #ebebeb; /* accent.gray */
-  font-family: var(--font-inter);
-  font-feature-settings: 'cv11', 'ss01';
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-neue-montreal);
+  font-feature-settings: 'cv11', 'ss01', 'tnum', 'lnum';
   font-variation-settings: 'opsz' 32;
   min-height: 100vh;
   /* Mobile optimizations */
@@ -63,25 +77,41 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #2b2b2b;
+  background: #1f201f;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #404040;
+  background: #333533;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #525252;
+  background: #444644;
 }
 
-/* Custom utilities for EcoFlow theme */
-.ecoflow-gradient {
-  background: linear-gradient(135deg, #44af21 0%, #00c356 50%, #00e16e 100%);
+/* ── Utility classes for new design system ── */
+.card-surface {
+  background: var(--surface-1);
+  border: 1px solid var(--stroke-subtle);
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  padding: 18px;
 }
 
-.ecoflow-glow {
-  box-shadow: 0 0 20px rgba(68, 175, 33, 0.3);
+.pill-button {
+  border-radius: 999px;
+  border: 1px solid var(--stroke-strong);
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.metric-text {
+  font-size: 2.75rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-weight: 500;
 }
 
 /* Animation utilities */
@@ -98,15 +128,10 @@ body {
   }
 }
 
-/* Focus styles */
-.focus-green:focus {
-  outline: 2px solid #44af21;
+/* Global focus-visible ring */
+*:focus-visible {
+  outline: 2px solid rgba(68, 175, 33, 0.4);
   outline-offset: 2px;
-}
-
-/* High contrast text for accessibility */
-.text-high-contrast {
-  color: #ffffff;
 }
 
 /* Status indicator colors */
@@ -132,8 +157,4 @@ body {
 
 .status-warning {
   color: #ffa500;
-}
-
-.bg-accent-green {
-  background-color: #44af21;
 }

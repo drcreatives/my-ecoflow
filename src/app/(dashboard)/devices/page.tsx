@@ -59,16 +59,16 @@ const DevicesPage = () => {
   });
 
   const getStatusColor = (online: boolean, batteryLevel?: number) => {
-    if (!online) return "text-red-400";
-    if (batteryLevel && batteryLevel < 20) return "text-yellow-400";
-    return "text-accent-green";
+    if (!online) return "text-danger";
+    if (batteryLevel && batteryLevel < 20) return "text-warning";
+    return "text-brand-primary";
   };
 
   const getStatusIcon = (online: boolean, batteryLevel?: number) => {
-    if (!online) return <WifiOff size={16} className="text-red-400" />;
+    if (!online) return <WifiOff size={16} className="text-danger" />;
     if (batteryLevel && batteryLevel < 20)
-      return <AlertTriangle size={16} className="text-yellow-400" />;
-    return <Wifi size={16} className="text-accent-green" />;
+      return <AlertTriangle size={16} className="text-warning" />;
+    return <Wifi size={16} className="text-brand-primary" />;
   };
 
   const getStatusText = (
@@ -89,18 +89,18 @@ const DevicesPage = () => {
     const remainingTime = device.currentReading?.remainingTime;
 
     return (
-      <div className="bg-primary-dark rounded-lg border border-gray-800 hover:border-accent-green transition-all duration-200 group">
-        <div className="p-6">
+      <div className="bg-surface-1 rounded-card border border-stroke-subtle shadow-card hover:shadow-card-hover hover:border-stroke-strong transition-all duration-160 ease-dashboard group">
+        <div className="p-[18px]">
           {/* Header */}
           <div className="flex justify-between items-start mb-4">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <h3 className="text-lg font-semibold text-accent-gray group-hover:text-white transition-colors">
+                <h3 className="text-lg font-medium text-text-primary group-hover:text-white transition-colors">
                   {device.deviceName}
                 </h3>
                 {getStatusIcon(device.online, batteryLevel)}
               </div>
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-text-secondary">
                 {device.deviceSn} • {device.deviceType || "DELTA 2"}
               </p>
               <p
@@ -112,8 +112,8 @@ const DevicesPage = () => {
                 {getStatusText(device.online, batteryLevel, device.status)}
               </p>
             </div>
-            <button className="p-2 hover:bg-gray-800 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
-              <MoreVertical size={16} className="text-gray-400" />
+            <button className="p-2 hover:bg-surface-2 rounded-inner transition-all duration-160 opacity-0 group-hover:opacity-100">
+              <MoreVertical size={16} className="text-icon" />
             </button>
           </div>
 
@@ -125,12 +125,12 @@ const DevicesPage = () => {
                 <Battery
                   size={16}
                   className={cn(
-                    batteryLevel > 20 ? "text-accent-green" : "text-yellow-400"
+                    batteryLevel > 20 ? "text-brand-primary" : "text-warning"
                   )}
                 />
                 <div>
-                  <p className="text-xs text-gray-400">Battery</p>
-                  <p className="text-sm font-semibold text-white">
+                  <p className="text-xs text-text-muted">Battery</p>
+                  <p className="text-sm font-medium text-text-primary">
                     {batteryLevel}%
                   </p>
                 </div>
@@ -138,10 +138,10 @@ const DevicesPage = () => {
 
               {/* Input Power */}
               <div className="flex items-center gap-2">
-                <Zap size={16} className="text-blue-400" />
+                <Zap size={16} className="text-brand-tertiary" />
                 <div>
-                  <p className="text-xs text-gray-400">Input</p>
-                  <p className="text-sm font-semibold text-white">
+                  <p className="text-xs text-text-muted">Input</p>
+                  <p className="text-sm font-medium text-text-primary">
                     {inputWatts}W
                   </p>
                 </div>
@@ -149,10 +149,10 @@ const DevicesPage = () => {
 
               {/* Output Power */}
               <div className="flex items-center gap-2">
-                <Power size={16} className="text-accent-green" />
+                <Power size={16} className="text-brand-primary" />
                 <div>
-                  <p className="text-xs text-gray-400">Output</p>
-                  <p className="text-sm font-semibold text-white">
+                  <p className="text-xs text-text-muted">Output</p>
+                  <p className="text-sm font-medium text-text-primary">
                     {outputWatts}W
                   </p>
                 </div>
@@ -160,10 +160,10 @@ const DevicesPage = () => {
 
               {/* Temperature */}
               <div className="flex items-center gap-2">
-                <Thermometer size={16} className="text-orange-400" />
+                <Thermometer size={16} className="text-warning" />
                 <div>
-                  <p className="text-xs text-gray-400">Temp</p>
-                  <p className="text-sm font-semibold text-white">
+                  <p className="text-xs text-text-muted">Temp</p>
+                  <p className="text-sm font-medium text-text-primary">
                     {temperature}°C
                   </p>
                 </div>
@@ -173,11 +173,11 @@ const DevicesPage = () => {
 
           {/* Runtime */}
           {device.online && remainingTime && (
-            <div className="flex items-center gap-2 mb-4 p-3 bg-gray-900 rounded-md">
-              <Clock size={16} className="text-accent-green" />
+            <div className="flex items-center gap-2 mb-4 p-3 bg-surface-2 rounded-inner">
+              <Clock size={16} className="text-brand-primary" />
               <div>
-                <p className="text-xs text-gray-400">Estimated Runtime</p>
-                <p className="text-sm font-semibold text-white">
+                <p className="text-xs text-text-muted">Estimated Runtime</p>
+                <p className="text-sm font-medium text-text-primary">
                   {formatRemainingTime(remainingTime)}
                 </p>
               </div>
@@ -186,11 +186,11 @@ const DevicesPage = () => {
 
           {/* Offline State */}
           {!device.online && (
-            <div className="flex items-center gap-2 mb-4 p-3 bg-red-900/20 border border-red-900/30 rounded-md">
-              <WifiOff size={16} className="text-red-400" />
+            <div className="flex items-center gap-2 mb-4 p-3 bg-danger/5 border border-danger/15 rounded-inner">
+              <WifiOff size={16} className="text-danger" />
               <div>
-                <p className="text-sm text-red-400">Device is offline</p>
-                <p className="text-xs text-gray-400">Last seen: Unknown</p>
+                <p className="text-sm text-danger">Device is offline</p>
+                <p className="text-xs text-text-muted">Last seen: Unknown</p>
               </div>
             </div>
           )}
@@ -199,7 +199,7 @@ const DevicesPage = () => {
           <div className="flex gap-3">
             <Link
               href={`/device/${device.id}`}
-              className="flex-1 bg-accent-green hover:bg-accent-green/90 text-black font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 group"
+              className="flex-1 bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium py-2 px-4 rounded-pill transition-all duration-160 flex items-center justify-center gap-2 text-sm group"
             >
               View Details
               <ArrowRight
@@ -207,8 +207,8 @@ const DevicesPage = () => {
                 className="group-hover:translate-x-1 transition-transform"
               />
             </Link>
-            <Link href={`/device/${device.id}/settings`} className="flex items-center p-2 border border-gray-700 hover:border-gray-600 rounded-lg transition-colors">
-              <Settings size={16} className="text-gray-400" />
+            <Link href={`/device/${device.id}/settings`} className="flex items-center p-2 border border-stroke-subtle hover:border-stroke-strong rounded-inner transition-all duration-160">
+              <Settings size={16} className="text-icon" />
             </Link>
           </div>
         </div>
@@ -218,27 +218,24 @@ const DevicesPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-primary-black text-accent-gray">
-        <div className="container mx-auto px-4 py-8">
+      <div className="p-4 sm:p-6">
           <div className="flex items-center justify-center h-64">
             <div className="flex flex-col items-center gap-4">
-              <Loader2 size={32} className="animate-spin text-accent-green" />
-              <p className="text-gray-400">Loading devices...</p>
+              <Loader2 size={32} className="animate-spin text-brand-primary" />
+              <p className="text-text-secondary">Loading devices...</p>
             </div>
           </div>
-        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-primary-black text-accent-gray">
-      <div className="container mx-auto px-4 py-8">
+    <div className="p-4 sm:p-6">
         {/* Header */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">My Devices</h1>
-            <p className="text-gray-400">
+            <h1 className="text-page-title font-medium text-text-primary mb-2">My Devices</h1>
+            <p className="text-text-secondary">
               Manage and monitor your EcoFlow devices
             </p>
           </div>
@@ -246,7 +243,7 @@ const DevicesPage = () => {
           <div className="flex gap-3">
             <Link
               href="/devices/add"
-              className="bg-accent-green hover:bg-accent-green/90 text-black font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+              className="bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium py-2 px-4 rounded-pill transition-all duration-160 flex items-center gap-2 text-sm"
             >
               <Plus size={16} />
               Add Device
@@ -260,24 +257,24 @@ const DevicesPage = () => {
           <div className="relative flex-1">
             <Search
               size={20}
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-muted"
             />
             <input
               type="text"
               placeholder="Search devices..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-primary-dark border border-gray-700 rounded-lg focus:border-accent-green focus:outline-none text-white placeholder-gray-400"
+              className="w-full pl-10 pr-4 py-2 bg-surface-2 border border-stroke-subtle rounded-inner focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 focus:outline-none text-text-primary placeholder-text-muted"
             />
           </div>
 
           {/* Status Filter */}
           <div className="relative">
             <div className="flex items-center gap-2">
-              <Filter size={16} className="text-gray-400" />
+              <Filter size={16} className="text-text-muted" />
               <button
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className="bg-primary-dark border border-gray-700 rounded-lg px-3 py-2 text-white focus:border-accent-green focus:outline-none hover:border-gray-600 transition-colors flex items-center gap-2 min-w-[140px] justify-between"
+                className="bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:border-brand-primary focus:outline-none hover:border-stroke-strong transition-all duration-160 flex items-center gap-2 min-w-[140px] justify-between"
               >
                 <span>
                   {filterStatus === "all" && "All Devices"}
@@ -287,7 +284,7 @@ const DevicesPage = () => {
                 <ChevronDown
                   size={16}
                   className={cn(
-                    "text-gray-400 transition-transform",
+                    "text-text-muted transition-transform",
                     isFilterOpen && "rotate-180"
                   )}
                 />
@@ -303,16 +300,16 @@ const DevicesPage = () => {
                   onClick={() => setIsFilterOpen(false)}
                 />
                 {/* Dropdown Menu */}
-                <div className="absolute top-full left-6 mt-1 w-40 bg-primary-dark border border-gray-700 rounded-lg shadow-lg z-20 overflow-hidden">
+                <div className="absolute top-full left-6 mt-1 w-40 bg-surface-2 border border-stroke-subtle rounded-inner shadow-card z-20 overflow-hidden">
                   <button
                     onClick={() => {
                       setFilterStatus("all");
                       setIsFilterOpen(false);
                     }}
                     className={cn(
-                      "w-full px-3 py-2 text-left text-white hover:bg-gray-800 transition-colors",
+                      "w-full px-3 py-2 text-left text-text-primary hover:bg-surface-1 transition-all duration-160",
                       filterStatus === "all" &&
-                        "bg-accent-green/20 text-accent-green"
+                        "bg-brand-primary/10 text-brand-primary"
                     )}
                   >
                     All Devices
@@ -323,9 +320,9 @@ const DevicesPage = () => {
                       setIsFilterOpen(false);
                     }}
                     className={cn(
-                      "w-full px-3 py-2 text-left text-white hover:bg-gray-800 transition-colors",
+                      "w-full px-3 py-2 text-left text-text-primary hover:bg-surface-1 transition-all duration-160",
                       filterStatus === "online" &&
-                        "bg-accent-green/20 text-accent-green"
+                        "bg-brand-primary/10 text-brand-primary"
                     )}
                   >
                     Online Only
@@ -336,9 +333,9 @@ const DevicesPage = () => {
                       setIsFilterOpen(false);
                     }}
                     className={cn(
-                      "w-full px-3 py-2 text-left text-white hover:bg-gray-800 transition-colors",
+                      "w-full px-3 py-2 text-left text-text-primary hover:bg-surface-1 transition-all duration-160",
                       filterStatus === "offline" &&
-                        "bg-accent-green/20 text-accent-green"
+                        "bg-brand-primary/10 text-brand-primary"
                     )}
                   >
                     Offline Only
@@ -350,37 +347,37 @@ const DevicesPage = () => {
         </div>
 
         {/* Stats Summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-primary-dark rounded-lg border border-gray-800 p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-[18px] mb-8">
+          <div className="bg-surface-1 rounded-card border border-stroke-subtle shadow-card p-4">
             <div className="flex items-center gap-3">
-              <CheckCircle size={20} className="text-accent-green" />
+              <CheckCircle size={20} className="text-brand-primary" />
               <div>
-                <p className="text-xs text-gray-400">Total Devices</p>
-                <p className="text-lg font-semibold text-white">
+                <p className="text-xs text-text-muted">Total Devices</p>
+                <p className="text-lg font-medium text-text-primary">
                   {devices.length}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-primary-dark rounded-lg border border-gray-800 p-4">
+          <div className="bg-surface-1 rounded-card border border-stroke-subtle shadow-card p-4">
             <div className="flex items-center gap-3">
-              <Wifi size={20} className="text-accent-green" />
+              <Wifi size={20} className="text-brand-primary" />
               <div>
-                <p className="text-xs text-gray-400">Online</p>
-                <p className="text-lg font-semibold text-white">
+                <p className="text-xs text-text-muted">Online</p>
+                <p className="text-lg font-medium text-text-primary">
                   {devices.filter((d) => d.online).length}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-primary-dark rounded-lg border border-gray-800 p-4">
+          <div className="bg-surface-1 rounded-card border border-stroke-subtle shadow-card p-4">
             <div className="flex items-center gap-3">
-              <WifiOff size={20} className="text-red-400" />
+              <WifiOff size={20} className="text-danger" />
               <div>
-                <p className="text-xs text-gray-400">Offline</p>
-                <p className="text-lg font-semibold text-white">
+                <p className="text-xs text-text-muted">Offline</p>
+                <p className="text-lg font-medium text-text-primary">
                   {devices.filter((d) => !d.online).length}
                 </p>
               </div>
@@ -390,15 +387,15 @@ const DevicesPage = () => {
 
         {/* Error State */}
         {error && (
-          <div className="bg-red-900/20 border border-red-900/30 rounded-lg p-4 mb-6">
+          <div className="bg-danger/5 border border-danger/15 rounded-card p-4 mb-6">
             <div className="flex items-center gap-2">
-              <XCircle size={20} className="text-red-400" />
-              <p className="text-red-400 font-medium">Error loading devices</p>
+              <XCircle size={20} className="text-danger" />
+              <p className="text-danger font-medium">Error loading devices</p>
             </div>
-            <p className="text-gray-400 text-sm mt-1">{error}</p>
+            <p className="text-text-secondary text-sm mt-1">{error}</p>
             <button
               onClick={fetchDevices}
-              className="mt-3 text-accent-green hover:text-accent-green/80 text-sm font-medium transition-colors"
+              className="mt-3 text-brand-primary hover:text-brand-secondary text-sm font-medium transition-all duration-160"
             >
               Try again
             </button>
@@ -409,7 +406,7 @@ const DevicesPage = () => {
         {!error && (
           <>
             {filteredDevices.length > 0 ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[18px]">
                 {filteredDevices.map((device) => (
                   <DeviceCard key={device.id} device={device} />
                 ))}
@@ -417,22 +414,22 @@ const DevicesPage = () => {
                 {/* Add Device Card */}
                 <Link
                   href="/devices/add"
-                  className="bg-primary-dark rounded-lg border-2 border-dashed border-gray-700 hover:border-accent-green transition-all duration-200 group"
+                  className="bg-surface-1 rounded-card border-2 border-dashed border-stroke-subtle hover:border-brand-primary/40 transition-all duration-160 ease-dashboard group"
                 >
-                  <div className="p-6 h-full flex flex-col items-center justify-center text-center min-h-[300px]">
-                    <div className="w-16 h-16 bg-gray-800 group-hover:bg-accent-green/20 rounded-full flex items-center justify-center mb-4 transition-colors">
+                  <div className="p-[18px] h-full flex flex-col items-center justify-center text-center min-h-[300px]">
+                    <div className="w-16 h-16 bg-surface-2 group-hover:bg-brand-primary/10 rounded-full flex items-center justify-center mb-4 transition-all duration-160">
                       <Plus
                         size={32}
-                        className="text-gray-400 group-hover:text-accent-green transition-colors"
+                        className="text-text-muted group-hover:text-brand-primary transition-colors"
                       />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-400 group-hover:text-white transition-colors mb-2">
+                    <h3 className="text-lg font-medium text-text-secondary group-hover:text-text-primary transition-colors mb-2">
                       Add Another Device
                     </h3>
-                    <p className="text-sm text-gray-500 group-hover:text-gray-300 transition-colors mb-4">
+                    <p className="text-sm text-text-muted group-hover:text-text-secondary transition-colors mb-4">
                       Connect more EcoFlow devices to your dashboard
                     </p>
-                    <div className="bg-accent-green hover:bg-accent-green/90 text-black font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2">
+                    <div className="bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium py-2 px-4 rounded-pill transition-all duration-160 flex items-center gap-2 text-sm">
                       <Plus size={16} />
                       Add Device
                     </div>
@@ -443,11 +440,11 @@ const DevicesPage = () => {
               <div className="text-center py-12">
                 {searchTerm || filterStatus !== "all" ? (
                   <div>
-                    <Search size={48} className="mx-auto text-gray-600 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-400 mb-2">
+                    <Search size={48} className="mx-auto text-text-muted mb-4" />
+                    <h3 className="text-lg font-medium text-text-secondary mb-2">
                       No devices found
                     </h3>
-                    <p className="text-gray-500">
+                    <p className="text-text-muted">
                       Try adjusting your search terms or filters
                     </p>
                     <button
@@ -455,23 +452,23 @@ const DevicesPage = () => {
                         setSearchTerm("");
                         setFilterStatus("all");
                       }}
-                      className="mt-4 text-accent-green hover:text-accent-green/80 font-medium transition-colors"
+                      className="mt-4 text-brand-primary hover:text-brand-secondary font-medium transition-all duration-160"
                     >
                       Clear filters
                     </button>
                   </div>
                 ) : (
                   <div>
-                    <Power size={48} className="mx-auto text-gray-600 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-400 mb-2">
+                    <Power size={48} className="mx-auto text-text-muted mb-4" />
+                    <h3 className="text-lg font-medium text-text-secondary mb-2">
                       No devices yet
                     </h3>
-                    <p className="text-gray-500 mb-6">
+                    <p className="text-text-muted mb-6">
                       Add your first EcoFlow device to get started
                     </p>
                     <Link
                       href="/devices/add"
-                      className="inline-flex items-center gap-2 bg-accent-green hover:bg-accent-green/90 text-black font-medium py-2 px-6 rounded-lg transition-colors"
+                      className="inline-flex items-center gap-2 bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium py-2 px-6 rounded-pill transition-all duration-160 text-sm"
                     >
                       <Plus size={16} />
                       Add Your First Device
@@ -486,15 +483,11 @@ const DevicesPage = () => {
         {/* Floating Action Button */}
         <Link
           href="/devices/add"
-          className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-accent-green hover:bg-accent-green/90 text-black rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center group"
+          className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-brand-primary hover:bg-brand-secondary text-bg-base rounded-full shadow-card hover:shadow-card-hover transition-all duration-160 ease-dashboard flex items-center justify-center"
           title="Add Device"
         >
-          <Plus
-            size={24}
-            className="group-hover:scale-110 transition-transform"
-          />
+          <Plus size={24} />
         </Link>
-      </div>
     </div>
   );
 };

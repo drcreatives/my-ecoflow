@@ -55,12 +55,16 @@ This is a full-stack Next.js dashboard for monitoring EcoFlow Delta 2 power stat
 ## Tech Stack & Architecture
 
 ### Core Technologies
-- **Framework**: Next.js 15.5.3 with App Router and Turbopack
-- **Styling**: Tailwind CSS + Chakra UI v2 (dark theme only)
+- **Framework**: Next.js 15.5.x with App Router and Turbopack
+- **UI**: React 19
+- **Styling**: Tailwind CSS v4 (dark theme only)
 - **State Management**: Zustand
 - **Forms**: Formik + Yup validation
-- **Animations**: GSAP
+- **Animations**: GSAP + Framer Motion (simple transitions)
+- **Charts**: Recharts
 - **Icons**: Lucide React
+- **Notifications**: Sonner
+- **Email**: Resend + React Email
 - **Database**: Supabase (PostgreSQL) with direct pg library connection (Prisma ORM bypassed for production stability)
 - **Authentication**: Supabase Auth (fully implemented)
 - **API Integration**: EcoFlow API (fully working)
@@ -68,6 +72,7 @@ This is a full-stack Next.js dashboard for monitoring EcoFlow Delta 2 power stat
 
 ### Current Project Structure
 ```
+middleware.ts                      # Supabase auth session refresh + route protection ✅
 src/
 ├── app/                           # Next.js App Router pages
 │   ├── (dashboard)/              # SPA Route Group with persistent layout ✅
@@ -84,56 +89,106 @@ src/
 │       ├── auth/                 # Authentication endpoints ✅
 │       ├── devices/              # Device management APIs ✅
 │       │   ├── route.ts         # Device CRUD operations ✅
-│       │   ├── discover/        # EcoFlow device discovery ✅
-│       │   ├── register/        # Device registration ✅
-│       │   └── collect-readings/ # Reading collection (partial) ⚠️
+│       │   ├── collect-readings/ # Reading collection (interval-aware) ✅
+│       │   ├── latest-readings/  # Fetch latest readings per device ✅
+│       │   ├── monitor/          # Live device monitoring ✅
+│       │   └── [deviceId]/       # Single-device operations ✅
+│       ├── cron/                 # Cron-triggered background jobs ✅
+│       │   └── collect-readings/ # Scheduled reading collection ✅
+│       ├── history/              # Historical data queries ✅
+│       ├── readings/             # Reading management ✅
+│       ├── register-device/      # Device registration ✅
+│       ├── unregister-device/    # Device removal ✅
+│       ├── monitor-readings/     # Reading monitor endpoint ✅
+│       ├── email/                # Email sending ✅
+│       ├── user/                 # User management ✅
+│       ├── logout/               # Logout endpoint ✅
 │       └── test-*/               # Comprehensive testing suite ✅
 ├── components/                    # Reusable UI components
-│   ├── ui/                       # Base UI components
-│   ├── forms/                    # Form components
-│   ├── charts/                   # Chart components
-│   ├── layout/                   # Layout components with logout ✅
+│   ├── charts/                   # Chart components (HistoryCharts) ✅
+│   ├── controls/                 # Device control panel & status card ✅
+│   ├── layout/                   # AppLayout, Header, Sidebar ✅
 │   ├── AuthWrapper.tsx           # Route protection with state persistence ✅
-│   └── LogoutButton.tsx          # Auth controls ✅
+│   ├── LogoutButton.tsx          # Auth controls ✅
+│   ├── ReadingCollector.tsx      # Client-side reading collector ✅
+│   ├── CronStatusWidget.tsx      # Cron job status display ✅
+│   └── DatabaseSetupButton.tsx   # DB setup utility ✅
+├── hooks/                         # Custom React hooks
+│   ├── useAutomaticReadingCollection.ts  # Auto reading collection ✅
+│   ├── useClientSideReadingCollection.ts # Client-side collection ✅
+│   └── useBreakpoint.ts                  # Responsive breakpoints ✅
 ├── lib/                          # Utility functions and configs
 │   ├── ecoflow-api.ts           # Working EcoFlow API wrapper ✅
 │   ├── database.ts              # Direct PostgreSQL connection ✅
 │   ├── supabase.ts              # Supabase client ✅
 │   ├── supabase-server.ts       # Server-side Supabase ✅
 │   ├── data-utils.ts            # Data formatting utilities ✅
+│   ├── email.ts                 # Email service (Resend + React Email) ✅
+│   ├── email-simple.ts          # Lightweight email helper ✅
 │   ├── utils.ts                 # General utilities ✅
+│   ├── prisma.ts                # Prisma client (legacy, prefer database.ts) ⚠️
 │   └── env-validation.ts        # Environment validation ✅
 ├── stores/                       # Zustand stores
+│   ├── index.ts                 # Store exports ✅
+│   ├── authStore.ts             # Authentication state ✅
+│   ├── deviceStore.ts           # Device list & selection ✅
+│   ├── readingsStore.ts         # Device readings cache ✅
+│   ├── uiStore.ts               # UI state (sidebar, notifications) ✅
+│   └── userStore.ts             # User profile state ✅
 ├── types/                        # TypeScript type definitions
+│   └── index.ts                 # All application types & enums ✅
 └── prisma/                       # Database schema ✅
     └── schema.prisma            # Complete database structure ✅
 ```
 
 ## Design System
 
-### Color Palette (Dark Theme Only)
+### Design System — Dark Modular Energy Dashboard
 ```typescript
+// Tailwind tokens defined in tailwind.config.ts
 const colors = {
-  primary: {
-    black: '#000000',
-    dark: '#2b2b2b',
-  },
-  accent: {
-    green: '#44af21',       // Primary brand color
-    greenSecondary: '#00c356',
-    greenLight: '#00e16e',
-    blue: '#3a6fe3',
-    gray: '#ebebeb',
-  }
+  'bg-base': '#151615',         // Page background
+  'surface-1': '#1f201f',       // Card surfaces
+  'surface-2': '#242624',       // Input backgrounds, nested elements
+  'stroke-subtle': 'rgba(255,255,255,0.08)',
+  'stroke-strong': 'rgba(255,255,255,0.15)',
+  'text-primary': 'rgba(255,255,255,0.92)',
+  'text-secondary': 'rgba(255,255,255,0.65)',
+  'text-muted': 'rgba(255,255,255,0.45)',
+  'icon': 'rgba(255,255,255,0.55)',
+  'brand-primary': '#44af21',   // Main accent (buttons, indicators)
+  'brand-secondary': '#00c356',
+  'brand-tertiary': '#3a6fe3',  // Blue accent (links, info)
+  'success': '#00e16e',
+  'warning': '#ffa500',
+  'danger': '#ff4444',
 }
+// borderRadius: card 18px, pill 999px, inner 12px
+// boxShadow: card, card-hover
+// Font: Neue Montreal (loaded from public/fonts/)
+// Motion: 160ms hover, 220ms chart/panel, ease-dashboard cubic-bezier(0.2,0.8,0.2,1)
 ```
 
+### UI Components (src/components/ui/)
+- **Card**: `bg-surface-1 border-stroke-subtle rounded-card shadow-card` — variants: default, accent, hero
+- **PillButton**: `rounded-pill` — variants: primary (filled), filled, ghost, danger
+- **Toggle**: `w-12 h-6` — on: `bg-brand-primary`, off: `bg-stroke-strong`
+- **MetricDisplay**: `text-metric` (44px) with unit label and optional trend
+- **ChipSelector**: Pill chips with active state highlight
+- **KebabMenu**: Three-dot dropdown menu
+
 ### Authentication UI Design
-- **Modern Gradient Backgrounds**: Subtle green/blue gradients with blur effects
-- **Glassmorphism**: Semi-transparent cards with backdrop blur
-- **Interactive Elements**: Smooth transitions and hover states
-- **Form Validation**: Real-time validation with clear error states
+- **Solid matte background**: `bg-bg-base` (no gradients, no glassmorphism)
+- **Card container**: `bg-surface-1 border border-stroke-subtle rounded-card shadow-card`
+- **Interactive Elements**: 160ms transitions with dashboard easing
+- **Form Validation**: Real-time validation with `text-danger` error states
 - **Responsive Design**: Mobile-first approach with proper breakpoints
+
+### Middleware (Auth Session Refresh)
+The root `middleware.ts` uses `@supabase/ssr` to refresh Supabase sessions on every request and enforce route protection:
+- Unauthenticated users hitting `/dashboard*` are redirected to `/login`
+- Authenticated users hitting `/login` are redirected to `/dashboard`
+- Runs on all paths except static assets
 
 ## Current Working Features
 
@@ -193,11 +248,6 @@ model Device {
   alerts       DeviceAlert[]
 }
 ```
-    blue: '#3a6fe3',
-    gray: '#ebebeb',
-  }
-}
-```
 
 ### Component Naming Conventions
 - **UI Components**: PascalCase (e.g., `StatusCard`, `PowerGauge`)
@@ -210,24 +260,35 @@ model Device {
 
 ### TypeScript Best Practices
 ```typescript
-// Always define proper interfaces for API responses
+// Always define proper interfaces for API responses (see src/types/index.ts)
 interface DeviceReading {
   id: string;
   deviceId: string;
-  batteryLevel: number;
-  inputWatts: number;
-  outputWatts: number;
-  temperature: number;
-  status: DeviceStatus;
+  batteryLevel?: number;
+  inputWatts?: number;
+  outputWatts?: number;       // Total output (AC + DC) from pd.wattsOutSum
+  remainingTime?: number;     // Minutes: positive = until full, negative = until empty
+  temperature?: number;
+  status?: string;
+  rawData?: Record<string, unknown>;
   recordedAt: Date;
 }
 
-// Use enums for constants
-enum DeviceStatus {
-  ONLINE = 'online',
-  OFFLINE = 'offline',
-  CHARGING = 'charging',
-  DISCHARGING = 'discharging',
+// Use enums for constants (defined in src/types/index.ts)
+enum AlertType {
+  BATTERY_LOW = 'BATTERY_LOW',
+  TEMPERATURE_HIGH = 'TEMPERATURE_HIGH',
+  DEVICE_OFFLINE = 'DEVICE_OFFLINE',
+  POWER_OVERLOAD = 'POWER_OVERLOAD',
+  CHARGING_ERROR = 'CHARGING_ERROR',
+  SYSTEM_ERROR = 'SYSTEM_ERROR',
+}
+
+enum AlertSeverity {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  CRITICAL = 'CRITICAL',
 }
 
 // Use generic types for reusable components
@@ -242,7 +303,6 @@ interface DataCardProps<T> {
 ```typescript
 // Preferred component structure
 import { FC } from 'react';
-import { Box, Text } from '@chakra-ui/react';
 
 interface ComponentProps {
   // Props interface first
@@ -254,9 +314,9 @@ export const Component: FC<ComponentProps> = ({ prop1, prop2 }) => {
   // Render logic
   
   return (
-    <Box>
+    <div className="bg-surface-1 border border-stroke-subtle rounded-card p-6">
       {/* JSX content */}
-    </Box>
+    </div>
   );
 };
 ```
@@ -317,17 +377,17 @@ const signature = crypto
 
 ### Required Environment Variables
 ```bash
-# EcoFlow API (Working credentials configured)
-ECOFLOW_ACCESS_KEY=2JDaLtMwMX2tE3WEEfddALhSJGbHjdeL
-ECOFLOW_SECRET_KEY=GIgLC5YyTtGFfSrcFpUYKOdhJ9bsJoJ3pFKKw86JiUw
+# EcoFlow API
+ECOFLOW_ACCESS_KEY=your_access_key
+ECOFLOW_SECRET_KEY=your_secret_key
 
-# Supabase (Fully configured)
-NEXT_PUBLIC_SUPABASE_URL=https://hzjdlprkyofqtgllgfhm.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
-# Database (Working connection)
-DATABASE_URL=postgresql://postgres.hzjdlprkyofqtgllgfhm:[YOUR-PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres
+# Database
+DATABASE_URL=postgresql://<user>:<password>@<host>:<port>/<db>
 ```
 
 ### Error Handling
@@ -401,46 +461,20 @@ const data = await executeQuery<Device[]>(
 
 ## UI/UX Guidelines
 
-### Tailwind CSS & Custom Components
+### Tailwind CSS & Design Tokens
 ```typescript
-// Use Tailwind CSS with consistent dark theme classes
-<div className="bg-primary-dark border border-gray-700 rounded-lg p-4">
-  <h3 className="text-white font-semibold mb-2">Device Status</h3>
-  <p className="text-gray-400 text-sm">Battery Level</p>
-  <p className="text-accent-green text-2xl font-bold">{batteryLevel}%</p>
+// Use Tailwind CSS with design system tokens
+<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6">
+  <h3 className="text-text-primary font-semibold mb-2">Device Status</h3>
+  <p className="text-text-secondary text-sm">Battery Level</p>
+  <p className="text-brand-primary text-metric font-bold">{batteryLevel}%</p>
 </div>
 
-// Custom dropdown components for dark theme consistency
-const CustomDropdown = ({ options, value, onChange }) => {
-  return (
-    <div className="relative">
-      <button className="bg-primary-dark border border-gray-700 rounded-lg px-3 py-2 text-white">
-        {value}
-        <ChevronDown className="ml-2" />
-      </button>
-      {/* Custom dropdown menu with dark styling */}
-    </div>
-  );
-};
-```
-
-### Chakra UI Usage
-```typescript
-// Use Chakra UI components with consistent props
-<Box
-  bg="primary.dark"
-  p={4}
-  borderRadius="md"
-  border="1px solid"
-  borderColor="accent.green"
->
-  <Text color="accent.gray" fontSize="sm" fontWeight="medium">
-    Battery Level
-  </Text>
-  <Text color="accent.green" fontSize="2xl" fontWeight="bold">
-    {batteryLevel}%
-  </Text>
-</Box>
+// Pill buttons for actions
+<button className="bg-brand-primary text-bg-base rounded-pill px-6 py-2 font-semibold
+  hover:brightness-110 transition-all duration-160 ease-dashboard">
+  Start Monitoring
+</button>
 ```
 
 ### Animation Guidelines
@@ -462,7 +496,7 @@ const animateCard = (element: HTMLElement) => {
 ```typescript
 // Use Tailwind CSS responsive classes
 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-  <div className="bg-primary-dark rounded-lg p-6">
+  <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6">
     {/* Device card content */}
   </div>
 </div>
@@ -470,7 +504,7 @@ const animateCard = (element: HTMLElement) => {
 // Mobile-first approach with floating action buttons
 <Link
   href="/devices/add"
-  className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-accent-green rounded-full flex items-center justify-center"
+  className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-brand-primary rounded-full shadow-card flex items-center justify-center"
 >
   <Plus size={24} />
 </Link>
@@ -512,7 +546,7 @@ const animateCard = (element: HTMLElement) => {
 - **SSL Certificate Issues**: Fixed with proper Supabase SSL configuration
 - **Serverless Compatibility**: Optimized for Vercel deployment environment
 - **API Endpoints**: All critical endpoints (monitor-readings, devices, collect-readings) functional
-- **Database Permissions**: Minor permissions issue identified in collect-readings endpoint
+- **Database Permissions**: Collect-readings endpoint fully functional with interval-aware collection
 
 #### 🎨 **UI/UX Implementation**:
 - **Complete Devices Management**: Full-featured /devices page with search, filtering, and device cards
@@ -571,7 +605,7 @@ curl http://localhost:3000/api/devices               # Protected device manageme
 - ✅ `src/lib/database.ts` - Direct PostgreSQL connection (COMPLETED)
 - ✅ `prisma/schema.prisma` - Database schema (COMPLETED)
 - ✅ `.env.local` - All credentials configured (COMPLETED)
-- ⚠️ `src/app/api/devices/collect-readings/route.ts` - Database permissions issue
+- ✅ `src/app/api/devices/collect-readings/route.ts` - Interval-aware reading collection
 
 ## Future Development Notes
 
@@ -596,8 +630,8 @@ curl http://localhost:3000/api/devices               # Protected device manageme
 11. **Custom UI Components** - Dark-themed dropdowns and responsive design
 12. **Multiple Navigation Paths** - Header buttons, grid cards, floating FAB
 
-#### ⚠️ **Minor Issues**:
-- Database permissions for collect-readings endpoint (identified, needs service role auth)
+#### ⚠️ **Minor Issues / Risks**:
+- Collection jobs may require service role permissions in production depending on DB policies
 
 The core infrastructure is complete. Future enhancements could include:
 - Real-time device monitoring dashboards
@@ -608,6 +642,12 @@ The core infrastructure is complete. Future enhancements could include:
 - Device sharing and management
 
 Remember: This is a dashboard for monitoring critical infrastructure, so prioritize reliability, accuracy, and user experience. Always validate data from external APIs and provide meaningful error messages to users.
+
+### Reading Collection System
+The dashboard includes two reading collection strategies:
+- **Server-side / Cron**: `POST /api/devices/collect-readings` and `/api/cron/collect-readings` — interval-aware background collection that respects each user's `collection_interval_minutes` setting. Can target a single user (`?userId=`) or run globally. Skips users whose last collection is within their interval unless `?force=true`.
+- **Client-side hooks**: `useAutomaticReadingCollection` and `useClientSideReadingCollection` trigger collection via the API while the user has the dashboard open, with configurable polling intervals.
+- **Data flow**: EcoFlow API → `ecoflowAPI.getDeviceQuota()` → `transformQuotaToReading()` → INSERT into `device_readings` table (stores AC, DC, USB output breakdowns, battery level, temperature, remaining time, and raw JSON).
 
 ### Data Fetching
 ```typescript
