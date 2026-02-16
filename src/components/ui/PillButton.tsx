@@ -23,6 +23,7 @@ export const PillButton: FC<PillButtonProps> = ({
   ...props
 }) => (
   <button
+    type="button"
     className={cn(
       variants[variant],
       'text-[12px] font-medium transition-all duration-160 ease-dashboard',

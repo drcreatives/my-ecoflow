@@ -32,6 +32,7 @@ export const KebabMenu: FC<KebabMenuProps> = ({ items, className, ...props }) =>
   return (
     <div ref={ref} className={cn('relative', className)} {...props}>
       <button
+        type="button"
         onClick={() => setOpen((p) => !p)}
         className="p-1 text-icon hover:text-text-primary rounded-inner transition-all duration-160"
         aria-label="More options"
@@ -43,6 +44,7 @@ export const KebabMenu: FC<KebabMenuProps> = ({ items, className, ...props }) =>
         <div className="absolute right-0 top-full mt-1 z-50 bg-surface-2 border border-stroke-subtle rounded-inner shadow-card p-1 min-w-[140px]">
           {items.map((item, i) => (
             <button
+              type="button"
               key={i}
               onClick={() => {
                 item.onClick()

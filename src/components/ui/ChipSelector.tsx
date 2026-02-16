@@ -24,6 +24,7 @@ export const ChipSelector: FC<ChipSelectorProps> = ({
   <div className={cn('flex gap-1.5 flex-wrap', className)} {...props}>
     {options.map((opt) => (
       <button
+        type="button"
         key={opt.value}
         onClick={() => onChange(opt.value)}
         className={cn(

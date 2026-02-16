@@ -8,7 +8,7 @@ import { useReadingsStore } from '@/stores/readingsStore';
 import { DeviceStatusCard } from '@/components/controls';
 import CollectionStatusControl from '@/components/ReadingCollector';
 import { cn } from '@/lib/utils';
-import { Card, CardHeader, CardTitle } from '@/components/ui';
+import { Card } from '@/components/ui';
 import { ReactElement } from 'react';
 
 export default function DashboardPage() {
@@ -142,11 +142,12 @@ export default function DashboardPage() {
             </p>
           </div>
           
-          <Link href="/devices/add">
-            <button className="bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium px-4 sm:px-6 py-2.5 rounded-pill flex items-center justify-center gap-2 transition-all duration-160 ease-dashboard text-sm touch-manipulation">
-              <Plus size={16} />
-              <span className="sm:inline">Add Device</span>
-            </button>
+          <Link
+            href="/devices/add"
+            className="bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium px-4 sm:px-6 py-2.5 rounded-pill flex items-center justify-center gap-2 transition-all duration-160 ease-dashboard text-sm touch-manipulation"
+          >
+            <Plus size={16} />
+            <span className="sm:inline">Add Device</span>
           </Link>
         </div>
 
@@ -207,11 +208,12 @@ export default function DashboardPage() {
                     Connect your first EcoFlow device to start monitoring
                   </p>
                 </div>
-                <Link href="/devices/add">
-                  <button className="bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium px-4 sm:px-6 py-2.5 rounded-pill flex items-center gap-2 text-sm transition-all duration-160 touch-manipulation">
-                    <Plus size={16} />
-                    Add Your First Device
-                  </button>
+                <Link
+                  href="/devices/add"
+                  className="bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium px-4 sm:px-6 py-2.5 rounded-pill flex items-center gap-2 text-sm transition-all duration-160 touch-manipulation"
+                >
+                  <Plus size={16} />
+                  Add Your First Device
                 </Link>
               </div>
             </div>

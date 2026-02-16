@@ -55,7 +55,7 @@ This is a full-stack Next.js dashboard for monitoring EcoFlow Delta 2 power stat
 ## Tech Stack & Architecture
 
 ### Core Technologies
-- **Framework**: Next.js 15.5.3 with App Router and Turbopack
+- **Framework**: Next.js 15.5.x with App Router and Turbopack
 - **UI**: React 19
 - **Styling**: Tailwind CSS v4 (dark theme only)
 - **State Management**: Zustand

@@ -73,6 +73,10 @@ const config: Config = {
         'safe-left': 'env(safe-area-inset-left)',
         'safe-right': 'env(safe-area-inset-right)',
       },
+      transitionDuration: {
+        '160': '160ms',
+        '180': '180ms',
+      },
       transitionTimingFunction: {
         'dashboard': 'cubic-bezier(0.2, 0.8, 0.2, 1)',
       },
