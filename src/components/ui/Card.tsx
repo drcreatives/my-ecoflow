@@ -61,7 +61,7 @@ export const CardHeader: FC<CardHeaderProps> = ({
 )
 
 /* ── CardTitle ── */
-export interface CardTitleProps extends HTMLAttributes<HTMLHeadingElement> {}
+export type CardTitleProps = HTMLAttributes<HTMLHeadingElement>
 
 export const CardTitle: FC<CardTitleProps> = ({
   className,

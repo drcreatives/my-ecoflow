@@ -390,7 +390,7 @@ function HistoryPage() {
               <button
                 onClick={handleExportData}
                 disabled={isExporting || readings.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-brand-tertiary hover:bg-brand-tertiary/90 disabled:bg-surface-2 disabled:opacity-50 text-white rounded-pill transition-all duration-160 text-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-brand-tertiary hover:bg-brand-tertiary/90 disabled:bg-surface-2 disabled:opacity-50 text-bg-base rounded-pill transition-all duration-160 text-sm"
               >
                 {isExporting ? (
                   <Loader2 size={16} className="animate-spin" />

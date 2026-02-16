@@ -55,28 +55,28 @@ export default function AuthTestForm() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-gray-800 p-4 rounded">
-        <h3 className="text-lg font-semibold text-yellow-400 mb-3">🔐 Test Authentication</h3>
+      <div className="bg-surface-1 border border-stroke-subtle rounded-card p-4">
+        <h3 className="text-lg font-semibold text-warning mb-3">🔐 Test Authentication</h3>
         
         <div className="space-y-3">
           <div>
-            <label className="block text-sm text-gray-300 mb-1">Email:</label>
+            <label className="block text-sm text-text-secondary mb-1">Email:</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-2 bg-gray-700 text-white rounded border border-gray-600"
+              className="w-full p-2 bg-surface-2 text-text-primary rounded-inner border border-stroke-subtle"
               placeholder="test@example.com"
             />
           </div>
           
           <div>
-            <label className="block text-sm text-gray-300 mb-1">Password:</label>
+            <label className="block text-sm text-text-secondary mb-1">Password:</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-2 bg-gray-700 text-white rounded border border-gray-600"
+              className="w-full p-2 bg-surface-2 text-text-primary rounded-inner border border-stroke-subtle"
               placeholder="password123"
             />
           </div>
@@ -85,7 +85,7 @@ export default function AuthTestForm() {
             <button
               onClick={() => handleAuth('signup')}
               disabled={isLoading}
-              className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white py-2 px-4 rounded transition-colors"
+              className="flex-1 bg-brand-primary hover:brightness-110 disabled:bg-surface-2 disabled:opacity-50 text-bg-base py-2 px-4 rounded-pill transition-all duration-160"
             >
               {isLoading ? 'Creating...' : 'Sign Up'}
             </button>
@@ -93,7 +93,7 @@ export default function AuthTestForm() {
             <button
               onClick={() => handleAuth('login')}
               disabled={isLoading}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white py-2 px-4 rounded transition-colors"
+              className="flex-1 bg-brand-tertiary hover:bg-brand-tertiary/90 disabled:bg-surface-2 disabled:opacity-50 text-bg-base py-2 px-4 rounded-pill transition-all duration-160"
             >
               {isLoading ? 'Logging in...' : 'Log In'}
             </button>
@@ -101,7 +101,7 @@ export default function AuthTestForm() {
           
           <button
             onClick={checkSession}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded transition-colors"
+            className="w-full bg-brand-secondary hover:bg-brand-secondary/90 text-bg-base py-2 px-4 rounded-pill transition-all duration-160"
           >
             Check Session
           </button>
@@ -109,9 +109,9 @@ export default function AuthTestForm() {
       </div>
       
       {result && (
-        <div className="bg-gray-800 p-3 rounded">
-          <h4 className="text-sm font-semibold text-gray-300 mb-2">Result:</h4>
-          <pre className="text-xs text-green-400 overflow-x-auto whitespace-pre-wrap">
+        <div className="bg-surface-1 border border-stroke-subtle rounded-card p-3">
+          <h4 className="text-sm font-semibold text-text-secondary mb-2">Result:</h4>
+          <pre className="text-xs text-brand-primary overflow-x-auto whitespace-pre-wrap">
             {JSON.stringify(result, null, 2)}
           </pre>
         </div>

@@ -34,18 +34,18 @@ export default function DatabaseSetupButton() {
       <button 
         onClick={handleSetup}
         disabled={isLoading}
-        className={`block w-full py-2 px-4 rounded transition-colors text-center font-medium ${
+        className={`block w-full py-2 px-4 rounded-pill transition-all duration-160 ease-dashboard text-center font-medium ${
           isLoading 
-            ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
-            : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+            ? 'bg-surface-2 text-text-muted cursor-not-allowed' 
+            : 'bg-brand-primary hover:brightness-110 text-bg-base'
         }`}
       >
         {isLoading ? 'Creating Tables...' : 'Create Database Tables'}
       </button>
       
       {result && (
-        <div className="text-xs bg-gray-800 p-2 rounded">
-          <pre className="text-green-400 overflow-x-auto">
+        <div className="text-xs bg-surface-2 border border-stroke-subtle rounded-inner p-2">
+          <pre className="text-brand-primary overflow-x-auto">
             {JSON.stringify(result, null, 2)}
           </pre>
         </div>
