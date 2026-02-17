@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 
 interface ReadingCollectionStatus {
   isActive: boolean
@@ -11,9 +11,15 @@ interface ReadingCollectionStatus {
 }
 
 /**
- * Client-side reading collection for Vercel Free Plan
- * Collects readings every 5 minutes when user is active
- * Pauses when tab is hidden to save API calls
+ * Client-side reading collection for Vercel Free Plan.
+ *
+ * Runs on a configurable interval (sourced from user settings).
+ * Does NOT pause when the tab is hidden — collection continues in the
+ * background as long as the page is open. A companion service worker
+ * handles collection when the page is closed (best-effort).
+ *
+ * Uses the user-scoped `/api/devices/collect-readings/self` endpoint so
+ * the service worker can also call it with auth cookies.
  */
 export const useClientSideReadingCollection = (intervalMinutes: number = 5) => {
   const [status, setStatus] = useState<ReadingCollectionStatus>({
@@ -25,50 +31,43 @@ export const useClientSideReadingCollection = (intervalMinutes: number = 5) => {
   })
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const isDocumentVisible = useRef(true)
+  const currentIntervalRef = useRef(intervalMinutes)
 
   const collectReading = useCallback(async () => {
-    // Don't collect if document is hidden (user switched tabs)
-    if (!isDocumentVisible.current) {
-      console.log('📱 Skipping reading collection - tab not visible')
-      return { success: false, reason: 'tab_hidden' }
-    }
-
     try {
-      console.log('📊 [GLOBAL] Client collecting device reading...')
-      
-      const response = await fetch('/api/devices/collect-readings', {
+      console.log('📊 [CLIENT] Collecting device reading...')
+
+      const response = await fetch('/api/devices/collect-readings/self', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
       })
 
       if (response.ok) {
         const data = await response.json()
-        console.log('✅ [GLOBAL] Client reading collection successful:', data.summary)
-        
+        console.log('✅ [CLIENT] Reading collection successful:', data.summary)
+
         setStatus(prev => ({
           ...prev,
           lastCollection: new Date().toISOString(),
           successCount: prev.successCount + 1
         }))
-        
+
         return { success: true, data }
       } else {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
     } catch (error) {
       console.error('❌ Client reading collection failed:', error)
-      
+
       setStatus(prev => ({
         ...prev,
         errorCount: prev.errorCount + 1
       }))
-      
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
       }
     }
   }, [])
@@ -78,55 +77,83 @@ export const useClientSideReadingCollection = (intervalMinutes: number = 5) => {
       clearInterval(intervalRef.current)
     }
 
-    console.log(`🚀 [GLOBAL] Starting client-side reading collection (every ${intervalMinutes} minutes)`)
-    
-    setStatus(prev => ({ 
-      ...prev, 
+    currentIntervalRef.current = intervalMinutes
+
+    console.log(
+      `🚀 [CLIENT] Starting reading collection (every ${intervalMinutes} min, runs while hidden)`
+    )
+
+    setStatus(prev => ({
+      ...prev,
       isActive: true,
-      intervalMinutes 
+      intervalMinutes
     }))
-    
+
     // Collect immediately on start
     collectReading()
-    
-    // Set up interval (convert minutes to milliseconds)
+
+    // Set up interval (convert minutes to ms)
     intervalRef.current = setInterval(collectReading, intervalMinutes * 60 * 1000)
-    
   }, [intervalMinutes, collectReading])
 
   const stopCollection = useCallback(() => {
     console.log('⏹️ Stopping client-side reading collection')
-    
+
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
       intervalRef.current = null
     }
-    
+
     setStatus(prev => ({ ...prev, isActive: false }))
   }, [])
 
-  // Handle document visibility changes
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      isDocumentVisible.current = !document.hidden
-      
-      if (document.hidden) {
-        console.log('👁️ Dashboard hidden - pausing collection')
-      } else {
-        console.log('👁️ Dashboard visible - resuming collection')
-        // If collection was active and we're now visible, restart
-        if (status.isActive) {
-          startCollection()
-        }
-      }
-    }
+  /**
+   * Update the collection interval on-the-fly without a full restart.
+   * Also re-registers the service-worker periodic sync so foreground and
+   * background intervals stay in sync.
+   */
+  const updateInterval = useCallback(
+    (newMinutes: number) => {
+      if (newMinutes === currentIntervalRef.current) return
+      console.log(`[CLIENT] Updating collection interval to ${newMinutes} min`)
+      currentIntervalRef.current = newMinutes
 
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [status.isActive, startCollection])
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = setInterval(collectReading, newMinutes * 60 * 1000)
+      }
+
+      setStatus(prev => ({ ...prev, intervalMinutes: newMinutes }))
+
+      // Best-effort: re-register SW periodic sync with the new interval
+      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.ready
+          .then(async (reg) => {
+            if ('periodicSync' in reg) {
+              try {
+                const perm = await navigator.permissions.query({
+                  // @ts-expect-error periodicSync permission not in lib.dom.d.ts yet
+                  name: 'periodic-background-sync',
+                })
+                if (perm.state === 'granted') {
+                  // @ts-expect-error periodicSync API not in lib.dom.d.ts yet
+                  await reg.periodicSync.register('collect-readings', {
+                    minInterval: Math.max(newMinutes, 1) * 60 * 1000,
+                  })
+                  console.log(`[SW] Periodic sync re-registered (${newMinutes} min)`)
+                }
+              } catch {
+                // periodic sync unavailable — foreground collector is primary
+              }
+            }
+          })
+          .catch(() => {
+            // no active SW — nothing to update
+          })
+      }
+    },
+    [collectReading]
+  )
 
   // Cleanup on unmount
   useEffect(() => {
@@ -141,6 +168,7 @@ export const useClientSideReadingCollection = (intervalMinutes: number = 5) => {
     status,
     startCollection,
     stopCollection,
-    collectReading
+    collectReading,
+    updateInterval
   }
 }
