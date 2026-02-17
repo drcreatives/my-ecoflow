@@ -175,12 +175,11 @@ function SettingsPage() {
                            dataRetention.retentionPeriod === '90d' ? 90 :
                            dataRetention.retentionPeriod === '1y' ? 365 : 90
                            
-      setDataSettings({
+      setDataSettings(prev => ({
+        ...prev,
         retentionPeriod: retentionDays,
         autoBackup: dataRetention.autoCleanup,
-        exportFormat: 'json',
-        collectInterval: 5
-      })
+      }))
     }
   }, [dataRetention])
 
@@ -191,7 +190,27 @@ function SettingsPage() {
       await fetchProfile()
       console.log('Profile fetched, current profile:', profile)
       // Note: Local state will be updated via useEffect when profile data arrives
-      
+
+      // Fetch data-retention settings directly from the API so we get the
+      // real collection_interval_minutes value (the Zustand store type
+      // doesn't carry it).
+      try {
+        const res = await fetch('/api/user/data-retention', { credentials: 'include' })
+        if (res.ok) {
+          const json = await res.json()
+          const s = json?.settings
+          if (s) {
+            setDataSettings(prev => ({
+              ...prev,
+              retentionPeriod: s.retention_period_days ?? prev.retentionPeriod,
+              autoBackup: s.backup_enabled ?? prev.autoBackup,
+              collectInterval: s.collection_interval_minutes ?? prev.collectInterval,
+            }))
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching data-retention settings:', e)
+      }
     } catch (err) {
       console.error('Error loading user settings:', err)
     }
