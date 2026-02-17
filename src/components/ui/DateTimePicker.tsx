@@ -15,8 +15,12 @@ import {
   isToday,
   setHours,
   setMinutes,
+  setMonth,
+  setYear,
   getHours,
   getMinutes,
+  getYear,
+  getMonth,
 } from 'date-fns'
 import { Calendar, ChevronLeft, ChevronRight, Clock, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -29,12 +33,18 @@ interface DateTimePickerProps {
   className?: string
 }
 
+type PickerView = 'days' | 'months' | 'years'
+
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+const MONTH_LABELS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+]
 
 /**
  * Dark-themed DateTime picker matching the EcoFlow dashboard design system.
  * Replaces the native <input type="datetime-local"> with a fully styled calendar
- * and time selector.
+ * and time selector. Supports drill-down: click header → year grid → month grid → day grid.
  */
 export const DateTimePicker: FC<DateTimePickerProps> = ({
   value,
@@ -43,6 +53,7 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
   className,
 }) => {
   const [open, setOpen] = useState(false)
+  const [pickerView, setPickerView] = useState<PickerView>('days')
   const [viewDate, setViewDate] = useState<Date>(() => {
     if (value) {
       const d = new Date(value)
@@ -56,6 +67,11 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
       return isNaN(d.getTime()) ? null : d
     }
     return null
+  })
+  // For year grid paging — center decade around the current viewDate year
+  const [yearRangeStart, setYearRangeStart] = useState(() => {
+    const y = value ? new Date(value).getFullYear() : new Date().getFullYear()
+    return isNaN(y) ? new Date().getFullYear() - 4 : y - 4
   })
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -73,6 +89,15 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
       setSelectedDate(null)
     }
   }, [value])
+
+  // Reset to day view when opening
+  useEffect(() => {
+    if (open) {
+      setPickerView('days')
+      const y = viewDate.getFullYear()
+      setYearRangeStart(y - 4)
+    }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close on outside click
   useEffect(() => {
@@ -98,7 +123,6 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
 
   const emitChange = useCallback(
     (date: Date) => {
-      // Emit in datetime-local compatible format: "YYYY-MM-DDTHH:mm"
       const y = date.getFullYear()
       const mo = String(date.getMonth() + 1).padStart(2, '0')
       const d = String(date.getDate()).padStart(2, '0')
@@ -109,14 +133,27 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
     [onChange]
   )
 
+  // --- Day view handlers ---
   const handleDayClick = (day: Date) => {
-    // Preserve existing time if a date was already selected
     let newDate = day
     if (selectedDate) {
       newDate = setHours(setMinutes(day, getMinutes(selectedDate)), getHours(selectedDate))
     }
     setSelectedDate(newDate)
     emitChange(newDate)
+  }
+
+  // --- Month view handler ---
+  const handleMonthClick = (monthIdx: number) => {
+    setViewDate(setMonth(viewDate, monthIdx))
+    setPickerView('days')
+  }
+
+  // --- Year view handler ---
+  const handleYearClick = (year: number) => {
+    setViewDate(setYear(viewDate, year))
+    setYearRangeStart(year - 4)
+    setPickerView('months')
   }
 
   const handleHourChange = (hour: number) => {
@@ -143,13 +180,15 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
     const now = new Date()
     setViewDate(now)
     setSelectedDate(now)
+    setYearRangeStart(now.getFullYear() - 4)
+    setPickerView('days')
     emitChange(now)
   }
 
   // --- Build calendar grid ---
   const monthStart = startOfMonth(viewDate)
   const monthEnd = endOfMonth(viewDate)
-  const gridStart = startOfWeek(monthStart) // Sunday
+  const gridStart = startOfWeek(monthStart)
   const gridEnd = endOfWeek(monthEnd)
 
   const days: Date[] = []
@@ -159,13 +198,45 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
     cursor = addDays(cursor, 1)
   }
 
+  // Year grid: 12 years (3 rows × 4 columns)
+  const yearGrid = Array.from({ length: 12 }, (_, i) => yearRangeStart + i)
+
   const hours = Array.from({ length: 24 }, (_, i) => i)
-  const minutes = Array.from({ length: 12 }, (_, i) => i * 5) // 5-minute increments
+  const minutes = Array.from({ length: 12 }, (_, i) => i * 5)
 
   const currentHour = selectedDate ? getHours(selectedDate) : getHours(new Date())
   const currentMinute = selectedDate ? getMinutes(selectedDate) : getMinutes(new Date())
-  // Round minute to nearest 5 for highlight
   const nearestMinute = Math.round(currentMinute / 5) * 5
+
+  const currentYear = getYear(viewDate)
+  const currentMonth = getMonth(viewDate)
+  const todayYear = new Date().getFullYear()
+  const todayMonth = new Date().getMonth()
+
+  // --- Header navigation per view ---
+  const handleHeaderClick = () => {
+    if (pickerView === 'days') setPickerView('months')
+    else if (pickerView === 'months') setPickerView('years')
+    // years view: clicking header does nothing (already at top level)
+  }
+
+  const handlePrev = () => {
+    if (pickerView === 'days') setViewDate(subMonths(viewDate, 1))
+    else if (pickerView === 'months') setViewDate(setYear(viewDate, currentYear - 1))
+    else setYearRangeStart(yearRangeStart - 12)
+  }
+
+  const handleNext = () => {
+    if (pickerView === 'days') setViewDate(addMonths(viewDate, 1))
+    else if (pickerView === 'months') setViewDate(setYear(viewDate, currentYear + 1))
+    else setYearRangeStart(yearRangeStart + 12)
+  }
+
+  const headerLabel = () => {
+    if (pickerView === 'days') return format(viewDate, 'MMMM yyyy')
+    if (pickerView === 'months') return String(currentYear)
+    return `${yearGrid[0]} – ${yearGrid[yearGrid.length - 1]}`
+  }
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
@@ -207,61 +278,129 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
             'animate-in fade-in-0 zoom-in-95 duration-150'
           )}
         >
-          {/* Calendar header */}
+          {/* Shared header — prev / label / next */}
           <div className="flex items-center justify-between mb-3">
             <button
               type="button"
-              onClick={() => setViewDate(subMonths(viewDate, 1))}
+              onClick={handlePrev}
               className="p-1.5 rounded-lg hover:bg-surface-2 text-text-secondary hover:text-text-primary transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-sm font-medium text-text-primary">
-              {format(viewDate, 'MMMM yyyy')}
-            </span>
+
             <button
               type="button"
-              onClick={() => setViewDate(addMonths(viewDate, 1))}
+              onClick={handleHeaderClick}
+              className={cn(
+                'text-sm font-medium transition-colors px-2 py-0.5 rounded-lg',
+                pickerView === 'years'
+                  ? 'text-text-primary cursor-default'
+                  : 'text-text-primary hover:bg-surface-2 hover:text-brand-primary cursor-pointer'
+              )}
+            >
+              {headerLabel()}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleNext}
               className="p-1.5 rounded-lg hover:bg-surface-2 text-text-secondary hover:text-text-primary transition-colors"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Day-of-week labels */}
-          <div className="grid grid-cols-7 mb-1">
-            {DAY_LABELS.map((d) => (
-              <div key={d} className="text-center text-[11px] font-medium text-text-muted py-1">
-                {d}
+          {/* ──────── YEAR GRID VIEW ──────── */}
+          {pickerView === 'years' && (
+            <div className="grid grid-cols-4 gap-1.5">
+              {yearGrid.map((year) => {
+                const isSelected = year === currentYear
+                const isCurrent = year === todayYear
+
+                return (
+                  <button
+                    key={year}
+                    type="button"
+                    onClick={() => handleYearClick(year)}
+                    className={cn(
+                      'py-2.5 rounded-lg text-sm font-medium transition-all duration-100',
+                      !isSelected && !isCurrent && 'text-text-secondary hover:bg-surface-2 hover:text-text-primary',
+                      isCurrent && !isSelected && 'text-brand-primary font-semibold',
+                      isSelected && 'bg-brand-primary text-bg-base font-semibold'
+                    )}
+                  >
+                    {year}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* ──────── MONTH GRID VIEW ──────── */}
+          {pickerView === 'months' && (
+            <div className="grid grid-cols-3 gap-1.5">
+              {MONTH_LABELS.map((label, idx) => {
+                const isSelected = idx === currentMonth
+                const isCurrent = currentYear === todayYear && idx === todayMonth
+
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => handleMonthClick(idx)}
+                    className={cn(
+                      'py-3 rounded-lg text-sm font-medium transition-all duration-100',
+                      !isSelected && !isCurrent && 'text-text-secondary hover:bg-surface-2 hover:text-text-primary',
+                      isCurrent && !isSelected && 'text-brand-primary font-semibold',
+                      isSelected && 'bg-brand-primary text-bg-base font-semibold'
+                    )}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* ──────── DAY GRID VIEW ──────── */}
+          {pickerView === 'days' && (
+            <>
+              {/* Day-of-week labels */}
+              <div className="grid grid-cols-7 mb-1">
+                {DAY_LABELS.map((d) => (
+                  <div key={d} className="text-center text-[11px] font-medium text-text-muted py-1">
+                    {d}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          {/* Day grid */}
-          <div className="grid grid-cols-7 gap-0.5">
-            {days.map((day, idx) => {
-              const inMonth = isSameMonth(day, viewDate)
-              const selected = selectedDate ? isSameDay(day, selectedDate) : false
-              const today = isToday(day)
+              {/* Day grid */}
+              <div className="grid grid-cols-7 gap-0.5">
+                {days.map((day, idx) => {
+                  const inMonth = isSameMonth(day, viewDate)
+                  const selected = selectedDate ? isSameDay(day, selectedDate) : false
+                  const today = isToday(day)
 
-              return (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => handleDayClick(day)}
-                  className={cn(
-                    'h-8 w-full rounded-lg text-xs font-medium transition-all duration-100',
-                    !inMonth && 'text-text-muted/40',
-                    inMonth && !selected && 'text-text-secondary hover:bg-surface-2 hover:text-text-primary',
-                    today && !selected && 'text-brand-primary font-semibold',
-                    selected && 'bg-brand-primary text-bg-base font-semibold'
-                  )}
-                >
-                  {format(day, 'd')}
-                </button>
-              )
-            })}
-          </div>
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleDayClick(day)}
+                      className={cn(
+                        'h-8 w-full rounded-lg text-xs font-medium transition-all duration-100',
+                        !inMonth && 'text-text-muted/40',
+                        inMonth && !selected && 'text-text-secondary hover:bg-surface-2 hover:text-text-primary',
+                        today && !selected && 'text-brand-primary font-semibold',
+                        selected && 'bg-brand-primary text-bg-base font-semibold'
+                      )}
+                    >
+                      {format(day, 'd')}
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
 
           {/* Divider */}
           <div className="border-t border-stroke-subtle my-3" />
