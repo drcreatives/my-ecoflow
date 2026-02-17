@@ -1,14 +1,16 @@
 // ---------------------------------------------------------------------------
-// EcoFlow Dashboard – Service Worker
+// EcoFlow Dashboard – Service Worker  (v1)
 // ---------------------------------------------------------------------------
 // Provides best-effort background reading collection via the Background Sync
 // and Periodic Background Sync APIs.  Falls back gracefully when neither API
 // is available (the foreground interval collector handles that case).
 //
 // This file lives in /public so it is served from the site root, giving it
-// scope over all pages.
+// scope over all pages.  Bump the version comment above when deploying
+// changes so browsers detect the update.
 // ---------------------------------------------------------------------------
 
+const SW_VERSION = '1.0.0'
 const COLLECT_ENDPOINT = '/api/devices/collect-readings/self'
 const SYNC_TAG = 'collect-readings'
 
@@ -16,13 +18,20 @@ const SYNC_TAG = 'collect-readings'
 // Install & Activate
 // ---------------------------------------------------------------------------
 self.addEventListener('install', () => {
-  console.log('[SW] Installing service worker')
+  console.log(`[SW v${SW_VERSION}] Installing service worker`)
   self.skipWaiting()
 })
 
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Service worker activated')
+  console.log(`[SW v${SW_VERSION}] Service worker activated`)
   event.waitUntil(self.clients.claim())
+})
+
+// Handle SKIP_WAITING message from the client when a new version is found
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
 })
 
 // ---------------------------------------------------------------------------
@@ -58,11 +67,26 @@ async function collectReadings() {
 
     if (!response.ok) {
       console.warn(`[SW] Collection returned HTTP ${response.status}`)
-      // Throwing causes the sync manager to retry later
+
+      // 401/403 – session expired or user signed out; notify clients so the
+      // foreground app can prompt re-authentication if needed.
+      if (response.status === 401 || response.status === 403) {
+        const clients = await self.clients.matchAll({ type: 'window' })
+        for (const client of clients) {
+          client.postMessage({
+            type: 'AUTH_EXPIRED',
+            status: response.status,
+          })
+        }
+        return // don't retry auth failures
+      }
+
+      // 5xx – let SyncManager retry later
       if (response.status >= 500) {
         throw new Error(`Server error ${response.status}`)
       }
-      return // 4xx – don't retry
+
+      return // other 4xx – don't retry
     }
 
     const data = await response.json()

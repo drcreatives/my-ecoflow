@@ -109,11 +109,13 @@ export const useClientSideReadingCollection = (intervalMinutes: number = 5) => {
 
   /**
    * Update the collection interval on-the-fly without a full restart.
+   * Also re-registers the service-worker periodic sync so foreground and
+   * background intervals stay in sync.
    */
   const updateInterval = useCallback(
     (newMinutes: number) => {
       if (newMinutes === currentIntervalRef.current) return
-      console.log(`🔄 [CLIENT] Updating collection interval to ${newMinutes} min`)
+      console.log(`[CLIENT] Updating collection interval to ${newMinutes} min`)
       currentIntervalRef.current = newMinutes
 
       if (intervalRef.current) {
@@ -122,6 +124,33 @@ export const useClientSideReadingCollection = (intervalMinutes: number = 5) => {
       }
 
       setStatus(prev => ({ ...prev, intervalMinutes: newMinutes }))
+
+      // Best-effort: re-register SW periodic sync with the new interval
+      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.ready
+          .then(async (reg) => {
+            if ('periodicSync' in reg) {
+              try {
+                const perm = await navigator.permissions.query({
+                  // @ts-expect-error periodicSync permission not in lib.dom.d.ts yet
+                  name: 'periodic-background-sync',
+                })
+                if (perm.state === 'granted') {
+                  // @ts-expect-error periodicSync API not in lib.dom.d.ts yet
+                  await reg.periodicSync.register('collect-readings', {
+                    minInterval: Math.max(newMinutes, 1) * 60 * 1000,
+                  })
+                  console.log(`[SW] Periodic sync re-registered (${newMinutes} min)`)
+                }
+              } catch {
+                // periodic sync unavailable — foreground collector is primary
+              }
+            }
+          })
+          .catch(() => {
+            // no active SW — nothing to update
+          })
+      }
     },
     [collectReading]
   )
