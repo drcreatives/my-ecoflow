@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { 
-  Calendar,
   Download,
   Filter,
   BarChart3,
@@ -69,17 +68,14 @@ function HistoryPage() {
   const [summary, setSummary] = useState<HistorySummary | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
-  // Debug: Log readings state changes
+  // Compute summary when readings change
   useEffect(() => {
-    console.log('Readings state changed:', {
-      readingsCount: readings.length,
-      totalCount,
-      hasMore,
-      isLoading,
-      error,
-      currentFilters
-    })
-  }, [readings, totalCount, hasMore, isLoading, error, currentFilters])
+    if (readings.length > 0) {
+      setSummary(calculateSummary(readings))
+    } else {
+      setSummary(null)
+    }
+  }, [readings])
 
   // Filter state
   const [filters, setFilters] = useState<HistoryFilters>({
@@ -208,42 +204,6 @@ function HistoryPage() {
         aggregation: filters.aggregation
       })
     }
-  }
-
-  // Mock data generator (will be replaced with API call)
-  const generateMockHistoryData = (): DeviceReading[] => {
-    const now = new Date()
-    const readings: DeviceReading[] = []
-    const hoursBack = filters.timeRange === '1h' ? 1 : 
-                     filters.timeRange === '6h' ? 6 :
-                     filters.timeRange === '24h' ? 24 :
-                     filters.timeRange === '7d' ? 168 :
-                     filters.timeRange === '30d' ? 720 : 24
-
-    for (let i = hoursBack; i >= 0; i--) {
-      const timestamp = new Date(now.getTime() - i * 60 * 60 * 1000)
-      const totalOutput = Math.max(0, 300 + Math.cos(i / 8) * 200)
-      const acOutput = Math.max(0, totalOutput * 0.6) // 60% AC
-      const dcOutput = Math.max(0, totalOutput * 0.3) // 30% DC  
-      const usbOutput = Math.max(0, totalOutput * 0.1) // 10% USB
-      
-      readings.push({
-        id: `reading-${i}`,
-        deviceId: devices[0]?.id || 'mock-device',
-        batteryLevel: Math.max(20, Math.min(100, 80 + Math.sin(i / 10) * 20)),
-        inputWatts: Math.max(0, 200 + Math.sin(i / 5) * 150),
-        outputWatts: totalOutput,
-        acOutputWatts: acOutput,
-        dcOutputWatts: dcOutput,
-        usbOutputWatts: usbOutput,
-        temperature: 25 + Math.sin(i / 12) * 8,
-        remainingTime: Math.floor(Math.random() * 600) + 120,
-        status: 'normal',
-        recordedAt: timestamp
-      })
-    }
-
-    return readings.reverse()
   }
 
   const calculateSummary = (data: DeviceReading[]): HistorySummary => {
