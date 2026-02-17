@@ -469,10 +469,13 @@ export default function DevicePage({ params }: DevicePageProps) {
                 <Zap className="w-4 h-4" />
                 <span>Start Charging</span>
               </button>
-              <button className="w-full bg-bg-base hover:bg-surface-2 text-text-secondary border border-stroke-subtle hover:border-stroke-strong px-4 py-3 rounded-pill font-medium transition-all duration-160 ease-dashboard flex items-center justify-center space-x-2">
+              <Link
+                href={`/device/${device.id}/settings`}
+                className="w-full bg-bg-base hover:bg-surface-2 text-text-secondary border border-stroke-subtle hover:border-stroke-strong px-4 py-3 rounded-pill font-medium transition-all duration-160 ease-dashboard flex items-center justify-center space-x-2"
+              >
                 <Settings className="w-4 h-4" />
                 <span>Device Settings</span>
-              </button>
+              </Link>
               <button 
                 onClick={fetchDevices}
                 className="w-full bg-brand-tertiary hover:bg-brand-tertiary/80 text-text-primary px-4 py-3 rounded-pill font-medium transition-all duration-160 ease-dashboard flex items-center justify-center space-x-2"
