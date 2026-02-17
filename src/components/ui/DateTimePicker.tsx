@@ -62,14 +62,14 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
     setOpen(true)
   }
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     closingRef.current = true
     setOpen(false)
     // Reset after a tick so the trigger onClick doesn't immediately re-open
     requestAnimationFrame(() => {
       closingRef.current = false
     })
-  }
+  }, [])
 
   const [viewDate, setViewDate] = useState<Date>(() => {
     if (value) {
@@ -130,7 +130,7 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [open])
+  }, [open, handleClose])
 
   // Close on Escape
   useEffect(() => {
@@ -140,7 +140,7 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [open])
+  }, [open, handleClose])
 
   const emitChange = useCallback(
     (date: Date) => {
@@ -280,14 +280,15 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
           {selectedDate ? format(selectedDate, 'MMM d, yyyy  HH:mm') : placeholder}
         </span>
         {selectedDate && (
-          <span
-            role="button"
-            tabIndex={-1}
-            onClick={handleClear}
-            className="text-text-muted hover:text-text-secondary transition-colors"
+          <button
+            type="button"
+            tabIndex={0}
+            aria-label="Clear date"
+            onClick={(e) => { e.stopPropagation(); handleClear() }}
+            className="text-text-muted hover:text-text-secondary transition-colors p-0.5 -m-0.5 rounded focus:outline-none focus:ring-1 focus:ring-brand-primary/40"
           >
             <X className="w-3.5 h-3.5" />
-          </span>
+          </button>
         )}
       </button>
 
