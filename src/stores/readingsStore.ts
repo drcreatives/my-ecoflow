@@ -6,6 +6,7 @@ interface ReadingOptions {
   limit?: number
   offset?: number
   timeRange?: '1h' | '6h' | '24h' | '7d' | '30d'
+  aggregation?: 'raw' | '5m' | '1h' | '1d'
   startDate?: Date
   endDate?: Date
   deviceId?: string
@@ -84,6 +85,10 @@ export const useReadingsStore = create<ReadingsStore>()(
 
           if (options.timeRange) {
             params.append('timeRange', options.timeRange)
+          }
+
+          if (options.aggregation) {
+            params.append('aggregation', options.aggregation)
           }
           
           if (options.startDate) {
@@ -170,6 +175,10 @@ export const useReadingsStore = create<ReadingsStore>()(
           if (options.timeRange) {
             params.append('timeRange', options.timeRange)
           }
+
+          if (options.aggregation) {
+            params.append('aggregation', options.aggregation)
+          }
           
           if (options.startDate) {
             params.append('startDate', options.startDate.toISOString())
@@ -232,6 +241,10 @@ export const useReadingsStore = create<ReadingsStore>()(
 
           if (options.timeRange) {
             params.append('timeRange', options.timeRange)
+          }
+
+          if (options.aggregation) {
+            params.append('aggregation', options.aggregation)
           }
           
           if (options.startDate) {

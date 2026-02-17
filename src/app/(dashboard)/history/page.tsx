@@ -330,6 +330,21 @@ function HistoryPage() {
     }
   }
 
+  const getAggregationLabel = (aggregation: HistoryFilters['aggregation']) => {
+    switch (aggregation) {
+      case 'raw':
+        return 'Raw Data'
+      case '5m':
+        return '5 Minute Avg'
+      case '1h':
+        return 'Hourly Avg'
+      case '1d':
+        return 'Daily Avg'
+      default:
+        return 'Raw Data'
+    }
+  }
+
   const formatValue = (value: number | null | undefined, unit: string) => {
     if (value === null || value === undefined || isNaN(value)) return '0' + unit
     return value.toFixed(1) + unit
@@ -576,7 +591,7 @@ function HistoryPage() {
               <div className="flex items-center justify-between">
                 <h3 className="text-section-title font-medium text-text-primary">Device Readings History</h3>
                 <div className="text-sm text-text-muted">
-                  Showing {getTimeRangeLabel(filters.timeRange)} • {selectedDevice?.name}
+                  Showing {getTimeRangeLabel(filters.timeRange)} • {getAggregationLabel(filters.aggregation)} • {selectedDevice?.name}
                 </div>
               </div>
             </div>
