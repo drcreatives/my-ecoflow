@@ -14,7 +14,8 @@ import {
   Loader2,
   ChevronDown,
   ExternalLink,
-  AlertTriangle
+  AlertTriangle,
+  Search
 } from 'lucide-react'
 import { useDeviceStore } from '@/stores/deviceStore'
 import { useReadingsStore } from '@/stores/readingsStore'
@@ -136,8 +137,10 @@ function HistoryPage() {
   }, [devices])
 
   // Fetch history data when filters change and we have a valid device
+  // Skip auto-fetching for 'custom' range — user must click "Apply" to avoid
+  // firing API calls on every date/time picker interaction
   useEffect(() => {
-    if (devices.length > 0 && filters.deviceId !== 'all') {
+    if (devices.length > 0 && filters.deviceId !== 'all' && filters.timeRange !== 'custom') {
       console.log('Fetching history data for:', filters)
       fetchHistoryData()
     }
@@ -458,26 +461,38 @@ function HistoryPage() {
               </div>
 
               {filters.timeRange === 'custom' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                  <div>
-                    <label className="block text-sm font-medium text-text-secondary mb-2">
-                      Start Date
-                    </label>
-                    <DateTimePicker
-                      value={filters.customStartDate || ''}
-                      onChange={(val) => setFilters(prev => ({ ...prev, customStartDate: val }))}
-                      placeholder="Select start date & time"
-                    />
+                <div className="mt-4 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-text-secondary mb-2">
+                        Start Date
+                      </label>
+                      <DateTimePicker
+                        value={filters.customStartDate || ''}
+                        onChange={(val) => setFilters(prev => ({ ...prev, customStartDate: val }))}
+                        placeholder="Select start date & time"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-text-secondary mb-2">
+                        End Date
+                      </label>
+                      <DateTimePicker
+                        value={filters.customEndDate || ''}
+                        onChange={(val) => setFilters(prev => ({ ...prev, customEndDate: val }))}
+                        placeholder="Select end date & time"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text-secondary mb-2">
-                      End Date
-                    </label>
-                    <DateTimePicker
-                      value={filters.customEndDate || ''}
-                      onChange={(val) => setFilters(prev => ({ ...prev, customEndDate: val }))}
-                      placeholder="Select end date & time"
-                    />
+                  <div className="flex justify-end">
+                    <button
+                      onClick={fetchHistoryData}
+                      disabled={!filters.customStartDate || !filters.customEndDate}
+                      className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-bg-base rounded-pill text-sm font-medium hover:brightness-110 transition-all duration-160 ease-dashboard disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Search size={14} />
+                      Apply Custom Range
+                    </button>
                   </div>
                 </div>
               )}
