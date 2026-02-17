@@ -223,7 +223,6 @@ const CollapsedSidebar = () => {
 }
 
 export const Sidebar = () => {
-  const pathname = usePathname()
   const { sidebarOpen, toggleSidebar } = useUIStore()
   const isMobile = useIsMobile()
 

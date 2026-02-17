@@ -2,7 +2,6 @@
 
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
-import { useUIStore } from '@/stores/uiStore'
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -10,8 +9,6 @@ interface AppLayoutProps {
 }
 
 export const AppLayout = ({ children, title }: AppLayoutProps) => {
-  const { sidebarOpen } = useUIStore()
-
   return (
     <div className="flex h-screen bg-bg-base">
       {/* Sidebar */}

@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { 
-  Calendar,
   Download,
   Filter,
   BarChart3,
@@ -15,12 +14,14 @@ import {
   Loader2,
   ChevronDown,
   ExternalLink,
-  AlertTriangle
+  AlertTriangle,
+  Search
 } from 'lucide-react'
 import { useDeviceStore } from '@/stores/deviceStore'
 import { useReadingsStore } from '@/stores/readingsStore'
 import { DeviceReading } from '@/lib/data-utils'
 import { cn } from '@/lib/utils'
+import { DateTimePicker } from '@/components/ui/DateTimePicker'
 
 // Types for history data
 interface HistoryFilters {
@@ -69,17 +70,14 @@ function HistoryPage() {
   const [summary, setSummary] = useState<HistorySummary | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
-  // Debug: Log readings state changes
+  // Compute summary when readings change
   useEffect(() => {
-    console.log('Readings state changed:', {
-      readingsCount: readings.length,
-      totalCount,
-      hasMore,
-      isLoading,
-      error,
-      currentFilters
-    })
-  }, [readings, totalCount, hasMore, isLoading, error, currentFilters])
+    if (readings.length > 0) {
+      setSummary(calculateSummary(readings))
+    } else {
+      setSummary(null)
+    }
+  }, [readings])
 
   // Filter state
   const [filters, setFilters] = useState<HistoryFilters>({
@@ -139,8 +137,10 @@ function HistoryPage() {
   }, [devices])
 
   // Fetch history data when filters change and we have a valid device
+  // Skip auto-fetching for 'custom' range — user must click "Apply" to avoid
+  // firing API calls on every date/time picker interaction
   useEffect(() => {
-    if (devices.length > 0 && filters.deviceId !== 'all') {
+    if (devices.length > 0 && filters.deviceId !== 'all' && filters.timeRange !== 'custom') {
       console.log('Fetching history data for:', filters)
       fetchHistoryData()
     }
@@ -208,42 +208,6 @@ function HistoryPage() {
         aggregation: filters.aggregation
       })
     }
-  }
-
-  // Mock data generator (will be replaced with API call)
-  const generateMockHistoryData = (): DeviceReading[] => {
-    const now = new Date()
-    const readings: DeviceReading[] = []
-    const hoursBack = filters.timeRange === '1h' ? 1 : 
-                     filters.timeRange === '6h' ? 6 :
-                     filters.timeRange === '24h' ? 24 :
-                     filters.timeRange === '7d' ? 168 :
-                     filters.timeRange === '30d' ? 720 : 24
-
-    for (let i = hoursBack; i >= 0; i--) {
-      const timestamp = new Date(now.getTime() - i * 60 * 60 * 1000)
-      const totalOutput = Math.max(0, 300 + Math.cos(i / 8) * 200)
-      const acOutput = Math.max(0, totalOutput * 0.6) // 60% AC
-      const dcOutput = Math.max(0, totalOutput * 0.3) // 30% DC  
-      const usbOutput = Math.max(0, totalOutput * 0.1) // 10% USB
-      
-      readings.push({
-        id: `reading-${i}`,
-        deviceId: devices[0]?.id || 'mock-device',
-        batteryLevel: Math.max(20, Math.min(100, 80 + Math.sin(i / 10) * 20)),
-        inputWatts: Math.max(0, 200 + Math.sin(i / 5) * 150),
-        outputWatts: totalOutput,
-        acOutputWatts: acOutput,
-        dcOutputWatts: dcOutput,
-        usbOutputWatts: usbOutput,
-        temperature: 25 + Math.sin(i / 12) * 8,
-        remainingTime: Math.floor(Math.random() * 600) + 120,
-        status: 'normal',
-        recordedAt: timestamp
-      })
-    }
-
-    return readings.reverse()
   }
 
   const calculateSummary = (data: DeviceReading[]): HistorySummary => {
@@ -327,6 +291,21 @@ function HistoryPage() {
       case '30d': return 'Last 30 Days'
       case 'custom': return 'Custom Range'
       default: return 'Last 24 Hours'
+    }
+  }
+
+  const getAggregationLabel = (aggregation: HistoryFilters['aggregation']) => {
+    switch (aggregation) {
+      case 'raw':
+        return 'Raw Data'
+      case '5m':
+        return '5 Minute Avg'
+      case '1h':
+        return 'Hourly Avg'
+      case '1d':
+        return 'Daily Avg'
+      default:
+        return 'Raw Data'
     }
   }
 
@@ -482,28 +461,38 @@ function HistoryPage() {
               </div>
 
               {filters.timeRange === 'custom' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                  <div>
-                    <label className="block text-sm font-medium text-text-secondary mb-2">
-                      Start Date
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={filters.customStartDate || ''}
-                      onChange={(e) => setFilters(prev => ({ ...prev, customStartDate: e.target.value }))}
-                      className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
-                    />
+                <div className="mt-4 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-text-secondary mb-2">
+                        Start Date
+                      </label>
+                      <DateTimePicker
+                        value={filters.customStartDate || ''}
+                        onChange={(val) => setFilters(prev => ({ ...prev, customStartDate: val }))}
+                        placeholder="Select start date & time"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-text-secondary mb-2">
+                        End Date
+                      </label>
+                      <DateTimePicker
+                        value={filters.customEndDate || ''}
+                        onChange={(val) => setFilters(prev => ({ ...prev, customEndDate: val }))}
+                        placeholder="Select end date & time"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text-secondary mb-2">
-                      End Date
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={filters.customEndDate || ''}
-                      onChange={(e) => setFilters(prev => ({ ...prev, customEndDate: e.target.value }))}
-                      className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
-                    />
+                  <div className="flex justify-end">
+                    <button
+                      onClick={fetchHistoryData}
+                      disabled={!filters.customStartDate || !filters.customEndDate}
+                      className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-bg-base rounded-pill text-sm font-medium hover:brightness-110 transition-all duration-160 ease-dashboard disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Search size={14} />
+                      Apply Custom Range
+                    </button>
                   </div>
                 </div>
               )}
@@ -576,7 +565,7 @@ function HistoryPage() {
               <div className="flex items-center justify-between">
                 <h3 className="text-section-title font-medium text-text-primary">Device Readings History</h3>
                 <div className="text-sm text-text-muted">
-                  Showing {getTimeRangeLabel(filters.timeRange)} • {selectedDevice?.name}
+                  Showing {getTimeRangeLabel(filters.timeRange)} • {getAggregationLabel(filters.aggregation)} • {selectedDevice?.name}
                 </div>
               </div>
             </div>

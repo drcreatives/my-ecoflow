@@ -1,28 +1,90 @@
 @import "tailwindcss";
-@config "../../tailwind.config.ts";
+@source "../../src";
 
-:root {
+@theme {
+  /* ── Fonts ── */
+  --font-sans: 'Neue Montreal', 'Inter', 'SF Pro Text', 'Segoe UI', 'Roboto', system-ui, sans-serif;
   --font-neue-montreal: 'Neue Montreal', 'Inter', 'SF Pro Text', 'Segoe UI', 'Roboto', system-ui, sans-serif;
 
-  /* ── Design-system CSS custom properties ── */
-  --bg: #151615;
-  --surface-1: #1f201f;
-  --surface-2: #242624;
-  --stroke-subtle: rgba(255,255,255,0.08);
-  --stroke-strong: rgba(255,255,255,0.14);
-  --text-primary: rgba(255,255,255,0.92);
-  --text-secondary: rgba(255,255,255,0.62);
-  --text-muted: rgba(255,255,255,0.45);
-  --brand-primary: #44af21;
-  --brand-secondary: #00c356;
-  --brand-tertiary: #3a6fe3;
+  /* ── Colors: neutrals ── */
+  --color-bg-base: #151615;
+  --color-surface-1: #1f201f;
+  --color-surface-2: #242624;
+  --color-stroke-subtle: rgba(255,255,255,0.08);
+  --color-stroke-strong: rgba(255,255,255,0.14);
+  --color-text-primary: rgba(255,255,255,0.92);
+  --color-text-secondary: rgba(255,255,255,0.62);
+  --color-text-muted: rgba(255,255,255,0.45);
+  --color-icon: rgba(255,255,255,0.72);
+
+  /* ── Colors: brand / accent ── */
+  --color-brand-primary: #44af21;
+  --color-brand-secondary: #00c356;
+  --color-brand-tertiary: #3a6fe3;
+  --color-success: #00e16e;
+  --color-warning: #ffa500;
+  --color-danger: #ff4444;
+
+  /* ── Colors: status ── */
+  --color-status-online: #44af21;
+  --color-status-charging: #00c356;
+  --color-status-discharging: #00e16e;
+  --color-status-offline: #666666;
+  --color-status-error: #ff4444;
+  --color-status-warning: #ffa500;
+
+  /* ── Border radius ── */
+  --radius-card: 18px;
+  --radius-pill: 999px;
+  --radius-inner: 12px;
+
+  /* ── Box shadow ── */
+  --shadow-card: 0 10px 30px rgba(0,0,0,0.35);
+  --shadow-card-hover: 0 14px 40px rgba(0,0,0,0.45);
+
+  /* ── Breakpoints ── */
+  --breakpoint-xs: 480px;
+
+  /* ── Font sizes ── */
+  --text-metric: 2.75rem;
+  --text-metric--line-height: 1;
+  --text-metric--letter-spacing: -0.02em;
+  --text-metric--font-weight: 500;
+  --text-page-title: 2.125rem;
+  --text-page-title--line-height: 1.2;
+  --text-page-title--letter-spacing: -0.01em;
+  --text-page-title--font-weight: 500;
+  --text-section-title: 1rem;
+  --text-section-title--line-height: 1.4;
+  --text-section-title--font-weight: 500;
+
+  /* ── Spacing ── */
+  --spacing-safe-top: env(safe-area-inset-top);
+  --spacing-safe-bottom: env(safe-area-inset-bottom);
+  --spacing-safe-left: env(safe-area-inset-left);
+  --spacing-safe-right: env(safe-area-inset-right);
+  --width-70: 280px;
+
+  /* ── Transition ── */
+  --transition-duration-160: 160ms;
+  --transition-duration-180: 180ms;
+  --ease-dashboard: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* ── Animation ── */
+  --animate-pulse-green: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 /* Dark theme only - matching our design system */
 html,
 body {
-  background: var(--bg);
-  color: var(--text-primary);
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
+  color-scheme: dark;
   font-family: var(--font-neue-montreal);
   font-feature-settings: 'cv11', 'ss01', 'tnum', 'lnum';
   font-variation-settings: 'opsz' 32;
@@ -89,72 +151,8 @@ body {
   background: #444644;
 }
 
-/* ── Utility classes for new design system ── */
-.card-surface {
-  background: var(--surface-1);
-  border: 1px solid var(--stroke-subtle);
-  border-radius: 18px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-  padding: 18px;
-}
-
-.pill-button {
-  border-radius: 999px;
-  border: 1px solid var(--stroke-strong);
-  padding: 8px 16px;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.metric-text {
-  font-size: 2.75rem;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  font-weight: 500;
-}
-
-/* Animation utilities */
-.animate-pulse-green {
-  animation: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes pulse-green {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: .5;
-  }
-}
-
 /* Global focus-visible ring */
 *:focus-visible {
   outline: 2px solid rgba(68, 175, 33, 0.4);
   outline-offset: 2px;
-}
-
-/* Status indicator colors */
-.status-online {
-  color: #44af21;
-}
-
-.status-charging {
-  color: #00c356;
-}
-
-.status-discharging {
-  color: #00e16e;
-}
-
-.status-offline {
-  color: #666666;
-}
-
-.status-error {
-  color: #ff4444;
-}
-
-.status-warning {
-  color: #ffa500;
 }
