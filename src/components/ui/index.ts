@@ -15,3 +15,5 @@ export type { ChipSelectorProps, ChipOption } from './ChipSelector'
 
 export { KebabMenu } from './KebabMenu'
 export type { KebabMenuProps, KebabMenuItem } from './KebabMenu'
+
+export { DateTimePicker } from './DateTimePicker'

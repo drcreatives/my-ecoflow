@@ -20,6 +20,7 @@ import { useDeviceStore } from '@/stores/deviceStore'
 import { useReadingsStore } from '@/stores/readingsStore'
 import { DeviceReading } from '@/lib/data-utils'
 import { cn } from '@/lib/utils'
+import { DateTimePicker } from '@/components/ui/DateTimePicker'
 
 // Types for history data
 interface HistoryFilters {
@@ -462,22 +463,20 @@ function HistoryPage() {
                     <label className="block text-sm font-medium text-text-secondary mb-2">
                       Start Date
                     </label>
-                    <input
-                      type="datetime-local"
+                    <DateTimePicker
                       value={filters.customStartDate || ''}
-                      onChange={(e) => setFilters(prev => ({ ...prev, customStartDate: e.target.value }))}
-                      className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
+                      onChange={(val) => setFilters(prev => ({ ...prev, customStartDate: val }))}
+                      placeholder="Select start date & time"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-text-secondary mb-2">
                       End Date
                     </label>
-                    <input
-                      type="datetime-local"
+                    <DateTimePicker
                       value={filters.customEndDate || ''}
-                      onChange={(e) => setFilters(prev => ({ ...prev, customEndDate: e.target.value }))}
-                      className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
+                      onChange={(val) => setFilters(prev => ({ ...prev, customEndDate: val }))}
+                      placeholder="Select end date & time"
                     />
                   </div>
                 </div>

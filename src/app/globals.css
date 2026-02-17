@@ -101,6 +101,7 @@ html,
 body {
   background: var(--bg);
   color: var(--text-primary);
+  color-scheme: dark;
   font-family: var(--font-neue-montreal);
   font-feature-settings: 'cv11', 'ss01', 'tnum', 'lnum';
   font-variation-settings: 'opsz' 32;
