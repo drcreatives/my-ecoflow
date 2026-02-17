@@ -77,13 +77,17 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
-  // Sync external value changes
+  // Sync external value changes (only when value actually differs from current selectedDate)
   useEffect(() => {
     if (value) {
       const d = new Date(value)
       if (!isNaN(d.getTime())) {
-        setSelectedDate(d)
-        setViewDate(d)
+        // Only update if the incoming value actually differs from current state
+        // This prevents time changes from resetting the view
+        setSelectedDate(prev => {
+          if (!prev || prev.getTime() !== d.getTime()) return d
+          return prev
+        })
       }
     } else {
       setSelectedDate(null)
@@ -157,16 +161,19 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
   }
 
   const handleHourChange = (hour: number) => {
-    const base = selectedDate || new Date()
+    // Use selectedDate if available, otherwise use viewDate to preserve the date the user is looking at
+    const base = selectedDate || viewDate
     const newDate = setHours(base, hour)
     setSelectedDate(newDate)
+    setViewDate(newDate)
     emitChange(newDate)
   }
 
   const handleMinuteChange = (minute: number) => {
-    const base = selectedDate || new Date()
+    const base = selectedDate || viewDate
     const newDate = setMinutes(base, minute)
     setSelectedDate(newDate)
+    setViewDate(newDate)
     emitChange(newDate)
   }
 
