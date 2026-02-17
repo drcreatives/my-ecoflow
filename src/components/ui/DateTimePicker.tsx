@@ -54,6 +54,23 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
 }) => {
   const [open, setOpen] = useState(false)
   const [pickerView, setPickerView] = useState<PickerView>('days')
+  // Guard against the "Done" click re-opening the picker due to DOM removal click-through
+  const closingRef = useRef(false)
+
+  const handleOpen = () => {
+    if (closingRef.current) return
+    setOpen(true)
+  }
+
+  const handleClose = () => {
+    closingRef.current = true
+    setOpen(false)
+    // Reset after a tick so the trigger onClick doesn't immediately re-open
+    requestAnimationFrame(() => {
+      closingRef.current = false
+    })
+  }
+
   const [viewDate, setViewDate] = useState<Date>(() => {
     if (value) {
       const d = new Date(value)
@@ -108,7 +125,7 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
     if (!open) return
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
+        handleClose()
       }
     }
     document.addEventListener('mousedown', handler)
@@ -119,7 +136,7 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') handleClose()
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
@@ -177,8 +194,8 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
     emitChange(newDate)
   }
 
-  const handleClear = (e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleClear = (e?: React.MouseEvent) => {
+    e?.stopPropagation()
     setSelectedDate(null)
     onChange('')
   }
@@ -250,7 +267,7 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
       {/* Trigger input */}
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => open ? handleClose() : handleOpen()}
         className={cn(
           'w-full flex items-center gap-2 bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2',
           'text-left transition-all duration-160 ease-dashboard',
@@ -278,6 +295,8 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
       {open && (
         <div
           ref={panelRef}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
           className={cn(
             'absolute z-50 mt-2 left-0',
             'bg-surface-1 border border-stroke-subtle rounded-card shadow-card',
@@ -475,7 +494,7 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
           <div className="flex items-center justify-between mt-4 pt-3 border-t border-stroke-subtle">
             <button
               type="button"
-              onClick={handleClear}
+              onClick={(e) => handleClear(e)}
               className="text-xs text-text-muted hover:text-text-secondary transition-colors"
             >
               Clear
@@ -490,7 +509,7 @@ export const DateTimePicker: FC<DateTimePickerProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={() => handleClose()}
                 className={cn(
                   'px-3 py-1 rounded-pill text-xs font-medium',
                   'bg-brand-primary text-bg-base',
