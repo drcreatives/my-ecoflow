@@ -13,6 +13,7 @@ import { useDeviceStore } from '@/stores/deviceStore'
 import { useIsMobile } from '@/hooks/useBreakpoint'
 import LogoutButton from '@/components/LogoutButton'
 import { cn } from '@/lib/utils'
+import Link from 'next/link'
 
 interface HeaderProps {
   title?: string
@@ -20,7 +21,7 @@ interface HeaderProps {
 
 export const Header = ({ title }: HeaderProps) => {
   const { user } = useAuthStore()
-  const { notifications } = useUIStore()
+  const { notifications, toggleSidebar } = useUIStore()
   const { devices } = useDeviceStore()
   const isMobile = useIsMobile()
 
@@ -36,6 +37,15 @@ export const Header = ({ title }: HeaderProps) => {
       <div className="flex items-center justify-between w-full">
         {/* Left side */}
         <div className="flex items-center gap-2 sm:gap-4">
+          {isMobile && (
+            <button
+              onClick={toggleSidebar}
+              className="p-2 text-icon hover:text-text-primary hover:bg-surface-2 rounded-inner transition-all duration-160 touch-manipulation"
+              aria-label="Open navigation menu"
+            >
+              <Menu size={18} />
+            </button>
+          )}
           <div className="flex flex-col gap-0.5">
             <h1 className="text-base sm:text-lg font-medium text-text-primary">
               {title || 'Dashboard'}
@@ -95,12 +105,13 @@ export const Header = ({ title }: HeaderProps) => {
 
           {/* Settings - Hidden on mobile */}
           {!isMobile && (
-            <button 
+            <Link
+              href="/settings"
               className="p-2 text-icon hover:text-text-primary hover:bg-surface-2 rounded-inner transition-all duration-160"
               aria-label="Settings"
             >
               <Settings size={16} />
-            </button>
+            </Link>
           )}
 
           {/* Logout Button */}
