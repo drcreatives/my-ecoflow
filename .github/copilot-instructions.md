@@ -144,30 +144,42 @@ src/
 ## Design System
 
 ### Design System — Dark Modular Energy Dashboard
-```typescript
-// Tailwind tokens defined in tailwind.config.ts
-const colors = {
-  'bg-base': '#151615',         // Page background
-  'surface-1': '#1f201f',       // Card surfaces
-  'surface-2': '#242624',       // Input backgrounds, nested elements
-  'stroke-subtle': 'rgba(255,255,255,0.08)',
-  'stroke-strong': 'rgba(255,255,255,0.15)',
-  'text-primary': 'rgba(255,255,255,0.92)',
-  'text-secondary': 'rgba(255,255,255,0.65)',
-  'text-muted': 'rgba(255,255,255,0.45)',
-  'icon': 'rgba(255,255,255,0.55)',
-  'brand-primary': '#44af21',   // Main accent (buttons, indicators)
-  'brand-secondary': '#00c356',
-  'brand-tertiary': '#3a6fe3',  // Blue accent (links, info)
-  'success': '#00e16e',
-  'warning': '#ffa500',
-  'danger': '#ff4444',
+
+All design tokens are defined in a single `@theme` block inside `src/app/globals.css` (Tailwind CSS v4 native).
+There is **no `tailwind.config.ts`** — the `@theme` block is the sole source of truth for colors, radii, shadows, type scales, spacing, transitions, and animations.
+
+```css
+/* src/app/globals.css — @theme excerpt */
+@theme {
+  --color-bg-base: #151615;          /* Page background */
+  --color-surface-1: #1f201f;        /* Card surfaces */
+  --color-surface-2: #242624;        /* Input backgrounds, nested elements */
+  --color-stroke-subtle: rgba(255,255,255,0.08);
+  --color-stroke-strong: rgba(255,255,255,0.14);
+  --color-text-primary: rgba(255,255,255,0.92);
+  --color-text-secondary: rgba(255,255,255,0.62);
+  --color-text-muted: rgba(255,255,255,0.45);
+  --color-icon: rgba(255,255,255,0.72);
+  --color-brand-primary: #44af21;    /* Main accent (buttons, indicators) */
+  --color-brand-secondary: #00c356;
+  --color-brand-tertiary: #3a6fe3;   /* Blue accent (links, info) */
+  --color-success: #00e16e;
+  --color-warning: #ffa500;
+  --color-danger: #ff4444;
+  --radius-card: 18px;
+  --radius-pill: 999px;
+  --radius-inner: 12px;
+  --shadow-card: 0 10px 30px rgba(0,0,0,0.35);
+  --shadow-card-hover: 0 14px 40px rgba(0,0,0,0.45);
+  --ease-dashboard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* … fonts, font sizes, spacing, animations … */
 }
-// borderRadius: card 18px, pill 999px, inner 12px
-// boxShadow: card, card-hover
+```
+
+**Important**: To add or modify design tokens, edit the `@theme` block in `globals.css` only. Do not create a `tailwind.config.ts` — that is a v3 compatibility layer and would create duplication.
+
 // Font: Neue Montreal (loaded from public/fonts/)
 // Motion: 160ms hover, 220ms chart/panel, ease-dashboard cubic-bezier(0.2,0.8,0.2,1)
-```
 
 ### UI Components (src/components/ui/)
 - **Card**: `bg-surface-1 border-stroke-subtle rounded-card shadow-card` — variants: default, accent, hero
@@ -462,6 +474,10 @@ const data = await executeQuery<Device[]>(
 ## UI/UX Guidelines
 
 ### Tailwind CSS & Design Tokens
+
+All tokens live in the `@theme` block in `src/app/globals.css` (Tailwind CSS v4). There is no `tailwind.config.ts`.
+Tailwind v4 auto-generates utility classes from `@theme` variables, so `--color-surface-1` → `bg-surface-1`, `--radius-card` → `rounded-card`, etc.
+
 ```typescript
 // Use Tailwind CSS with design system tokens
 <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6">
