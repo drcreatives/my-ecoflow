@@ -184,19 +184,31 @@ export const useReadingsStore = create<ReadingsStore>()(
               latestMap.set(r.deviceId, r)
             }
 
-            // Replace / insert per-device latest, keep other readings intact
+            // Replace / insert per-device latest, keep other readings intact.
+            // Find the *latest* existing reading per device (not just the first
+            // match) to avoid leaving stale duplicates when the store holds
+            // historical data for the same device.
             const merged = [...state.readings]
 
             for (const [deviceId, newReading] of latestMap) {
-              const existingIdx = merged.findIndex(
-                (r) => r.deviceId === deviceId
-              )
-              if (existingIdx !== -1) {
-                // Only update if the new reading is actually newer
-                const existingDate = new Date(merged[existingIdx].recordedAt).getTime()
+              // Find the index of the newest existing reading for this device
+              let latestIdx = -1
+              let latestTime = -Infinity
+
+              for (let i = 0; i < merged.length; i++) {
+                if (merged[i].deviceId === deviceId) {
+                  const t = new Date(merged[i].recordedAt).getTime()
+                  if (t > latestTime) {
+                    latestTime = t
+                    latestIdx = i
+                  }
+                }
+              }
+
+              if (latestIdx !== -1) {
                 const newDate = new Date(newReading.recordedAt).getTime()
-                if (newDate >= existingDate) {
-                  merged[existingIdx] = newReading
+                if (newDate >= latestTime) {
+                  merged[latestIdx] = newReading
                 }
               } else {
                 merged.push(newReading)

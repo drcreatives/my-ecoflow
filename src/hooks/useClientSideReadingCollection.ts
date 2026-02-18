@@ -50,6 +50,7 @@ export const useClientSideReadingCollection = (
   const currentIntervalRef = useRef(intervalMinutes)
   const onSuccessRef = useRef(onCollectionSuccess)
   const isCollectingRef = useRef(false)
+  const collectReadingRef = useRef<() => Promise<unknown>>(null!)
 
   // Keep the callback ref current without re-running effects
   useEffect(() => {
@@ -59,6 +60,7 @@ export const useClientSideReadingCollection = (
   // ------------------------------------------------------------------
   // Core collection call
   // ------------------------------------------------------------------
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const collectReading = useCallback(async () => {
     // Guard against overlapping calls (worker ticks may queue up)
     if (isCollectingRef.current) return
@@ -107,6 +109,11 @@ export const useClientSideReadingCollection = (
     }
   }, [])
 
+  // Keep ref current so the worker onmessage handler never has a stale closure
+  useEffect(() => {
+    collectReadingRef.current = collectReading
+  }, [collectReading])
+
   // ------------------------------------------------------------------
   // Web Worker lifecycle
   // ------------------------------------------------------------------
@@ -120,7 +127,8 @@ export const useClientSideReadingCollection = (
 
       worker.onmessage = (event: MessageEvent) => {
         if (event.data?.type === 'TICK') {
-          collectReading()
+          // Call via ref to always use the latest collectReading
+          collectReadingRef.current()
         }
       }
 
@@ -134,12 +142,18 @@ export const useClientSideReadingCollection = (
       console.error('[CollectionWorker] Failed to create worker:', err)
       return null
     }
-  }, [collectReading])
+  }, [])  // no deps — worker onmessage uses ref, not closure
 
   // ------------------------------------------------------------------
   // Public API
   // ------------------------------------------------------------------
   const startCollection = useCallback(() => {
+    // Guard: if the worker is already running at this interval, skip
+    if (status.isActive && currentIntervalRef.current === intervalMinutes) {
+      console.log('[CLIENT] Collection already active — skipping duplicate start')
+      return
+    }
+
     currentIntervalRef.current = intervalMinutes
 
     console.log(
@@ -157,7 +171,7 @@ export const useClientSideReadingCollection = (
       type: 'START',
       intervalMs: intervalMinutes * 60 * 1000,
     })
-  }, [intervalMinutes, ensureWorker])
+  }, [intervalMinutes, ensureWorker, status.isActive])
 
   const stopCollection = useCallback(() => {
     console.log('⏹️ Stopping client-side reading collection')

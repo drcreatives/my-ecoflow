@@ -190,15 +190,21 @@ export default function AuthWrapper({
   const { fetchDevices, devices } = useDeviceStore()
   const { fetchLatestForAllDevices } = useReadingsStore()
   const initializationRef = useRef(false)
+  const hiddenSinceRef = useRef<number | null>(null)
+  const isRefreshingRef = useRef(false)
 
   // ------------------------------------------------------------------
   // Store refresh helper — called after every collection and on
   // visibility-change.  Debounced via globalAuthState.lastStoreRefresh.
   // ------------------------------------------------------------------
   const refreshStores = useCallback(async () => {
+    // Skip if a refresh is already in flight
+    if (isRefreshingRef.current) return
     const now = Date.now()
     // Skip if we refreshed very recently (< 10 s)
     if (now - globalAuthState.lastStoreRefresh < 10_000) return
+
+    isRefreshingRef.current = true
     globalAuthState.lastStoreRefresh = now
     console.log('[AuthWrapper] Refreshing stores with latest data...')
     try {
@@ -208,6 +214,8 @@ export default function AuthWrapper({
       ])
     } catch (err) {
       console.warn('[AuthWrapper] Store refresh error:', err)
+    } finally {
+      isRefreshingRef.current = false
     }
   }, [fetchDevices, fetchLatestForAllDevices])
 
@@ -266,24 +274,22 @@ export default function AuthWrapper({
   useEffect(() => {
     if (typeof document === 'undefined') return
 
-    let hiddenSince: number | null = null
-
     const handleVisibility = () => {
       if (document.hidden) {
         // Record when the tab went hidden
-        hiddenSince = Date.now()
+        hiddenSinceRef.current = Date.now()
       } else {
         // Tab is visible again
         if (
-          hiddenSince &&
-          Date.now() - hiddenSince >= VISIBILITY_REFRESH_THRESHOLD &&
+          hiddenSinceRef.current &&
+          Date.now() - hiddenSinceRef.current >= VISIBILITY_REFRESH_THRESHOLD &&
           globalAuthState.initialized &&
           globalAuthState.user
         ) {
           console.log('[AuthWrapper] Tab visible again after ≥30 s — refreshing stores')
           refreshStoresRef.current()
         }
-        hiddenSince = null
+        hiddenSinceRef.current = null
       }
     }
 
