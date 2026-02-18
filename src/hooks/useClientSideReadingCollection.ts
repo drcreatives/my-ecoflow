@@ -2,6 +2,9 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 interface ReadingCollectionStatus {
   isActive: boolean
   lastCollection: string | null
@@ -20,18 +23,59 @@ interface UseClientSideReadingCollectionOptions {
   onCollectionSuccess?: () => void
 }
 
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+const LAST_COLLECTION_KEY = 'ecoflow:lastCollectionTs'
+
 /**
- * Client-side reading collection hook (Web-Worker-driven).
+ * If the worker hasn't sent a heartbeat in this many ms we consider it dead
+ * and restart it.  The worker sends heartbeats every 30 s, so 90 s gives a
+ * generous buffer (missed 2 beats = dead).
+ */
+const HEARTBEAT_TIMEOUT = 90_000
+
+/**
+ * How often the main thread checks the heartbeat (ms).
+ */
+const HEARTBEAT_CHECK_INTERVAL = 45_000
+
+// ---------------------------------------------------------------------------
+// localStorage helpers
+// ---------------------------------------------------------------------------
+function persistLastCollection(ts: number) {
+  try {
+    localStorage.setItem(LAST_COLLECTION_KEY, String(ts))
+  } catch {
+    // Private browsing or quota exceeded — non-critical
+  }
+}
+
+function getPersistedLastCollection(): number {
+  try {
+    const raw = localStorage.getItem(LAST_COLLECTION_KEY)
+    return raw ? Number(raw) : 0
+  } catch {
+    return 0
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
+
+/**
+ * Client-side reading collection hook (Web-Worker-driven, resilient).
  *
- * **Why a Web Worker?**
- * Browsers aggressively throttle `setInterval` on hidden tabs (Chrome: once
- * per minute after 5 min, potentially frozen after extended periods).  A
- * dedicated Web Worker runs in its own thread and is NOT subject to those
- * restrictions, so the timer keeps firing even when the tab has been hidden
- * for hours.
+ * ### Strategy against hidden-tab / freeze gaps
  *
- * Uses the user-scoped `/api/devices/collect-readings/self` endpoint so the
- * companion service worker can also call it with auth cookies.
+ * | Layer | What it does |
+ * |-------|-------------|
+ * | Web Worker timer | Fires at the configured interval; immune to main-thread throttling |
+ * | Web Lock keepalive | Holds `navigator.locks` to hint Chrome not to freeze the tab |
+ * | Heartbeat monitor | Worker pings every 30 s; main thread checks every 45 s and restarts if dead |
+ * | localStorage timestamp | Survives tab freeze/discard so we always know how stale we are |
+ * | Catch-up on resume | `visibilitychange` + `freeze`/`resume` events trigger an immediate force-collect when the gap exceeds the interval |
  */
 export const useClientSideReadingCollection = (
   options: UseClientSideReadingCollectionOptions = {}
@@ -50,7 +94,10 @@ export const useClientSideReadingCollection = (
   const currentIntervalRef = useRef(intervalMinutes)
   const onSuccessRef = useRef(onCollectionSuccess)
   const isCollectingRef = useRef(false)
-  const collectReadingRef = useRef<() => Promise<unknown>>(null!)
+  const collectReadingRef = useRef<(force?: boolean) => Promise<unknown>>(null!)
+  const lastHeartbeatRef = useRef<number>(Date.now())
+  const heartbeatCheckRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const isActiveRef = useRef(false)
 
   // Keep the callback ref current without re-running effects
   useEffect(() => {
@@ -60,16 +107,19 @@ export const useClientSideReadingCollection = (
   // ------------------------------------------------------------------
   // Core collection call
   // ------------------------------------------------------------------
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const collectReading = useCallback(async () => {
+  const collectReading = useCallback(async (force = false) => {
     // Guard against overlapping calls (worker ticks may queue up)
     if (isCollectingRef.current) return
     isCollectingRef.current = true
 
     try {
-      console.log('📊 [CLIENT] Collecting device reading...')
+      const url = force
+        ? '/api/devices/collect-readings/self?force=true'
+        : '/api/devices/collect-readings/self'
 
-      const response = await fetch('/api/devices/collect-readings/self', {
+      console.log(`📊 [CLIENT] Collecting device reading...${force ? ' (force)' : ''}`)
+
+      const response = await fetch(url, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -79,9 +129,12 @@ export const useClientSideReadingCollection = (
         const data = await response.json()
         console.log('✅ [CLIENT] Reading collection successful:', data.summary)
 
+        const now = Date.now()
+        persistLastCollection(now)
+
         setStatus((prev) => ({
           ...prev,
-          lastCollection: new Date().toISOString(),
+          lastCollection: new Date(now).toISOString(),
           successCount: prev.successCount + 1,
         }))
 
@@ -117,8 +170,12 @@ export const useClientSideReadingCollection = (
   // ------------------------------------------------------------------
   // Web Worker lifecycle
   // ------------------------------------------------------------------
-  const ensureWorker = useCallback((): Worker | null => {
-    if (workerRef.current) return workerRef.current
+  const createWorker = useCallback((): Worker | null => {
+    // Terminate old worker if one exists (restart scenario)
+    if (workerRef.current) {
+      workerRef.current.terminate()
+      workerRef.current = null
+    }
 
     if (typeof window === 'undefined') return null
 
@@ -127,8 +184,10 @@ export const useClientSideReadingCollection = (
 
       worker.onmessage = (event: MessageEvent) => {
         if (event.data?.type === 'TICK') {
-          // Call via ref to always use the latest collectReading
           collectReadingRef.current()
+        }
+        if (event.data?.type === 'HEARTBEAT') {
+          lastHeartbeatRef.current = event.data.timestamp ?? Date.now()
         }
       }
 
@@ -137,24 +196,128 @@ export const useClientSideReadingCollection = (
       }
 
       workerRef.current = worker
+      lastHeartbeatRef.current = Date.now()
       return worker
     } catch (err) {
       console.error('[CollectionWorker] Failed to create worker:', err)
       return null
     }
-  }, [])  // no deps — worker onmessage uses ref, not closure
+  }, [])
+
+  const ensureWorker = useCallback((): Worker | null => {
+    if (workerRef.current) return workerRef.current
+    return createWorker()
+  }, [createWorker])
+
+  /** Kill & recreate the worker, restarting the timer at the current interval. */
+  const restartWorker = useCallback(() => {
+    console.log('[CLIENT] Restarting dead/frozen Web Worker...')
+    const worker = createWorker()
+    if (worker && isActiveRef.current) {
+      worker.postMessage({
+        type: 'START',
+        intervalMs: currentIntervalRef.current * 60 * 1000,
+      })
+    }
+  }, [createWorker])
+
+  // ------------------------------------------------------------------
+  // Heartbeat monitor — detect if the worker was frozen/killed
+  // ------------------------------------------------------------------
+  const startHeartbeatMonitor = useCallback(() => {
+    if (heartbeatCheckRef.current) return
+    lastHeartbeatRef.current = Date.now()
+
+    heartbeatCheckRef.current = setInterval(() => {
+      const elapsed = Date.now() - lastHeartbeatRef.current
+      if (elapsed > HEARTBEAT_TIMEOUT && isActiveRef.current) {
+        console.warn(
+          `[CLIENT] Worker heartbeat missing for ${Math.round(elapsed / 1000)}s — restarting`
+        )
+        restartWorker()
+      }
+    }, HEARTBEAT_CHECK_INTERVAL)
+  }, [restartWorker])
+
+  const stopHeartbeatMonitor = useCallback(() => {
+    if (heartbeatCheckRef.current) {
+      clearInterval(heartbeatCheckRef.current)
+      heartbeatCheckRef.current = null
+    }
+  }, [])
+
+  // ------------------------------------------------------------------
+  // Catch-up: force-collect if the last collection is older than the
+  // configured interval.  Called on visibility-change and resume.
+  // ------------------------------------------------------------------
+  const catchUpIfNeeded = useCallback(() => {
+    if (!isActiveRef.current) return
+
+    const lastTs = getPersistedLastCollection()
+    if (lastTs === 0) return // never collected — initial collect will handle it
+
+    const gap = Date.now() - lastTs
+    const intervalMs = currentIntervalRef.current * 60 * 1000
+
+    if (gap >= intervalMs) {
+      console.log(
+        `[CLIENT] Gap detected (${Math.round(gap / 60_000)} min) — force-collecting`
+      )
+      collectReadingRef.current(true)
+    }
+  }, [])
+
+  // ------------------------------------------------------------------
+  // Page Lifecycle listeners (freeze / resume + visibilitychange)
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    // "resume" fires when a frozen tab is unfrozen (Chrome Page Lifecycle).
+    const handleResume = () => {
+      console.log('[CLIENT] Page resumed from freeze')
+      // The worker may be dead — restart and catch up
+      if (isActiveRef.current) {
+        restartWorker()
+        catchUpIfNeeded()
+      }
+    }
+
+    // "visibilitychange" fires on tab switch / screen lock / unlock.
+    const handleVisibility = () => {
+      if (!document.hidden && isActiveRef.current) {
+        // Tab just became visible — check for gap
+        catchUpIfNeeded()
+
+        // Also verify the worker is still alive
+        const elapsed = Date.now() - lastHeartbeatRef.current
+        if (elapsed > HEARTBEAT_TIMEOUT) {
+          restartWorker()
+        }
+      }
+    }
+
+    document.addEventListener('resume', handleResume)
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      document.removeEventListener('resume', handleResume)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [restartWorker, catchUpIfNeeded])
 
   // ------------------------------------------------------------------
   // Public API
   // ------------------------------------------------------------------
   const startCollection = useCallback(() => {
     // Guard: if the worker is already running at this interval, skip
-    if (status.isActive && currentIntervalRef.current === intervalMinutes) {
+    if (isActiveRef.current && currentIntervalRef.current === intervalMinutes) {
       console.log('[CLIENT] Collection already active — skipping duplicate start')
       return
     }
 
     currentIntervalRef.current = intervalMinutes
+    isActiveRef.current = true
 
     console.log(
       `🚀 [CLIENT] Starting reading collection via Web Worker (every ${intervalMinutes} min)`
@@ -171,64 +334,65 @@ export const useClientSideReadingCollection = (
       type: 'START',
       intervalMs: intervalMinutes * 60 * 1000,
     })
-  }, [intervalMinutes, ensureWorker, status.isActive])
+
+    startHeartbeatMonitor()
+  }, [intervalMinutes, ensureWorker, startHeartbeatMonitor])
 
   const stopCollection = useCallback(() => {
     console.log('⏹️ Stopping client-side reading collection')
+    isActiveRef.current = false
 
     workerRef.current?.postMessage({ type: 'STOP' })
+    stopHeartbeatMonitor()
 
     setStatus((prev) => ({ ...prev, isActive: false }))
-  }, [])
+  }, [stopHeartbeatMonitor])
 
   /**
    * Update the collection interval on-the-fly without a full restart.
    * Also re-registers the service-worker periodic sync so foreground and
    * background intervals stay in sync.
    */
-  const updateInterval = useCallback(
-    (newMinutes: number) => {
-      if (newMinutes === currentIntervalRef.current) return
-      console.log(`[CLIENT] Updating collection interval to ${newMinutes} min`)
-      currentIntervalRef.current = newMinutes
+  const updateInterval = useCallback((newMinutes: number) => {
+    if (newMinutes === currentIntervalRef.current) return
+    console.log(`[CLIENT] Updating collection interval to ${newMinutes} min`)
+    currentIntervalRef.current = newMinutes
 
-      // Update the Web Worker timer
-      workerRef.current?.postMessage({
-        type: 'UPDATE_INTERVAL',
-        intervalMs: newMinutes * 60 * 1000,
-      })
+    // Update the Web Worker timer
+    workerRef.current?.postMessage({
+      type: 'UPDATE_INTERVAL',
+      intervalMs: newMinutes * 60 * 1000,
+    })
 
-      setStatus((prev) => ({ ...prev, intervalMinutes: newMinutes }))
+    setStatus((prev) => ({ ...prev, intervalMinutes: newMinutes }))
 
-      // Best-effort: re-register SW periodic sync with the new interval
-      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-        navigator.serviceWorker.ready
-          .then(async (reg) => {
-            if ('periodicSync' in reg) {
-              try {
-                const perm = await navigator.permissions.query({
-                  // @ts-expect-error periodicSync permission not in lib.dom.d.ts yet
-                  name: 'periodic-background-sync',
+    // Best-effort: re-register SW periodic sync with the new interval
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then(async (reg) => {
+          if ('periodicSync' in reg) {
+            try {
+              const perm = await navigator.permissions.query({
+                // @ts-expect-error periodicSync permission not in lib.dom.d.ts yet
+                name: 'periodic-background-sync',
+              })
+              if (perm.state === 'granted') {
+                // @ts-expect-error periodicSync API not in lib.dom.d.ts yet
+                await reg.periodicSync.register('collect-readings', {
+                  minInterval: Math.max(newMinutes, 1) * 60 * 1000,
                 })
-                if (perm.state === 'granted') {
-                  // @ts-expect-error periodicSync API not in lib.dom.d.ts yet
-                  await reg.periodicSync.register('collect-readings', {
-                    minInterval: Math.max(newMinutes, 1) * 60 * 1000,
-                  })
-                  console.log(`[SW] Periodic sync re-registered (${newMinutes} min)`)
-                }
-              } catch {
-                // periodic sync unavailable — foreground collector is primary
+                console.log(`[SW] Periodic sync re-registered (${newMinutes} min)`)
               }
+            } catch {
+              // periodic sync unavailable — foreground collector is primary
             }
-          })
-          .catch(() => {
-            // no active SW — nothing to update
-          })
-      }
-    },
-    []
-  )
+          }
+        })
+        .catch(() => {
+          // no active SW — nothing to update
+        })
+    }
+  }, [])
 
   // ------------------------------------------------------------------
   // Cleanup – terminate the worker on unmount
@@ -237,8 +401,9 @@ export const useClientSideReadingCollection = (
     return () => {
       workerRef.current?.terminate()
       workerRef.current = null
+      stopHeartbeatMonitor()
     }
-  }, [])
+  }, [stopHeartbeatMonitor])
 
   return {
     status,
