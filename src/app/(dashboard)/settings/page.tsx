@@ -840,6 +840,7 @@ function SettingsPage() {
                             className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40"
                           >
                             <option value={1}>1 minute</option>
+                            <option value={2}>2 minutes</option>
                             <option value={5}>5 minutes</option>
                             <option value={15}>15 minutes</option>
                             <option value={30}>30 minutes</option>

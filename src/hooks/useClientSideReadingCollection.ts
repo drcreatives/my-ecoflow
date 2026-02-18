@@ -10,48 +10,81 @@ interface ReadingCollectionStatus {
   intervalMinutes: number
 }
 
+interface UseClientSideReadingCollectionOptions {
+  /** Collection interval in minutes (sourced from user settings). */
+  intervalMinutes?: number
+  /**
+   * Called after every *successful* collection so the caller can refresh
+   * Zustand stores (devices, readings, etc.) without a full page reload.
+   */
+  onCollectionSuccess?: () => void
+}
+
 /**
- * Client-side reading collection for Vercel Free Plan.
+ * Client-side reading collection hook (Web-Worker-driven).
  *
- * Runs on a configurable interval (sourced from user settings).
- * Does NOT pause when the tab is hidden — collection continues in the
- * background as long as the page is open. A companion service worker
- * handles collection when the page is closed (best-effort).
+ * **Why a Web Worker?**
+ * Browsers aggressively throttle `setInterval` on hidden tabs (Chrome: once
+ * per minute after 5 min, potentially frozen after extended periods).  A
+ * dedicated Web Worker runs in its own thread and is NOT subject to those
+ * restrictions, so the timer keeps firing even when the tab has been hidden
+ * for hours.
  *
- * Uses the user-scoped `/api/devices/collect-readings/self` endpoint so
- * the service worker can also call it with auth cookies.
+ * Uses the user-scoped `/api/devices/collect-readings/self` endpoint so the
+ * companion service worker can also call it with auth cookies.
  */
-export const useClientSideReadingCollection = (intervalMinutes: number = 5) => {
+export const useClientSideReadingCollection = (
+  options: UseClientSideReadingCollectionOptions = {}
+) => {
+  const { intervalMinutes = 5, onCollectionSuccess } = options
+
   const [status, setStatus] = useState<ReadingCollectionStatus>({
     isActive: false,
     lastCollection: null,
     successCount: 0,
     errorCount: 0,
-    intervalMinutes
+    intervalMinutes,
   })
 
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const workerRef = useRef<Worker | null>(null)
   const currentIntervalRef = useRef(intervalMinutes)
+  const onSuccessRef = useRef(onCollectionSuccess)
+  const isCollectingRef = useRef(false)
 
+  // Keep the callback ref current without re-running effects
+  useEffect(() => {
+    onSuccessRef.current = onCollectionSuccess
+  }, [onCollectionSuccess])
+
+  // ------------------------------------------------------------------
+  // Core collection call
+  // ------------------------------------------------------------------
   const collectReading = useCallback(async () => {
+    // Guard against overlapping calls (worker ticks may queue up)
+    if (isCollectingRef.current) return
+    isCollectingRef.current = true
+
     try {
       console.log('📊 [CLIENT] Collecting device reading...')
 
       const response = await fetch('/api/devices/collect-readings/self', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       })
 
       if (response.ok) {
         const data = await response.json()
         console.log('✅ [CLIENT] Reading collection successful:', data.summary)
 
-        setStatus(prev => ({
+        setStatus((prev) => ({
           ...prev,
           lastCollection: new Date().toISOString(),
-          successCount: prev.successCount + 1
+          successCount: prev.successCount + 1,
         }))
+
+        // Notify the caller so it can refresh stores
+        onSuccessRef.current?.()
 
         return { success: true, data }
       } else {
@@ -60,51 +93,78 @@ export const useClientSideReadingCollection = (intervalMinutes: number = 5) => {
     } catch (error) {
       console.error('❌ Client reading collection failed:', error)
 
-      setStatus(prev => ({
+      setStatus((prev) => ({
         ...prev,
-        errorCount: prev.errorCount + 1
+        errorCount: prev.errorCount + 1,
       }))
 
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       }
+    } finally {
+      isCollectingRef.current = false
     }
   }, [])
 
-  const startCollection = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-    }
+  // ------------------------------------------------------------------
+  // Web Worker lifecycle
+  // ------------------------------------------------------------------
+  const ensureWorker = useCallback((): Worker | null => {
+    if (workerRef.current) return workerRef.current
 
+    if (typeof window === 'undefined') return null
+
+    try {
+      const worker = new Worker('/collection-worker.js')
+
+      worker.onmessage = (event: MessageEvent) => {
+        if (event.data?.type === 'TICK') {
+          collectReading()
+        }
+      }
+
+      worker.onerror = (err) => {
+        console.error('[CollectionWorker] error:', err)
+      }
+
+      workerRef.current = worker
+      return worker
+    } catch (err) {
+      console.error('[CollectionWorker] Failed to create worker:', err)
+      return null
+    }
+  }, [collectReading])
+
+  // ------------------------------------------------------------------
+  // Public API
+  // ------------------------------------------------------------------
+  const startCollection = useCallback(() => {
     currentIntervalRef.current = intervalMinutes
 
     console.log(
-      `🚀 [CLIENT] Starting reading collection (every ${intervalMinutes} min, runs while hidden)`
+      `🚀 [CLIENT] Starting reading collection via Web Worker (every ${intervalMinutes} min)`
     )
 
-    setStatus(prev => ({
+    setStatus((prev) => ({
       ...prev,
       isActive: true,
-      intervalMinutes
+      intervalMinutes,
     }))
 
-    // Collect immediately on start
-    collectReading()
-
-    // Set up interval (convert minutes to ms)
-    intervalRef.current = setInterval(collectReading, intervalMinutes * 60 * 1000)
-  }, [intervalMinutes, collectReading])
+    const worker = ensureWorker()
+    worker?.postMessage({
+      type: 'START',
+      intervalMs: intervalMinutes * 60 * 1000,
+    })
+  }, [intervalMinutes, ensureWorker])
 
   const stopCollection = useCallback(() => {
     console.log('⏹️ Stopping client-side reading collection')
 
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
-    }
+    workerRef.current?.postMessage({ type: 'STOP' })
 
-    setStatus(prev => ({ ...prev, isActive: false }))
+    setStatus((prev) => ({ ...prev, isActive: false }))
   }, [])
 
   /**
@@ -118,12 +178,13 @@ export const useClientSideReadingCollection = (intervalMinutes: number = 5) => {
       console.log(`[CLIENT] Updating collection interval to ${newMinutes} min`)
       currentIntervalRef.current = newMinutes
 
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = setInterval(collectReading, newMinutes * 60 * 1000)
-      }
+      // Update the Web Worker timer
+      workerRef.current?.postMessage({
+        type: 'UPDATE_INTERVAL',
+        intervalMs: newMinutes * 60 * 1000,
+      })
 
-      setStatus(prev => ({ ...prev, intervalMinutes: newMinutes }))
+      setStatus((prev) => ({ ...prev, intervalMinutes: newMinutes }))
 
       // Best-effort: re-register SW periodic sync with the new interval
       if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
@@ -152,15 +213,16 @@ export const useClientSideReadingCollection = (intervalMinutes: number = 5) => {
           })
       }
     },
-    [collectReading]
+    []
   )
 
-  // Cleanup on unmount
+  // ------------------------------------------------------------------
+  // Cleanup – terminate the worker on unmount
+  // ------------------------------------------------------------------
   useEffect(() => {
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
+      workerRef.current?.terminate()
+      workerRef.current = null
     }
   }, [])
 
@@ -169,6 +231,6 @@ export const useClientSideReadingCollection = (intervalMinutes: number = 5) => {
     startCollection,
     stopCollection,
     collectReading,
-    updateInterval
+    updateInterval,
   }
 }

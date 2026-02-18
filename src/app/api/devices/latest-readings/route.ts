@@ -14,14 +14,23 @@ export async function GET() {
     }
 
     // Get the latest reading for each device belonging to this user
+    // Returns all fields the client DeviceReading interface expects.
     const latestReadings = await executeQuery(`
       SELECT 
-        dr.device_id,
-        dr.recorded_at,
-        dr.battery_level,
-        dr.output_watts,
-        d.device_name,
-        d.device_sn
+        dr.id,
+        dr.device_id        AS "deviceId",
+        dr.battery_level     AS "batteryLevel",
+        dr.input_watts       AS "inputWatts",
+        dr.output_watts      AS "outputWatts",
+        dr.ac_output_watts   AS "acOutputWatts",
+        dr.dc_output_watts   AS "dcOutputWatts",
+        dr.usb_output_watts  AS "usbOutputWatts",
+        dr.remaining_time    AS "remainingTime",
+        dr.temperature,
+        dr.status,
+        dr.recorded_at       AS "recordedAt",
+        d.device_name        AS "deviceName",
+        d.device_sn          AS "deviceSn"
       FROM device_readings dr
       INNER JOIN devices d ON dr.device_id = d.id
       WHERE d.user_id = $1
