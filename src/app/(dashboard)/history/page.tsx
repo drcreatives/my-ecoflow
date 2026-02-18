@@ -107,11 +107,13 @@ function HistoryPage() {
 
   const selectedDevice = deviceOptions.find(d => d.id === filters.deviceId)
 
-  // Pagination calculations using store's total count
-  const totalPages = Math.ceil(totalCount / itemsPerPage)
+  // Pagination calculations using local readings array length
+  // (totalCount from the store reflects the server-side total which may
+  //  differ from readings.length when server-side limit < total rows)
+  const totalPages = Math.max(1, Math.ceil(readings.length / itemsPerPage))
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedReadings = readings.slice(0, Math.min(readings.length, itemsPerPage))
+  const paginatedReadings = readings.slice(startIndex, endIndex)
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -692,7 +694,7 @@ function HistoryPage() {
             {readings.length > 0 && (
               <div className="p-4 border-t border-stroke-subtle flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-sm text-text-muted">
-                  Showing {startIndex + 1}-{Math.min(endIndex, readings.length)} of {readings.length} readings
+                  Showing {Math.min(startIndex + 1, readings.length)}-{Math.min(endIndex, readings.length)} of {readings.length} readings
                 </div>
                 <div className="flex items-center gap-2">
                   <button 
