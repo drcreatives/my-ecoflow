@@ -22,7 +22,7 @@ export default function CronStatusWidget() {
     status: clientStatus,
     startCollection,
     stopCollection
-  } = useClientSideReadingCollection(5) // 5-minute intervals
+  } = useClientSideReadingCollection({ intervalMinutes: 5 })
 
   const fetchMonitoringData = async () => {
     try {

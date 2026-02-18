@@ -25,6 +25,7 @@ interface ReadingsState {
 interface ReadingsActions {
   // Data fetching
   fetchReadings: (deviceId: string, options?: ReadingOptions) => Promise<void>
+  fetchLatestForAllDevices: () => Promise<void>
   loadMoreReadings: (deviceId: string) => Promise<void>
   refreshReadings: (deviceId: string) => Promise<void>
   
@@ -147,6 +148,69 @@ export const useReadingsStore = create<ReadingsStore>()(
             isLoading: false,
           })
           console.error('Failed to fetch readings:', error)
+        }
+      },
+
+      /**
+       * Fetch the latest reading for every device belonging to the
+       * authenticated user and merge them into the store.  Existing
+       * readings for other time-ranges are preserved; only the per-device
+       * "latest" entry is upserted.
+       *
+       * This is intentionally light-weight (one SQL lateral join on the
+       * server) so it can be called frequently: after each collection
+       * cycle, on visibility-change, and when the SW posts
+       * READING_COLLECTED.
+       */
+      fetchLatestForAllDevices: async () => {
+        try {
+          const response = await fetch('/api/devices/latest-readings', {
+            credentials: 'include',
+          })
+
+          if (!response.ok) {
+            console.warn('[ReadingsStore] latest-readings returned', response.status)
+            return
+          }
+
+          const latestReadings: DeviceReading[] = await response.json()
+
+          if (!Array.isArray(latestReadings) || latestReadings.length === 0) return
+
+          set((state) => {
+            // Build a map of deviceId → latest reading from the API
+            const latestMap = new Map<string, DeviceReading>()
+            for (const r of latestReadings) {
+              latestMap.set(r.deviceId, r)
+            }
+
+            // Replace / insert per-device latest, keep other readings intact
+            const merged = [...state.readings]
+
+            for (const [deviceId, newReading] of latestMap) {
+              const existingIdx = merged.findIndex(
+                (r) => r.deviceId === deviceId
+              )
+              if (existingIdx !== -1) {
+                // Only update if the new reading is actually newer
+                const existingDate = new Date(merged[existingIdx].recordedAt).getTime()
+                const newDate = new Date(newReading.recordedAt).getTime()
+                if (newDate >= existingDate) {
+                  merged[existingIdx] = newReading
+                }
+              } else {
+                merged.push(newReading)
+              }
+            }
+
+            return { readings: merged, lastUpdated: new Date() }
+          })
+
+          console.log(
+            `[ReadingsStore] Merged latest readings for ${latestReadings.length} device(s)`
+          )
+        } catch (error) {
+          console.error('[ReadingsStore] fetchLatestForAllDevices error:', error)
         }
       },
 

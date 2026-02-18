@@ -7,6 +7,7 @@ import { User } from '@supabase/supabase-js'
 import { Loader2 } from 'lucide-react'
 import { useClientSideReadingCollection } from '@/hooks/useClientSideReadingCollection'
 import { useDeviceStore } from '@/stores/deviceStore'
+import { useReadingsStore } from '@/stores/readingsStore'
 
 interface AuthWrapperProps {
   children: React.ReactNode
@@ -19,8 +20,11 @@ const DEFAULT_COLLECTION_INTERVAL = 5
 const MIN_PERIODIC_SYNC_INTERVAL = 1
 // How long to wait for SW activation before giving up (ms)
 const SW_ACTIVATION_TIMEOUT = 10_000
+// Minimum elapsed ms before a visibility-change triggers a store refresh.
+// Prevents unnecessary fetches when the user Alt-Tabs quickly.
+const VISIBILITY_REFRESH_THRESHOLD = 30_000 // 30 seconds
 
-// Global state to persist auth across navigations
+// Global state to persist auth across SPA navigations
 let globalAuthState: {
   user: User | null
   initialized: boolean
@@ -28,6 +32,8 @@ let globalAuthState: {
   collectionStarted: boolean
   swRegistered: boolean
   collectionInterval: number
+  /** Epoch ms of the last successful store refresh (collection or visibility). */
+  lastStoreRefresh: number
 } = {
   user: null,
   initialized: false,
@@ -35,6 +41,7 @@ let globalAuthState: {
   collectionStarted: false,
   swRegistered: false,
   collectionInterval: DEFAULT_COLLECTION_INTERVAL,
+  lastStoreRefresh: 0,
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +114,7 @@ async function registerServiceWorker(intervalMinutes: number) {
     const reg = await navigator.serviceWorker.register('/sw.js')
     console.log('[SW] Service worker registered', reg.scope)
 
-    // --- Wait until SW is active (with timeout + redundant guard) ---------
+    // --- Wait until SW is active (with timeout + redundant guard) --------
     const sw = reg.active ?? reg.installing ?? reg.waiting
     if (sw && sw.state !== 'activated') {
       try {
@@ -154,21 +161,6 @@ async function registerServiceWorker(intervalMinutes: number) {
   }
 }
 
-/**
- * Re-register periodic sync with an updated interval.
- * Called when the user changes their collection interval at runtime.
- */
-async function updateServiceWorkerInterval(intervalMinutes: number) {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
-
-  try {
-    const reg = await navigator.serviceWorker.ready
-    await registerSyncOnRegistration(reg, intervalMinutes)
-  } catch (err) {
-    console.warn('[SW] Failed to update sync interval:', err)
-  }
-}
-
 /** Unregister all service workers (called on sign-out). */
 async function unregisterServiceWorkers() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
@@ -196,12 +188,43 @@ export default function AuthWrapper({
   const router = useRouter()
   const supabase = createClient()
   const { fetchDevices, devices } = useDeviceStore()
+  const { fetchLatestForAllDevices } = useReadingsStore()
   const initializationRef = useRef(false)
 
-  // Collector with the current interval (defaults to cached value)
-  const { startCollection, updateInterval } = useClientSideReadingCollection(
-    globalAuthState.collectionInterval
-  )
+  // ------------------------------------------------------------------
+  // Store refresh helper — called after every collection and on
+  // visibility-change.  Debounced via globalAuthState.lastStoreRefresh.
+  // ------------------------------------------------------------------
+  const refreshStores = useCallback(async () => {
+    const now = Date.now()
+    // Skip if we refreshed very recently (< 10 s)
+    if (now - globalAuthState.lastStoreRefresh < 10_000) return
+    globalAuthState.lastStoreRefresh = now
+    console.log('[AuthWrapper] Refreshing stores with latest data...')
+    try {
+      await Promise.all([
+        fetchDevices(),
+        fetchLatestForAllDevices(),
+      ])
+    } catch (err) {
+      console.warn('[AuthWrapper] Store refresh error:', err)
+    }
+  }, [fetchDevices, fetchLatestForAllDevices])
+
+  // Stable ref so callbacks/effects always see the latest version
+  const refreshStoresRef = useRef(refreshStores)
+  useEffect(() => { refreshStoresRef.current = refreshStores }, [refreshStores])
+
+  // ------------------------------------------------------------------
+  // Hook: collection with Web Worker + store refresh callback
+  // ------------------------------------------------------------------
+  const { startCollection, updateInterval } = useClientSideReadingCollection({
+    intervalMinutes: globalAuthState.collectionInterval,
+    onCollectionSuccess: useCallback(() => {
+      // Fire-and-forget store refresh after each successful collection
+      refreshStoresRef.current()
+    }, []),
+  })
 
   // Stable refs so the main useEffect doesn't re-run when these change
   const startCollectionRef = useRef(startCollection)
@@ -214,16 +237,21 @@ export default function AuthWrapper({
   useEffect(() => { fetchDevicesRef.current = fetchDevices }, [fetchDevices])
   useEffect(() => { devicesLengthRef.current = devices.length }, [devices.length])
 
-  // --- Listen for SW READING_COLLECTED messages ---------------------------
+  // ------------------------------------------------------------------
+  // Listen for SW messages (READING_COLLECTED, AUTH_EXPIRED)
+  // ------------------------------------------------------------------
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
 
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'READING_COLLECTED') {
         console.log('[SW→Client] Background collection completed:', event.data.summary)
-        // The foreground collector will notice the new reading on its next
-        // cycle via the interval-check in the API, so no explicit refresh is
-        // needed here.  This log aids debugging visible-tab verification.
+        // Refresh stores so the UI shows the data collected by the SW
+        refreshStoresRef.current()
+      }
+
+      if (event.data?.type === 'AUTH_EXPIRED') {
+        console.warn('[SW→Client] Auth expired, session may need refresh')
       }
     }
 
@@ -231,7 +259,41 @@ export default function AuthWrapper({
     return () => navigator.serviceWorker.removeEventListener('message', handleMessage)
   }, [])
 
-  // --- Main auth + initialization effect ----------------------------------
+  // ------------------------------------------------------------------
+  // Visibility-change handler: refresh stores when the user returns
+  // to the tab after being away for VISIBILITY_REFRESH_THRESHOLD ms.
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    let hiddenSince: number | null = null
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        // Record when the tab went hidden
+        hiddenSince = Date.now()
+      } else {
+        // Tab is visible again
+        if (
+          hiddenSince &&
+          Date.now() - hiddenSince >= VISIBILITY_REFRESH_THRESHOLD &&
+          globalAuthState.initialized &&
+          globalAuthState.user
+        ) {
+          console.log('[AuthWrapper] Tab visible again after ≥30 s — refreshing stores')
+          refreshStoresRef.current()
+        }
+        hiddenSince = null
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
+
+  // ------------------------------------------------------------------
+  // Main auth + initialization effect
+  // ------------------------------------------------------------------
   useEffect(() => {
     if (initializationRef.current) return
 
@@ -248,7 +310,7 @@ export default function AuthWrapper({
       const interval = await fetchCollectionInterval()
       globalAuthState.collectionInterval = interval
 
-      // Start / update foreground collector
+      // Start / update foreground collector (Web Worker driven)
       if (!globalAuthState.collectionStarted) {
         console.log(`Starting reading collection (interval ${interval} min)...`)
         updateIntervalRef.current(interval)
@@ -263,6 +325,9 @@ export default function AuthWrapper({
         await registerServiceWorker(interval)
         globalAuthState.swRegistered = true
       }
+
+      // Initial store refresh (loads latest readings into Zustand)
+      refreshStoresRef.current()
     }
 
     const resetGlobalState = () => {
@@ -273,6 +338,7 @@ export default function AuthWrapper({
         collectionStarted: false,
         swRegistered: false,
         collectionInterval: DEFAULT_COLLECTION_INTERVAL,
+        lastStoreRefresh: 0,
       }
     }
 
