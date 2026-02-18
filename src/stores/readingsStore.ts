@@ -184,19 +184,30 @@ export const useReadingsStore = create<ReadingsStore>()(
               latestMap.set(r.deviceId, r)
             }
 
-            // Replace / insert per-device latest, keep other readings intact
+            // Replace / insert per-device latest, keep other readings intact.
+            // Single pass over the existing readings to build a per-device
+            // index → latest-time map, then apply updates in a second pass.
+            // This is O(readings + devices) instead of O(devices × readings).
             const merged = [...state.readings]
 
+            // Pass 1: find the index & timestamp of the newest reading per device
+            const perDevice = new Map<string, { idx: number; time: number }>()
+            for (let i = 0; i < merged.length; i++) {
+              const did = merged[i].deviceId
+              const t = new Date(merged[i].recordedAt).getTime()
+              const existing = perDevice.get(did)
+              if (!existing || t > existing.time) {
+                perDevice.set(did, { idx: i, time: t })
+              }
+            }
+
+            // Pass 2: merge each incoming latest reading
             for (const [deviceId, newReading] of latestMap) {
-              const existingIdx = merged.findIndex(
-                (r) => r.deviceId === deviceId
-              )
-              if (existingIdx !== -1) {
-                // Only update if the new reading is actually newer
-                const existingDate = new Date(merged[existingIdx].recordedAt).getTime()
-                const newDate = new Date(newReading.recordedAt).getTime()
-                if (newDate >= existingDate) {
-                  merged[existingIdx] = newReading
+              const existing = perDevice.get(deviceId)
+              if (existing) {
+                const newTime = new Date(newReading.recordedAt).getTime()
+                if (newTime >= existing.time) {
+                  merged[existing.idx] = newReading
                 }
               } else {
                 merged.push(newReading)
