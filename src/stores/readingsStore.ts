@@ -185,30 +185,29 @@ export const useReadingsStore = create<ReadingsStore>()(
             }
 
             // Replace / insert per-device latest, keep other readings intact.
-            // Find the *latest* existing reading per device (not just the first
-            // match) to avoid leaving stale duplicates when the store holds
-            // historical data for the same device.
+            // Single pass over the existing readings to build a per-device
+            // index → latest-time map, then apply updates in a second pass.
+            // This is O(readings + devices) instead of O(devices × readings).
             const merged = [...state.readings]
 
-            for (const [deviceId, newReading] of latestMap) {
-              // Find the index of the newest existing reading for this device
-              let latestIdx = -1
-              let latestTime = -Infinity
-
-              for (let i = 0; i < merged.length; i++) {
-                if (merged[i].deviceId === deviceId) {
-                  const t = new Date(merged[i].recordedAt).getTime()
-                  if (t > latestTime) {
-                    latestTime = t
-                    latestIdx = i
-                  }
-                }
+            // Pass 1: find the index & timestamp of the newest reading per device
+            const perDevice = new Map<string, { idx: number; time: number }>()
+            for (let i = 0; i < merged.length; i++) {
+              const did = merged[i].deviceId
+              const t = new Date(merged[i].recordedAt).getTime()
+              const existing = perDevice.get(did)
+              if (!existing || t > existing.time) {
+                perDevice.set(did, { idx: i, time: t })
               }
+            }
 
-              if (latestIdx !== -1) {
-                const newDate = new Date(newReading.recordedAt).getTime()
-                if (newDate >= latestTime) {
-                  merged[latestIdx] = newReading
+            // Pass 2: merge each incoming latest reading
+            for (const [deviceId, newReading] of latestMap) {
+              const existing = perDevice.get(deviceId)
+              if (existing) {
+                const newTime = new Date(newReading.recordedAt).getTime()
+                if (newTime >= existing.time) {
+                  merged[existing.idx] = newReading
                 }
               } else {
                 merged.push(newReading)
