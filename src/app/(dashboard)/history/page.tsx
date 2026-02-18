@@ -111,7 +111,7 @@ function HistoryPage() {
   const totalPages = Math.ceil(totalCount / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedReadings = readings.slice(0, Math.min(readings.length, itemsPerPage))
+  const paginatedReadings = readings.slice(startIndex, endIndex)
 
   // Reset to first page when filters change
   useEffect(() => {
