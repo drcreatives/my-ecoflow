@@ -75,6 +75,7 @@ function getPersistedLastCollection(): number {
 // that produces no audible output but keeps the AudioContext alive.
 // ---------------------------------------------------------------------------
 let keepaliveCtx: AudioContext | null = null
+let keepaliveAbort: AbortController | null = null
 
 function startAudioKeepalive(): void {
   if (typeof window === 'undefined' || keepaliveCtx) return
@@ -95,17 +96,20 @@ function startAudioKeepalive(): void {
     gain.connect(ctx.destination)
     oscillator.start()
 
-    // Handle autoplay policy — resume on first user interaction if needed
+    // Handle autoplay policy — resume on first user interaction if needed.
+    // Use AbortController so stopAudioKeepalive() can clean up the listeners
+    // even if no user interaction has occurred yet.
     if (ctx.state === 'suspended') {
+      const ac = new AbortController()
+      keepaliveAbort = ac
       const resume = () => {
         ctx.resume().catch(() => {})
-        document.removeEventListener('click', resume)
-        document.removeEventListener('keydown', resume)
-        document.removeEventListener('touchstart', resume)
+        ac.abort() // removes all listeners registered with this signal
       }
-      document.addEventListener('click', resume, { once: true })
-      document.addEventListener('keydown', resume, { once: true })
-      document.addEventListener('touchstart', resume, { once: true })
+      const opts = { once: true, signal: ac.signal }
+      document.addEventListener('click', resume, opts)
+      document.addEventListener('keydown', resume, opts)
+      document.addEventListener('touchstart', resume, opts)
     }
 
     keepaliveCtx = ctx
@@ -116,6 +120,11 @@ function startAudioKeepalive(): void {
 }
 
 function stopAudioKeepalive(): void {
+  // Clean up any pending autoplay-resume listeners
+  if (keepaliveAbort) {
+    keepaliveAbort.abort()
+    keepaliveAbort = null
+  }
   if (keepaliveCtx) {
     keepaliveCtx.close().catch(() => {})
     keepaliveCtx = null
