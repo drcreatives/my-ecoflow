@@ -75,6 +75,7 @@ function getPersistedLastCollection(): number {
 // that produces no audible output but keeps the AudioContext alive.
 // ---------------------------------------------------------------------------
 let keepaliveCtx: AudioContext | null = null
+let keepaliveOsc: OscillatorNode | null = null
 let keepaliveAbort: AbortController | null = null
 
 function startAudioKeepalive(): void {
@@ -95,6 +96,7 @@ function startAudioKeepalive(): void {
     oscillator.connect(gain)
     gain.connect(ctx.destination)
     oscillator.start()
+    keepaliveOsc = oscillator
 
     // Handle autoplay policy — resume on first user interaction if needed.
     // Use AbortController so stopAudioKeepalive() can clean up the listeners
@@ -124,6 +126,10 @@ function stopAudioKeepalive(): void {
   if (keepaliveAbort) {
     keepaliveAbort.abort()
     keepaliveAbort = null
+  }
+  if (keepaliveOsc) {
+    try { keepaliveOsc.stop() } catch { /* already stopped */ }
+    keepaliveOsc = null
   }
   if (keepaliveCtx) {
     keepaliveCtx.close().catch(() => {})
