@@ -106,16 +106,19 @@ export async function POST(_request: NextRequest) {
 
         const saved = await executeQuery<{ id: string }>(
           `INSERT INTO device_readings (
-             id, device_id, battery_level, input_watts, output_watts,
-             ac_output_watts, dc_output_watts, usb_output_watts,
+             id, device_id, battery_level, input_watts, ac_input_watts, dc_input_watts,
+             charging_type, output_watts, ac_output_watts, dc_output_watts, usb_output_watts,
              remaining_time, temperature, status, raw_data, recorded_at
            ) VALUES (
-             gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW()
+             gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW()
            ) RETURNING id`,
           [
             device.id,
             reading.batteryLevel ?? 0,
             reading.inputWatts ?? 0,
+            reading.acInputWatts ?? 0,
+            reading.dcInputWatts ?? 0,
+            reading.chargingType,
             reading.outputWatts ?? 0,
             reading.acOutputWatts ?? 0,
             reading.dcOutputWatts ?? 0,

@@ -22,6 +22,9 @@ export interface DeviceReading {
   deviceId: string
   batteryLevel?: number
   inputWatts?: number
+  acInputWatts?: number    // AC wall charging input
+  dcInputWatts?: number    // DC/Solar/Car charging input (MPPT)
+  chargingType?: number    // 0=null, 1=Adapter/DC, 2=Solar, 3=AC, 4=Gas, 5=Wind
   outputWatts?: number
   acOutputWatts?: number
   dcOutputWatts?: number

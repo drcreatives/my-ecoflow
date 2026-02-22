@@ -132,6 +132,9 @@ export async function POST(request: NextRequest) {
             device_id, 
             battery_level, 
             input_watts, 
+            ac_input_watts,
+            dc_input_watts,
+            charging_type,
             output_watts,
             ac_output_watts,
             dc_output_watts,
@@ -155,6 +158,9 @@ export async function POST(request: NextRequest) {
             $9,
             $10,
             $11,
+            $12,
+            $13,
+            $14,
             NOW()
           )
           RETURNING id
@@ -162,6 +168,9 @@ export async function POST(request: NextRequest) {
           device.id,
           reading.batteryLevel || 0,
           reading.inputWatts || 0,
+          reading.acInputWatts || 0,
+          reading.dcInputWatts || 0,
+          reading.chargingType,
           reading.outputWatts || 0,
           reading.acOutputWatts || 0,
           reading.dcOutputWatts || 0,

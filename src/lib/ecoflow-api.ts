@@ -340,6 +340,20 @@ export class EcoFlowAPI {
 
     const quota = quotaData.quotaMap
     
+    // === INPUT POWER ===
+    // AC Input (from wall outlet via inverter)
+    const acInputWatts = this.getQuotaValue(quota, 'inv.inputWatts') || 0
+    
+    // DC Input (solar panels, car charger, or DC adapter via MPPT)
+    const dcInputWatts = this.getQuotaValue(quota, 'mppt.inWatts') || 0
+    
+    // Total input (use API total, or sum of AC + DC)
+    const totalInput = this.getQuotaValue(quota, 'pd.wattsInSum') || (acInputWatts + dcInputWatts)
+    
+    // Charging type: 0=null, 1=Adapter/DC, 2=MPPT/Solar, 3=AC, 4=Gas, 5=Wind
+    const chgType = this.getQuotaValue(quota, 'mppt.chgType')
+    
+    // === OUTPUT POWER ===
     // AC Output (from inverter)
     const acOutputWatts = this.getQuotaValue(quota, 'inv.outputWatts') || 0
     
@@ -365,7 +379,10 @@ export class EcoFlowAPI {
     return {
       deviceId,
       batteryLevel: this.getQuotaValue(quota, 'bms_bmsStatus.soc'),
-      inputWatts: this.getQuotaValue(quota, 'inv.inputWatts'),
+      inputWatts: totalInput,         // Total input from ALL sources (AC + DC/Solar)
+      acInputWatts: acInputWatts,     // AC wall charging input
+      dcInputWatts: dcInputWatts,     // DC/Solar/Car charging input (MPPT)
+      chargingType: chgType,          // 0=null, 1=Adapter, 2=Solar, 3=AC, 4=Gas, 5=Wind
       outputWatts: totalOutput,
       acOutputWatts: acOutputWatts,
       dcOutputWatts: dcOutputWatts,
@@ -396,11 +413,14 @@ export class EcoFlowAPI {
    * Determine device status based on quota data
    */
   private determineDeviceStatus(quotaMap: Record<string, { val: number; scale?: number }>): string {
-    const inputWatts = this.getQuotaValue(quotaMap, 'inv.inputWatts') || 0
+    // Use total input (pd.wattsInSum) to detect charging from ANY source (AC, solar, car)
+    const totalInput = this.getQuotaValue(quotaMap, 'pd.wattsInSum') || 
+                       (this.getQuotaValue(quotaMap, 'inv.inputWatts') || 0) + 
+                       (this.getQuotaValue(quotaMap, 'mppt.inWatts') || 0)
     const outputWatts = this.getQuotaValue(quotaMap, 'pd.wattsOutSum') || this.getQuotaValue(quotaMap, 'inv.outputWatts') || 0 // Total output (AC + DC)
     const batteryLevel = this.getQuotaValue(quotaMap, 'bms_bmsStatus.soc') || 0
 
-    if (inputWatts > 10) {
+    if (totalInput > 10) {
       return 'charging'
     } else if (outputWatts > 10) {
       return 'discharging'

@@ -53,9 +53,18 @@ export async function GET(_request: NextRequest) {
             }
 
             // Use Delta 2 specific field names
+            // Input power - AC from inverter, DC from MPPT (solar/car charger)
+            const acInputWatts = getQuotaValue('inv.inputWatts') || 0
+            const dcInputWatts = getQuotaValue('mppt.inWatts') || 0
+            const totalInputWatts = getQuotaValue('pd.wattsInSum') || (acInputWatts + dcInputWatts)
+            const chargingType = getQuotaValue('mppt.chgType') ?? null
+
             currentReading = {
               batteryLevel: getQuotaValue('bms_bmsStatus.soc') || getQuotaValue('pd.soc') || 0,
-              inputWatts: getQuotaValue('inv.inputWatts') || getQuotaValue('pd.wattsInSum') || 0,
+              inputWatts: totalInputWatts,
+              acInputWatts: acInputWatts,
+              dcInputWatts: dcInputWatts,
+              chargingType: chargingType,
               outputWatts: getQuotaValue('pd.wattsOutSum') || getQuotaValue('inv.outputWatts') || 0, // Total output (AC + DC)
               // Granular power output breakdown
               acOutputWatts: getQuotaValue('inv.outputWatts') || getQuotaValue('inv.acWattsOut') || 0,
@@ -69,34 +78,42 @@ export async function GET(_request: NextRequest) {
                              (getQuotaValue('pd.qcUsb2Watts') || 0),
               temperature: getQuotaValue('bms_bmsStatus.temp') || 20,
               remainingTime: getQuotaValue('pd.remainTime') || null,
-              status: 'connected'
+              status: totalInputWatts > 10 ? 'charging'
+                : (getQuotaValue('pd.wattsOutSum') || getQuotaValue('inv.outputWatts') || 0) > 10 ? 'discharging'
+                : (getQuotaValue('bms_bmsStatus.soc') || 0) > 95 ? 'full'
+                : (getQuotaValue('bms_bmsStatus.soc') || 0) < 10 ? 'low'
+                : 'standby'
             }
 
-            // 📊 SAVE READING TO DATABASE for analytics
+            // 📊 SAVE READING TO DATABASE for analytics (use direct SQL for reliability)
             if (userDevice?.id && currentReading) {
               try {
-                const { error: insertError } = await supabase
-                  .from('device_readings')
-                  .insert({
-                    device_id: userDevice.id,
-                    battery_level: currentReading.batteryLevel,
-                    input_watts: currentReading.inputWatts,
-                    output_watts: currentReading.outputWatts,
-                    ac_output_watts: currentReading.acOutputWatts,
-                    dc_output_watts: currentReading.dcOutputWatts,
-                    usb_output_watts: currentReading.usbOutputWatts,
-                    remaining_time: currentReading.remainingTime,
-                    temperature: currentReading.temperature,
-                    status: currentReading.status,
-                    raw_data: quota.quotaMap,
-                    recorded_at: new Date().toISOString()
-                  })
-                
-                if (insertError) {
-                  console.error(`Failed to save reading for device ${ecoDevice.sn}:`, insertError)
-                } else {
-                  console.log(`✅ Saved reading for device ${ecoDevice.sn}`)
-                }
+                await executeQuery(
+                  `INSERT INTO device_readings (
+                    id, device_id, battery_level, input_watts, ac_input_watts, dc_input_watts,
+                    charging_type, output_watts, ac_output_watts, dc_output_watts, usb_output_watts,
+                    remaining_time, temperature, status, raw_data, recorded_at
+                  ) VALUES (
+                    gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW()
+                  )`,
+                  [
+                    userDevice.id,
+                    currentReading.batteryLevel || 0,
+                    currentReading.inputWatts || 0,
+                    currentReading.acInputWatts || 0,
+                    currentReading.dcInputWatts || 0,
+                    currentReading.chargingType,
+                    currentReading.outputWatts || 0,
+                    currentReading.acOutputWatts || 0,
+                    currentReading.dcOutputWatts || 0,
+                    currentReading.usbOutputWatts || 0,
+                    currentReading.remainingTime,
+                    currentReading.temperature || 0,
+                    currentReading.status || 'unknown',
+                    JSON.stringify({ sn: ecoDevice.sn, quotaMap: quota.quotaMap }),
+                  ]
+                )
+                console.log(`✅ Saved reading for device ${ecoDevice.sn}`)
               } catch (dbError) {
                 console.error(`Database error saving reading for ${ecoDevice.sn}:`, dbError)
               }
@@ -109,6 +126,9 @@ export async function GET(_request: NextRequest) {
           currentReading = {
             batteryLevel: 62, // Consistent realistic battery level
             inputWatts: 0, // Not charging currently
+            acInputWatts: 0, // No AC charging
+            dcInputWatts: 0, // No DC/Solar charging
+            chargingType: null,
             outputWatts: 45, // Moderate load (laptop + small devices)
             acOutputWatts: 35, // AC output (laptop charger)
             dcOutputWatts: 8, // DC output (car port charging)
