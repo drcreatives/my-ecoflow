@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EcoFlow Dashboard – Collection Timer Worker  (v2)
+// EcoFlow Dashboard – Collection Timer Worker  (v3)
 // ---------------------------------------------------------------------------
 // A dedicated Web Worker that provides a reliable timer for reading collection.
 //
@@ -7,14 +7,23 @@
 // -----------------
 // Browsers aggressively throttle `setInterval` / `setTimeout` on the main
 // thread when a tab is hidden.  Web Workers run in their own thread and are
-// largely immune to this — BUT Chrome can still "freeze" the entire tab
-// (including its workers) after extended idle via the Page Lifecycle API.
+// largely immune to this — BUT Chrome can still throttle/freeze workers
+// associated with hidden tabs under memory/CPU pressure.
 //
 // To combat this we:
 //   1. Hold a Web Lock ('ecoflow-collection-keepalive') for the lifetime of
 //      the timer.  An active lock hints Chrome to NOT freeze the tab.
-//   2. Send periodic HEARTBEAT messages (every 30 s) so the main thread can
+//   2. Use recursive setTimeout (chained) instead of setInterval — chained
+//      timeouts are processed differently by some browsers and can be more
+//      resilient to throttling edge cases.
+//   3. Send periodic HEARTBEAT messages (every 30 s) so the main thread can
 //      detect if the worker was suspended and restart it.
+//   4. Self-monitor: detect when a tick fires significantly later than
+//      expected (drift) and log it for diagnostics.
+//
+// The main thread also starts a silent AudioContext which is the primary
+// throttle-prevention mechanism (Chrome exempts "audible" tabs from all
+// timer throttling).
 //
 // Protocol (postMessage):
 //   → { type: 'START',           intervalMs: number }
@@ -28,14 +37,15 @@ let timerId = null
 let heartbeatId = null
 let intervalMs = 5 * 60 * 1000 // default 5 min
 let lockHeld = false
+let lastTickTime = 0
 
 const HEARTBEAT_INTERVAL = 30_000 // 30 seconds
+// If a tick fires more than 50% late, log a drift warning
+const DRIFT_WARN_FACTOR = 1.5
 
 // ---------------------------------------------------------------------------
 // Web Lock keepalive
 // ---------------------------------------------------------------------------
-// navigator.locks is available inside workers in Chrome 69+.
-// Holding a lock prevents the tab from being frozen by Chrome's lifecycle.
 function acquireKeepaliveLock() {
   if (lockHeld) return
   if (typeof navigator !== 'undefined' && navigator.locks) {
@@ -43,14 +53,10 @@ function acquireKeepaliveLock() {
       'ecoflow-collection-keepalive',
       { mode: 'exclusive', ifAvailable: false },
       () =>
-        // Return a promise that never resolves — keeps the lock held
-        // until the worker is terminated or STOP is called.
         new Promise((resolve) => {
           self._releaseLock = resolve
         })
-    ).catch(() => {
-      // Web Locks unavailable or rejected — not critical
-    })
+    ).catch(() => {})
     lockHeld = true
   }
 }
@@ -68,37 +74,65 @@ function releaseKeepaliveLock() {
 // ---------------------------------------------------------------------------
 function startHeartbeat() {
   stopHeartbeat()
-  heartbeatId = setInterval(() => {
+  // Use recursive setTimeout for heartbeats too
+  function beat() {
     self.postMessage({ type: 'HEARTBEAT', timestamp: Date.now() })
-  }, HEARTBEAT_INTERVAL)
+    heartbeatId = setTimeout(beat, HEARTBEAT_INTERVAL)
+  }
+  beat()
 }
 
 function stopHeartbeat() {
   if (heartbeatId !== null) {
-    clearInterval(heartbeatId)
+    clearTimeout(heartbeatId)
     heartbeatId = null
   }
 }
 
 // ---------------------------------------------------------------------------
-// Timer
+// Timer – recursive setTimeout (more resilient than setInterval)
 // ---------------------------------------------------------------------------
+function scheduleTick() {
+  timerId = setTimeout(() => {
+    const now = Date.now()
+
+    // Drift detection: warn if this tick is much later than expected
+    if (lastTickTime > 0) {
+      const elapsed = now - lastTickTime
+      if (elapsed > intervalMs * DRIFT_WARN_FACTOR) {
+        console.warn(
+          `[Worker] Timer drift detected: expected ${intervalMs}ms, got ${elapsed}ms (${Math.round(elapsed / intervalMs * 100)}%)`
+        )
+      }
+    }
+
+    lastTickTime = now
+    self.postMessage({ type: 'TICK' })
+
+    // Chain the next tick
+    scheduleTick()
+  }, intervalMs)
+}
+
 function startTimer() {
   stopTimer()
   acquireKeepaliveLock()
   startHeartbeat()
+
   // Immediate first tick
+  lastTickTime = Date.now()
   self.postMessage({ type: 'TICK' })
-  timerId = setInterval(() => {
-    self.postMessage({ type: 'TICK' })
-  }, intervalMs)
+
+  // Schedule subsequent ticks via recursive setTimeout
+  scheduleTick()
 }
 
 function stopTimer() {
   if (timerId !== null) {
-    clearInterval(timerId)
+    clearTimeout(timerId)
     timerId = null
   }
+  lastTickTime = 0
   stopHeartbeat()
   releaseKeepaliveLock()
 }
