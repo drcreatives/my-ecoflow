@@ -61,6 +61,69 @@ function getPersistedLastCollection(): number {
 }
 
 // ---------------------------------------------------------------------------
+// Silent AudioContext keepalive
+// ---------------------------------------------------------------------------
+// Chrome (87+) applies "intensive timer throttling" to hidden tabs, limiting
+// setInterval/setTimeout to at most once per minute — even inside Web Workers
+// in some builds (108+).  Web Locks do NOT prevent this.
+//
+// However Chrome EXEMPTS tabs that have an AudioContext in the "running" state
+// from ALL timer throttling.  This is the same technique Discord, Google Meet
+// and Slack use to keep real-time features alive in background tabs.
+//
+// We create a minimal audio graph (silent oscillator → gain=0 → destination)
+// that produces no audible output but keeps the AudioContext alive.
+// ---------------------------------------------------------------------------
+let keepaliveCtx: AudioContext | null = null
+
+function startAudioKeepalive(): void {
+  if (typeof window === 'undefined' || keepaliveCtx) return
+
+  try {
+    const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    if (!AudioCtx) return
+
+    const ctx = new AudioCtx()
+    const oscillator = ctx.createOscillator()
+    const gain = ctx.createGain()
+
+    // Inaudible: 1 Hz is far below human hearing, gain is 0
+    oscillator.frequency.value = 1
+    gain.gain.value = 0
+
+    oscillator.connect(gain)
+    gain.connect(ctx.destination)
+    oscillator.start()
+
+    // Handle autoplay policy — resume on first user interaction if needed
+    if (ctx.state === 'suspended') {
+      const resume = () => {
+        ctx.resume().catch(() => {})
+        document.removeEventListener('click', resume)
+        document.removeEventListener('keydown', resume)
+        document.removeEventListener('touchstart', resume)
+      }
+      document.addEventListener('click', resume, { once: true })
+      document.addEventListener('keydown', resume, { once: true })
+      document.addEventListener('touchstart', resume, { once: true })
+    }
+
+    keepaliveCtx = ctx
+    console.log('[Keepalive] Silent AudioContext started — tab timer throttling disabled')
+  } catch {
+    // AudioContext unavailable — fall through to other layers
+  }
+}
+
+function stopAudioKeepalive(): void {
+  if (keepaliveCtx) {
+    keepaliveCtx.close().catch(() => {})
+    keepaliveCtx = null
+    console.log('[Keepalive] Silent AudioContext stopped')
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
@@ -329,6 +392,10 @@ export const useClientSideReadingCollection = (
       intervalMinutes,
     }))
 
+    // Silent AudioContext prevents Chrome from throttling this tab's
+    // timers (including the Web Worker) while the tab is hidden.
+    startAudioKeepalive()
+
     const worker = ensureWorker()
     worker?.postMessage({
       type: 'START',
@@ -344,6 +411,7 @@ export const useClientSideReadingCollection = (
 
     workerRef.current?.postMessage({ type: 'STOP' })
     stopHeartbeatMonitor()
+    stopAudioKeepalive()
 
     setStatus((prev) => ({ ...prev, isActive: false }))
   }, [stopHeartbeatMonitor])
@@ -402,6 +470,7 @@ export const useClientSideReadingCollection = (
       workerRef.current?.terminate()
       workerRef.current = null
       stopHeartbeatMonitor()
+      stopAudioKeepalive()
     }
   }, [stopHeartbeatMonitor])
 
