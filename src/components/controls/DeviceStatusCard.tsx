@@ -30,6 +30,9 @@ interface DeviceData {
   currentReading?: {
     batteryLevel?: number
     inputWatts?: number
+    acInputWatts?: number
+    dcInputWatts?: number
+    chargingType?: number | null
     outputWatts?: number
     temperature?: number
     remainingTime?: number
@@ -40,6 +43,19 @@ interface DeviceData {
 interface DeviceStatusCardProps {
   device: DeviceData
   isCompact?: boolean
+}
+
+const CHARGING_TYPE_LABELS: Record<number, string> = {
+  1: 'DC Input',
+  2: 'Solar Input',
+  3: 'AC Input',
+  4: 'Gas Input',
+  5: 'Wind Input',
+}
+
+function getInputLabel(chargingType?: number | null, inputWatts?: number): string {
+  if (!inputWatts || inputWatts <= 0 || chargingType == null) return 'Input'
+  return CHARGING_TYPE_LABELS[chargingType] ?? 'Input'
 }
 
 export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCardProps) => {
@@ -287,7 +303,9 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
               {inputWatts}W
             </span>
             {!isCompact && (
-              <span className="text-xs text-text-muted">Input</span>
+              <span className="text-xs text-text-muted">
+                {getInputLabel(device.currentReading?.chargingType, inputWatts)}
+              </span>
             )}
           </div>
         </div>

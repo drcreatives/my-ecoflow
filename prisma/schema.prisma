@@ -50,6 +50,9 @@ model DeviceReading {
   deviceId         String   @map("device_id")
   batteryLevel     Int?     @map("battery_level")
   inputWatts       Decimal? @map("input_watts") @db.Decimal(10, 2)
+  acInputWatts     Decimal? @map("ac_input_watts") @db.Decimal(10, 2)
+  dcInputWatts     Decimal? @map("dc_input_watts") @db.Decimal(10, 2)
+  chargingType     Int?     @map("charging_type") // 0=null, 1=Adapter/DC, 2=Solar, 3=AC, 4=Gas, 5=Wind
   outputWatts      Decimal? @map("output_watts") @db.Decimal(10, 2)
   acOutputWatts    Decimal? @map("ac_output_watts") @db.Decimal(10, 2)
   dcOutputWatts    Decimal? @map("dc_output_watts") @db.Decimal(10, 2)

@@ -7,6 +7,9 @@ interface DeviceReading {
   deviceId: string;
   batteryLevel: number | null;
   inputWatts: number | null;
+  acInputWatts: number | null;
+  dcInputWatts: number | null;
+  chargingType: number | null;
   outputWatts: number | null;
   temperature: number | null;
   status: string;
@@ -115,6 +118,9 @@ export async function GET(request: NextRequest) {
         dr.device_id as "deviceId",
         dr.battery_level as "batteryLevel",
         dr.input_watts as "inputWatts",
+        dr.ac_input_watts as "acInputWatts",
+        dr.dc_input_watts as "dcInputWatts",
+        dr.charging_type as "chargingType",
         dr.output_watts as "outputWatts",
         dr.ac_output_watts as "acOutputWatts",
         dr.dc_output_watts as "dcOutputWatts",
@@ -158,13 +164,16 @@ export async function GET(request: NextRequest) {
             dr.device_id as "deviceId",
             AVG(dr.battery_level) as "batteryLevel",
             AVG(dr.input_watts) as "inputWatts",
+            AVG(dr.ac_input_watts) as "acInputWatts",
+            AVG(dr.dc_input_watts) as "dcInputWatts",
+            (array_agg(dr.charging_type ORDER BY dr.recorded_at DESC))[1] as "chargingType",
             AVG(dr.output_watts) as "outputWatts",
             AVG(dr.ac_output_watts) as "acOutputWatts",
             AVG(dr.dc_output_watts) as "dcOutputWatts",
             AVG(dr.usb_output_watts) as "usbOutputWatts",
             AVG(dr.temperature) as "temperature",
             AVG(dr.remaining_time) as "remainingTime",
-            MODE() WITHIN GROUP (ORDER BY dr.status) as status,
+            (array_agg(dr.status ORDER BY dr.recorded_at DESC))[1] as status,
             date_trunc('hour', dr.recorded_at) + 
             INTERVAL '5 minutes' * FLOOR(EXTRACT(minute FROM dr.recorded_at) / 5) as "recordedAt"
           FROM device_readings dr
@@ -184,13 +193,16 @@ export async function GET(request: NextRequest) {
             dr.device_id as "deviceId",
             AVG(dr.battery_level) as "batteryLevel",
             AVG(dr.input_watts) as "inputWatts",
+            AVG(dr.ac_input_watts) as "acInputWatts",
+            AVG(dr.dc_input_watts) as "dcInputWatts",
+            (array_agg(dr.charging_type ORDER BY dr.recorded_at DESC))[1] as "chargingType",
             AVG(dr.output_watts) as "outputWatts",
             AVG(dr.ac_output_watts) as "acOutputWatts",
             AVG(dr.dc_output_watts) as "dcOutputWatts",
             AVG(dr.usb_output_watts) as "usbOutputWatts",
             AVG(dr.temperature) as "temperature",
             AVG(dr.remaining_time) as "remainingTime",
-            MODE() WITHIN GROUP (ORDER BY dr.status) as status,
+            (array_agg(dr.status ORDER BY dr.recorded_at DESC))[1] as status,
             date_trunc('${truncInterval}', dr.recorded_at) as "recordedAt"
           FROM device_readings dr
           JOIN devices d ON dr.device_id = d.id
@@ -235,6 +247,9 @@ export async function GET(request: NextRequest) {
         deviceId: reading.deviceId,
         batteryLevel: reading.batteryLevel ? Number(reading.batteryLevel) : null,
         inputWatts: reading.inputWatts ? Number(reading.inputWatts) : null,
+        acInputWatts: reading.acInputWatts ? Number(reading.acInputWatts) : null,
+        dcInputWatts: reading.dcInputWatts ? Number(reading.dcInputWatts) : null,
+        chargingType: reading.chargingType != null ? Number(reading.chargingType) : null,
         outputWatts: reading.outputWatts ? Number(reading.outputWatts) : null,
         acOutputWatts: reading.acOutputWatts ? Number(reading.acOutputWatts) : null,
         dcOutputWatts: reading.dcOutputWatts ? Number(reading.dcOutputWatts) : null,

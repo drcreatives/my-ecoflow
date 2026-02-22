@@ -674,9 +674,11 @@ function HistoryPage() {
                           </td>
                           <td className="p-4 text-sm">
                             <span className={`px-2 py-1 rounded-pill text-xs font-medium ${
-                              reading.status === 'normal' ? 'bg-brand-primary/10 text-brand-primary' :
-                              reading.status === 'charging' ? 'bg-brand-tertiary/10 text-brand-tertiary' :
-                              reading.status === 'discharging' ? 'bg-warning/10 text-warning' :
+                              reading.status === 'charging' ? 'bg-brand-primary/10 text-brand-primary' :
+                              reading.status === 'discharging' ? 'bg-brand-tertiary/10 text-brand-tertiary' :
+                              reading.status === 'full' ? 'bg-success/10 text-success' :
+                              reading.status === 'low' ? 'bg-danger/10 text-danger' :
+                              reading.status === 'standby' ? 'bg-surface-2 text-text-secondary' :
                               'bg-surface-2 text-text-muted'
                             }`}>
                               {reading.status || 'unknown'}

@@ -24,12 +24,16 @@ interface ChartDataPoint {
   formattedTime: string
   batteryLevel?: number
   inputWatts?: number
+  acInputWatts?: number
+  dcInputWatts?: number
+  chargingType?: number
   outputWatts?: number
   acOutputWatts?: number
   dcOutputWatts?: number
   usbOutputWatts?: number
   temperature?: number
   totalOutput?: number
+  totalInput?: number
 }
 
 // Convert DeviceReading[] to chart-friendly format
@@ -39,12 +43,16 @@ export const transformReadingsToChartData = (readings: DeviceReading[]): ChartDa
     formattedTime: format(reading.recordedAt, 'MMM dd HH:mm'),
     batteryLevel: reading.batteryLevel,
     inputWatts: reading.inputWatts,
+    acInputWatts: reading.acInputWatts,
+    dcInputWatts: reading.dcInputWatts,
+    chargingType: reading.chargingType,
     outputWatts: reading.outputWatts,
     acOutputWatts: reading.acOutputWatts,
     dcOutputWatts: reading.dcOutputWatts,
     usbOutputWatts: reading.usbOutputWatts,
     temperature: reading.temperature,
-    totalOutput: (reading.acOutputWatts || 0) + (reading.dcOutputWatts || 0) + (reading.usbOutputWatts || 0)
+    totalOutput: (reading.acOutputWatts || 0) + (reading.dcOutputWatts || 0) + (reading.usbOutputWatts || 0),
+    totalInput: (reading.acInputWatts || 0) + (reading.dcInputWatts || 0)
   }))
 }
 
@@ -146,20 +154,30 @@ export const PowerUsageChart = ({ data, height = 300, showBreakdown = false }: P
                 const displayName = name === 'acOutputWatts' ? 'AC Output' :
                                  name === 'dcOutputWatts' ? 'DC Output' :
                                  name === 'usbOutputWatts' ? 'USB Output' :
-                                 name === 'inputWatts' ? 'Input Power' : name
+                                 name === 'acInputWatts' ? 'AC Input (Wall)' :
+                                 name === 'dcInputWatts' ? 'DC Input (Solar/Car)' :
+                                 name === 'inputWatts' ? 'Total Input' : name
                 return [`${value}${unit}`, displayName]
               }}
             />
             <Legend />
             
-            {/* Input power as line */}
+            {/* Input power - show AC vs DC input breakdown */}
             <Line
               type="monotone"
-              dataKey="inputWatts"
+              dataKey="acInputWatts"
               stroke="#3a6fe3"
               strokeWidth={2}
               dot={false}
-              name="Input Power"
+              name="AC Input (Wall)"
+            />
+            <Line
+              type="monotone"
+              dataKey="dcInputWatts"
+              stroke="#8b5cf6"
+              strokeWidth={2}
+              dot={false}
+              name="DC Input (Solar/Car)"
             />
             
             {/* Stacked areas for output breakdown */}
@@ -220,7 +238,9 @@ export const PowerUsageChart = ({ data, height = 300, showBreakdown = false }: P
             content={<CustomTooltip />}
             formatter={(value: any, name: string) => {
               const unit = 'W'
-              const displayName = name === 'inputWatts' ? 'Input Power' : 
+              const displayName = name === 'inputWatts' ? 'Total Input' : 
+                               name === 'acInputWatts' ? 'AC Input (Wall)' :
+                               name === 'dcInputWatts' ? 'DC Input (Solar/Car)' :
                                name === 'outputWatts' ? 'Output Power' : name
               return [`${value}${unit}`, displayName]
             }}
@@ -232,7 +252,25 @@ export const PowerUsageChart = ({ data, height = 300, showBreakdown = false }: P
             stroke="#3a6fe3"
             strokeWidth={2}
             dot={false}
-            name="Input Power"
+            name="Total Input"
+          />
+          <Line
+            type="monotone"
+            dataKey="acInputWatts"
+            stroke="#60a5fa"
+            strokeWidth={1.5}
+            dot={false}
+            strokeDasharray="5 5"
+            name="AC Input (Wall)"
+          />
+          <Line
+            type="monotone"
+            dataKey="dcInputWatts"
+            stroke="#8b5cf6"
+            strokeWidth={1.5}
+            dot={false}
+            strokeDasharray="5 5"
+            name="DC Input (Solar/Car)"
           />
           <Line
             type="monotone"
@@ -321,7 +359,10 @@ export const PowerFlowChart = ({ data, height = 300 }: PowerFlowChartProps) => {
             content={<CustomTooltip />}
             formatter={(value: any, name: string) => {
               const unit = 'W'
-              const displayName = name === 'inputWatts' ? 'Input Power' : 'Total Output'
+              const displayName = name === 'inputWatts' ? 'Total Input' : 
+                               name === 'acInputWatts' ? 'AC Input (Wall)' :
+                               name === 'dcInputWatts' ? 'DC Input (Solar/Car)' :
+                               'Total Output'
               return [`${value}${unit}`, displayName]
             }}
           />
@@ -332,7 +373,15 @@ export const PowerFlowChart = ({ data, height = 300 }: PowerFlowChartProps) => {
             stroke="#3a6fe3"
             fill="#3a6fe3"
             fillOpacity={0.3}
-            name="Input Power"
+            name="Total Input"
+          />
+          <Area
+            type="monotone"
+            dataKey="dcInputWatts"
+            stroke="#8b5cf6"
+            fill="#8b5cf6"
+            fillOpacity={0.2}
+            name="DC Input (Solar/Car)"
           />
           <Area
             type="monotone"
