@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { 
   Download,
@@ -129,11 +129,14 @@ function HistoryPage() {
     }
   )
 
+  // Reverse readings so the table shows newest first (query returns asc for charts)
+  const tableReadings = useMemo(() => [...readings].reverse(), [readings])
+
   // Pagination calculations
-  const totalPages = Math.max(1, Math.ceil(readings.length / itemsPerPage))
+  const totalPages = Math.max(1, Math.ceil(tableReadings.length / itemsPerPage))
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedReadings = readings.slice(startIndex, endIndex)
+  const paginatedReadings = tableReadings.slice(startIndex, endIndex)
 
   // Reset to first page when filters change
   useEffect(() => {
