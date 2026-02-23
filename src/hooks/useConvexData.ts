@@ -220,7 +220,6 @@ export function useConvexHistoryReadings(
           startTime,
           endTime,
           aggregation: filters?.aggregation ?? "1h",
-          limit: filters?.limit ?? 500,
         }
       : "skip"
   );

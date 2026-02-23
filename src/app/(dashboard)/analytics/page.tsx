@@ -96,7 +96,6 @@ function AnalyticsPage() {
 			customStartDate: filters.customStartDate,
 			customEndDate: filters.customEndDate,
 			aggregation: filters.aggregation,
-			limit: 500,
 		}
 	);
 

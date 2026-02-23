@@ -163,7 +163,7 @@ export const history = query({
             .lte("recordedAt", args.endTime)
         )
         .order("asc")
-        .take(limit as number);
+        .collect();
 
       for (const r of readings) {
         allReadings.push({
