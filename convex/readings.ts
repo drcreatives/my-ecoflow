@@ -104,7 +104,6 @@ export const history = query({
     deviceId: v.optional(v.id("devices")),
     startTime: v.float64(), // epoch ms
     endTime: v.float64(), // epoch ms
-    limit: v.optional(v.float64()),
     aggregation: v.optional(v.string()), // "raw" | "5m" | "15m" | "1h" | "1d"
   },
   handler: async (ctx, args) => {
@@ -127,7 +126,6 @@ export const history = query({
       if (!owned) return { readings: [], summary: null };
     }
 
-    const limit = args.limit ?? 1000;
     const allReadings: Array<{
       deviceId: Id<"devices">;
       deviceName: string;
@@ -154,7 +152,11 @@ export const history = query({
       const device = deviceMap.get(devId);
       if (!device) continue;
 
-      const readings = await ctx.db
+      // Use .take() with a safe cap to stay within Convex query limits.
+      // 1-minute collection ≈ 1,440/day, so 4000 covers ~2.8 days of raw data.
+      // Fetch DESC so we always keep the NEWEST readings for large ranges,
+      // then reverse to chronological order for aggregation/charts.
+      const rawReadings = await ctx.db
         .query("deviceReadings")
         .withIndex("by_deviceId_recordedAt", (q) =>
           q
@@ -162,8 +164,11 @@ export const history = query({
             .gte("recordedAt", args.startTime)
             .lte("recordedAt", args.endTime)
         )
-        .order("asc")
-        .collect();
+        .order("desc")
+        .take(4000);
+
+      // Reverse to chronological order (oldest → newest)
+      const readings = rawReadings.reverse();
 
       for (const r of readings) {
         allReadings.push({

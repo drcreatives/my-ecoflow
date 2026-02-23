@@ -98,7 +98,6 @@ export function useConvexReadingHistory(
     startTime?: number;
     endTime?: number;
     aggregation?: "raw" | "5m" | "15m" | "1h" | "1d";
-    limit?: number;
   }
 ) {
   const result = useQuery(
@@ -107,9 +106,8 @@ export function useConvexReadingHistory(
       ? {
           deviceId: deviceId as Id<"devices">,
           startTime: options?.startTime ?? Date.now() - 24 * 60 * 60 * 1000,
-          endTime: options?.endTime ?? Date.now(),
+          endTime: options?.endTime ?? Date.now() + 24 * 60 * 60 * 1000,
           aggregation: options?.aggregation,
-          limit: options?.limit,
         }
       : "skip"
   );
@@ -182,7 +180,9 @@ function timeRangeToEpoch(timeRange: string): { startDate: number; endDate: numb
   };
   return {
     startDate: now - (rangeMs[timeRange] ?? rangeMs["24h"]),
-    endDate: now,
+    // Use a generous future buffer so Convex reactive queries include
+    // new readings that arrive after the page loads (cron inserts every minute).
+    endDate: now + 24 * 60 * 60 * 1000,
   };
 }
 
@@ -197,7 +197,6 @@ export function useConvexHistoryReadings(
     customStartDate?: string;
     customEndDate?: string;
     aggregation?: "raw" | "5m" | "15m" | "1h" | "1d";
-    limit?: number;
   }
 ) {
   // Compute start/end dates from filter state
