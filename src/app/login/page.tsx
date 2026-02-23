@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase'
+import { useAuthActions } from '@convex-dev/auth/react'
+import { useConvexAuth } from 'convex/react'
 import { Eye, EyeOff, Power, Zap, Lock, Mail, ArrowRight } from 'lucide-react'
 
 interface FormData {
@@ -31,18 +32,15 @@ export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const { signIn } = useAuthActions()
+  const { isAuthenticated, isLoading: authLoading } = useConvexAuth()
 
-  // Check if user is already logged in
+  // Redirect if already authenticated
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        router.push('/dashboard')
-      }
+    if (!authLoading && isAuthenticated) {
+      router.push('/dashboard')
     }
-    checkUser()
-  }, [router, supabase.auth])
+  }, [isAuthenticated, authLoading, router])
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {}
@@ -83,36 +81,23 @@ export default function AuthPage() {
     setErrors({})
 
     try {
-      if (isLogin) {
-        // Login
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password
-        })
+      const formDataObj = new FormData()
+      formDataObj.set('email', formData.email)
+      formDataObj.set('password', formData.password)
+      formDataObj.set('flow', isLogin ? 'signIn' : 'signUp')
 
-        if (error) {
-          setErrors({ general: error.message })
-        } else if (data.session) {
-          router.push('/dashboard')
-        }
-      } else {
-        // Signup
-        const { data, error } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password
-        })
-
-        if (error) {
-          setErrors({ general: error.message })
-        } else if (data.user) {
-          setErrors({ 
-            general: 'Check your email for a confirmation link to complete registration!' 
-          })
-        }
-      }
+      await signIn('password', formDataObj)
+      router.push('/dashboard')
     } catch (err) {
       console.error('Auth error:', err)
-      setErrors({ general: 'An unexpected error occurred. Please try again.' })
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred'
+      if (message.includes('Could not find') || message.includes('Invalid')) {
+        setErrors({ general: 'Invalid email or password. Please try again.' })
+      } else if (message.includes('already exists') || message.includes('duplicate')) {
+        setErrors({ general: 'An account with this email already exists. Try signing in.' })
+      } else {
+        setErrors({ general: message })
+      }
     } finally {
       setIsLoading(false)
     }
