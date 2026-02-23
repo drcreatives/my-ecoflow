@@ -185,7 +185,27 @@ function transformQuotaToReading(data: Record<string, number | string>) {
   // === BATTERY & STATUS ===
   const batteryLevel = getQuotaValue(data, "bms_bmsStatus.soc");
   const temperature = getQuotaValue(data, "bms_bmsStatus.temp");
-  const remainingTime = getQuotaValue(data, "bms_bmsStatus.remainTime");
+
+  // remainingTime: prefer bms_emsStatus (precise minutes) over pd.remainTime (rounded by firmware).
+  // Use pd.remainTime sign convention: positive=charging, negative=discharging.
+  const chgRemain = getQuotaValue(data, "bms_emsStatus.chgRemainTime");
+  const dsgRemain = getQuotaValue(data, "bms_emsStatus.dsgRemainTime");
+  const pdRemain = getQuotaValue(data, "pd.remainTime");
+
+  let remainingTime: number | null = null;
+
+  // Determine charging vs discharging from pd.remainTime sign or status
+  const isCharging = (pdRemain !== null && pdRemain > 0) || (totalInput > 10);
+
+  if (isCharging && chgRemain && chgRemain > 0) {
+    remainingTime = chgRemain; // positive = time until full charge
+  } else if (!isCharging && dsgRemain && dsgRemain > 0) {
+    remainingTime = -dsgRemain; // negative = time until discharge
+  } else if (pdRemain !== null && pdRemain !== 0) {
+    remainingTime = pdRemain; // fallback to pd.remainTime (rounded but signed)
+  } else {
+    remainingTime = getQuotaValue(data, "bms_bmsStatus.remainTime");
+  }
 
   let status = "standby";
   if (totalInput > 10) status = "charging";
