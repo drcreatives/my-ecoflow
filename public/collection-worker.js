@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EcoFlow Dashboard – Collection Timer Worker  (v3)
+// EcoFlow Dashboard – Collection Timer Worker  (v4)
 // ---------------------------------------------------------------------------
 // A dedicated Web Worker that provides a reliable timer for reading collection.
 //
@@ -19,9 +19,9 @@
 //   3. Send periodic HEARTBEAT messages (every 30 s) so the main thread can
 //      detect if the worker was suspended and restart it.
 //   4. Self-monitor: detect when a tick fires significantly later than
-//      expected (drift) and log it for diagnostics.
+//      expected (drift) and self-heal by resetting the timer chain.
 //
-// The main thread also starts a silent AudioContext which is the primary
+// The main thread also starts a non-silent AudioContext which is the primary
 // throttle-prevention mechanism (Chrome exempts "audible" tabs from all
 // timer throttling).
 //
@@ -42,6 +42,8 @@ let lastTickTime = 0
 const HEARTBEAT_INTERVAL = 30_000 // 30 seconds
 // If a tick fires more than 50% late, log a drift warning
 const DRIFT_WARN_FACTOR = 1.5
+// If a tick fires more than 3x late, the timer chain may be broken — self-heal
+const DRIFT_RESET_FACTOR = 3
 
 // ---------------------------------------------------------------------------
 // Web Lock keepalive
@@ -99,6 +101,19 @@ function scheduleTick() {
     // Drift detection: warn if this tick is much later than expected
     if (lastTickTime > 0) {
       const elapsed = now - lastTickTime
+      if (elapsed > intervalMs * DRIFT_RESET_FACTOR) {
+        // Severe drift — the timer chain was likely frozen then resumed.
+        // Self-heal: emit the tick and restart the chain cleanly.
+        console.warn(
+          `[Worker] Severe drift: expected ${intervalMs}ms, got ${elapsed}ms — self-healing`
+        )
+        lastTickTime = now
+        self.postMessage({ type: 'TICK' })
+        // Clear and re-schedule from scratch
+        if (timerId !== null) clearTimeout(timerId)
+        scheduleTick()
+        return
+      }
       if (elapsed > intervalMs * DRIFT_WARN_FACTOR) {
         console.warn(
           `[Worker] Timer drift detected: expected ${intervalMs}ms, got ${elapsed}ms (${Math.round(elapsed / intervalMs * 100)}%)`

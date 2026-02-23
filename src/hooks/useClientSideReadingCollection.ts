@@ -89,9 +89,19 @@ function startAudioKeepalive(): void {
     const oscillator = ctx.createOscillator()
     const gain = ctx.createGain()
 
-    // Inaudible: 1 Hz is far below human hearing, gain is 0
+    // The oscillator runs at 1 Hz — far below the 20 Hz lower bound of
+    // human hearing AND below what any speaker can physically reproduce, so
+    // absolutely no sound is emitted.
+    //
+    // Gain is set to 0.001 (≈ −60 dBFS) instead of 0.  Chrome's internal
+    // AudioPowerMonitor has a silence threshold around −72 dBFS (~0.00025
+    // amplitude).  With gain = 0 the stream contained only zero-samples and
+    // Chrome still classified the tab as "silent", keeping intensive timer
+    // throttling active.  A gain of 0.001 is well above that threshold so
+    // Chrome now sees non-zero audio → marks the tab "audible" → exempts it
+    // from ALL timer throttling (main thread AND Web Workers).
     oscillator.frequency.value = 1
-    gain.gain.value = 0
+    gain.gain.value = 0.001
 
     oscillator.connect(gain)
     gain.connect(ctx.destination)
@@ -149,11 +159,13 @@ function stopAudioKeepalive(): void {
  *
  * | Layer | What it does |
  * |-------|-------------|
- * | Web Worker timer | Fires at the configured interval; immune to main-thread throttling |
+ * | AudioContext keepalive | Non-silent 1 Hz oscillator (gain 0.001) makes Chrome classify the tab as "audible" → exempt from ALL timer throttling |
+ * | Web Worker timer (v4) | Fires at the configured interval; immune to main-thread throttling; self-heals after severe drift |
+ * | Main-thread backup timer | Redundant `setInterval` on the main thread — fires even if the Worker dies (once/min under throttling) |
  * | Web Lock keepalive | Holds `navigator.locks` to hint Chrome not to freeze the tab |
  * | Heartbeat monitor | Worker pings every 30 s; main thread checks every 45 s and restarts if dead |
  * | localStorage timestamp | Survives tab freeze/discard so we always know how stale we are |
- * | Catch-up on resume | `visibilitychange` + `freeze`/`resume` events trigger an immediate force-collect when the gap exceeds the interval |
+ * | Catch-up on resume | `visibilitychange` + `focus` + `pageshow` + `freeze`/`resume` events trigger an immediate force-collect when the gap exceeds the interval |
  */
 export const useClientSideReadingCollection = (
   options: UseClientSideReadingCollectionOptions = {}
@@ -175,6 +187,7 @@ export const useClientSideReadingCollection = (
   const collectReadingRef = useRef<(force?: boolean) => Promise<unknown>>(null!)
   const lastHeartbeatRef = useRef<number>(Date.now())
   const heartbeatCheckRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const backupTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const isActiveRef = useRef(false)
 
   // Keep the callback ref current without re-running effects
@@ -375,12 +388,35 @@ export const useClientSideReadingCollection = (
       }
     }
 
+    // "focus" fires when the user clicks on the window — sometimes more
+    // reliable than visibilitychange (e.g. switching between windows on
+    // the same desktop, or clicking into the window after using another app).
+    const handleFocus = () => {
+      if (isActiveRef.current) {
+        catchUpIfNeeded()
+      }
+    }
+
+    // "pageshow" fires when navigating back to a bfcache'd page.  The
+    // `persisted` flag indicates the page was restored from cache.
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted && isActiveRef.current) {
+        console.log('[CLIENT] Page restored from bfcache — checking for gap')
+        restartWorker()
+        catchUpIfNeeded()
+      }
+    }
+
     document.addEventListener('resume', handleResume)
     document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleFocus)
+    window.addEventListener('pageshow', handlePageShow)
 
     return () => {
       document.removeEventListener('resume', handleResume)
       document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('pageshow', handlePageShow)
     }
   }, [restartWorker, catchUpIfNeeded])
 
@@ -418,6 +454,19 @@ export const useClientSideReadingCollection = (
     })
 
     startHeartbeatMonitor()
+
+    // Main-thread backup timer — a redundant setInterval that calls
+    // collectReading directly.  Under intensive throttling (hidden tab)
+    // this fires at most once per minute, but that's infinitely better
+    // than zero collections.  The isCollectingRef guard prevents
+    // double-collection when both the Worker and this timer fire.
+    if (backupTimerRef.current) clearInterval(backupTimerRef.current)
+    backupTimerRef.current = setInterval(() => {
+      if (isActiveRef.current) {
+        console.log('[BACKUP] Main-thread backup timer fired')
+        collectReadingRef.current()
+      }
+    }, intervalMinutes * 60 * 1000)
   }, [intervalMinutes, ensureWorker, startHeartbeatMonitor])
 
   const stopCollection = useCallback(() => {
@@ -427,6 +476,11 @@ export const useClientSideReadingCollection = (
     workerRef.current?.postMessage({ type: 'STOP' })
     stopHeartbeatMonitor()
     stopAudioKeepalive()
+
+    if (backupTimerRef.current) {
+      clearInterval(backupTimerRef.current)
+      backupTimerRef.current = null
+    }
 
     setStatus((prev) => ({ ...prev, isActive: false }))
   }, [stopHeartbeatMonitor])
@@ -486,6 +540,10 @@ export const useClientSideReadingCollection = (
       workerRef.current = null
       stopHeartbeatMonitor()
       stopAudioKeepalive()
+      if (backupTimerRef.current) {
+        clearInterval(backupTimerRef.current)
+        backupTimerRef.current = null
+      }
     }
   }, [stopHeartbeatMonitor])
 
