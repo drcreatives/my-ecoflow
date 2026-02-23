@@ -17,6 +17,7 @@ import type * as ecoflow from "../ecoflow.js";
 import type * as email from "../email.js";
 import type * as email_log from "../email_log.js";
 import type * as http from "../http.js";
+import type * as migrations from "../migrations.js";
 import type * as readings from "../readings.js";
 import type * as settings from "../settings.js";
 import type * as users from "../users.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   email: typeof email;
   email_log: typeof email_log;
   http: typeof http;
+  migrations: typeof migrations;
   readings: typeof readings;
   settings: typeof settings;
   users: typeof users;

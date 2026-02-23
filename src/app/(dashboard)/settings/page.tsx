@@ -310,17 +310,9 @@ function SettingsPage() {
   const handleTestEmail = async () => {
     setTestingEmail(true)
     try {
-      const response = await fetch('/api/email/test', {
-        method: 'GET'
-      })
-      
-      if (response.ok) {
-        const result = await response.json()
-        toast.success('Test email sent successfully! Check your inbox.')
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to send test email')
-      }
+      // Test emails are sent via Convex internal actions (triggered by device alerts)
+      // A manual test can be triggered from the Convex Dashboard
+      toast.info('Test emails are sent automatically when device alerts trigger. Check the Convex Dashboard for email logs.')
     } catch (error) {
       console.error('Test email error:', error)
       toast.error('Failed to send test email')
