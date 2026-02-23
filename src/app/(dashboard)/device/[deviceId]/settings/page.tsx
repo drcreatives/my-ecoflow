@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { useDeviceStore } from '@/stores/deviceStore';
+import { useConvexDevices, useConvexDeviceMutations } from '@/hooks/useConvexData';
 import Link from 'next/link';
 import { 
   ArrowLeft,
@@ -29,8 +29,9 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
   const { deviceId } = use(params);
   const router = useRouter();
   
-  // Use Zustand store for device management  
-  const { devices, isLoading: loading, error, fetchDevices, getDeviceById, updateDeviceSettings, unregisterDevice } = useDeviceStore();
+  // Use Convex reactive queries — no manual fetch needed
+  const { devices, isLoading: loading, error, getDeviceById } = useConvexDevices();
+  const { updateDevice, unregisterDevice } = useConvexDeviceMutations();
   
   // Get device from store
   const device = getDeviceById(deviceId);
@@ -49,26 +50,20 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
     }
   });
 
-  useEffect(() => {
-    // Ensure devices are loaded
-    if (devices.length === 0 && !loading) {
-      fetchDevices();
-    }
-    
-    // Initialize form data when device is available
-    if (device) {
-      setFormData({
-        deviceName: device.deviceName,
-        notifications: true,
-        autoCollectData: !device.id.startsWith('temp-'),
-        alertThresholds: {
-          lowBattery: 20,
-          highTemperature: 60,
-          powerLimit: 1000
-        }
-      });
-    }
-  }, [devices.length, loading, fetchDevices, device]);
+  // Initialize form data when device is available
+  const formReady = !!device;
+  if (device && formData.deviceName === '' && formReady) {
+    setFormData({
+      deviceName: device.deviceName,
+      notifications: true,
+      autoCollectData: !device.id.startsWith('temp-'),
+      alertThresholds: {
+        lowBattery: 20,
+        highTemperature: 60,
+        powerLimit: 1000
+      }
+    });
+  }
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -84,8 +79,8 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
     try {
       setSaving(true);
       
-      // Use store action to update device settings
-      await updateDeviceSettings(deviceId, {
+      // Use Convex mutation to update device
+      await updateDevice(deviceId, {
         deviceName: formData.deviceName
       });
       
@@ -106,7 +101,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
     try {
       setSaving(true);
       
-      // Use store action to unregister device
+      // Use Convex mutation to remove device
       await unregisterDevice(deviceId);
       
       router.push('/devices');

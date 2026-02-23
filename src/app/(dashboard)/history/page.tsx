@@ -17,9 +17,7 @@ import {
   AlertTriangle,
   Search
 } from 'lucide-react'
-import { useDeviceStore } from '@/stores/deviceStore'
-import { useReadingsStore } from '@/stores/readingsStore'
-import { DeviceReading } from '@/lib/data-utils'
+import { useConvexDevices, useConvexHistoryReadings } from '@/hooks/useConvexData'
 import { cn } from '@/lib/utils'
 import { DateTimePicker } from '@/components/ui/DateTimePicker'
 
@@ -32,6 +30,16 @@ interface HistoryFilters {
   aggregation: 'raw' | '5m' | '1h' | '1d'
 }
 
+function formatTimeSpan(startTime: number, endTime: number): string {
+  const diffMs = endTime - startTime;
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours} hours`;
+  const mins = Math.floor(diffMs / (1000 * 60));
+  return `${mins} minutes`;
+}
+
 interface HistorySummary {
   totalReadings: number
   avgBatteryLevel: number
@@ -40,7 +48,8 @@ interface HistorySummary {
   peakPowerOutput: number
   lowestBatteryLevel: number
   highestTemperature: number
-  timeSpan: string
+  startTime: number
+  endTime: number
 }
 
 interface DeviceOption {
@@ -51,33 +60,11 @@ interface DeviceOption {
 }
 
 function HistoryPage() {
-  // Use stores for data management
-  const { devices, fetchDevices, isLoading: devicesLoading } = useDeviceStore()
-  const { 
-    readings, 
-    totalCount, 
-    hasMore, 
-    isLoading, 
-    error, 
-    currentFilters,
-    fetchReadings, 
-    loadMoreReadings, 
-    exportReadings, 
-    clearReadings 
-  } = useReadingsStore()
+  // Use Convex reactive queries — no manual fetch needed
+  const { devices, isLoading: devicesLoading } = useConvexDevices()
 
   // Keep local UI state  
-  const [summary, setSummary] = useState<HistorySummary | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-
-  // Compute summary when readings change
-  useEffect(() => {
-    if (readings.length > 0) {
-      setSummary(calculateSummary(readings))
-    } else {
-      setSummary(null)
-    }
-  }, [readings])
 
   // Filter state
   const [filters, setFilters] = useState<HistoryFilters>({
@@ -107,9 +94,42 @@ function HistoryPage() {
 
   const selectedDevice = deviceOptions.find(d => d.id === filters.deviceId)
 
-  // Pagination calculations using local readings array length
-  // (totalCount from the store reflects the server-side total which may
-  //  differ from readings.length when server-side limit < total rows)
+  // Set default device when devices are loaded
+  useEffect(() => {
+    if (devices.length > 0 && filters.deviceId === 'all') {
+      const firstDevice = devices[0]
+      setFilters(prev => ({
+        ...prev,
+        deviceId: firstDevice.id
+      }))
+    }
+  }, [devices, filters.deviceId])
+
+  // ─── Convex reactive query for history data ───────────────────────────
+  // Only query when we have a valid device (not 'all') and either a preset
+  // range or both custom dates are filled in.
+  const shouldQuery =
+    filters.deviceId !== 'all' &&
+    (filters.timeRange !== 'custom' ||
+      (!!filters.customStartDate && !!filters.customEndDate))
+
+  const {
+    readings,
+    summary,
+    isLoading,
+    error,
+  } = useConvexHistoryReadings(
+    shouldQuery ? filters.deviceId : null,
+    {
+      timeRange: filters.timeRange !== 'custom' ? filters.timeRange : undefined,
+      customStartDate: filters.customStartDate,
+      customEndDate: filters.customEndDate,
+      aggregation: filters.aggregation,
+      limit: 500,
+    }
+  )
+
+  // Pagination calculations
   const totalPages = Math.max(1, Math.ceil(readings.length / itemsPerPage))
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
@@ -120,162 +140,31 @@ function HistoryPage() {
     setCurrentPage(1)
   }, [filters])
 
-  // Fetch devices on mount
-  useEffect(() => {
-    fetchDevices()
-  }, [fetchDevices])
-
-  // Set default device when devices are loaded
-  useEffect(() => {
-    if (devices.length > 0 && filters.deviceId === 'all') {
-      // Set the first device as default instead of 'all'
-      const firstDevice = devices[0]
-      console.log('Setting default device:', firstDevice)
-      setFilters(prev => ({
-        ...prev,
-        deviceId: firstDevice.id
-      }))
-    }
-  }, [devices])
-
-  // Fetch history data when filters change and we have a valid device
-  // Skip auto-fetching for 'custom' range — user must click "Apply" to avoid
-  // firing API calls on every date/time picker interaction
-  useEffect(() => {
-    if (devices.length > 0 && filters.deviceId !== 'all' && filters.timeRange !== 'custom') {
-      console.log('Fetching history data for:', filters)
-      fetchHistoryData()
-    }
-  }, [filters, devices])
-
-  const fetchHistoryData = async () => {
-    console.log('fetchHistoryData called with filters:', filters)
-    console.log('Available devices:', devices.map(d => ({ id: d.id, name: d.deviceName, sn: d.deviceSn })))
-    
-    try {
-      // Convert local filters to store options format
-      const options: any = {
-        aggregation: filters.aggregation,
-      }
-
-      // Handle timeRange - skip 'custom' since store doesn't support it
-      if (filters.timeRange !== 'custom') {
-        options.timeRange = filters.timeRange
-      }
-
-      // Convert string dates to Date objects
-      if (filters.customStartDate) {
-        options.startDate = new Date(filters.customStartDate)
-      }
-      if (filters.customEndDate) {
-        options.endDate = new Date(filters.customEndDate)
-      }
-
-      console.log('Store options being used:', options)
-
-      // Use store action to fetch readings
-      if (filters.deviceId !== 'all') {
-        console.log('Fetching readings for device:', filters.deviceId)
-        await fetchReadings(filters.deviceId, options)
-      } else {
-        // For 'all' devices, fetch readings for the first device as fallback
-        // TODO: Implement multi-device reading aggregation in the future
-        if (devices.length > 0) {
-          console.log('Fetching readings for first device (fallback):', devices[0].id)
-          await fetchReadings(devices[0].id, options)
-        } else {
-          console.log('No devices available, clearing readings')
-          clearReadings()
-        }
-      }
-
-      setLastUpdated(new Date())
-      
-      // Debug logging to help diagnose issues
-      console.log('History Data Fetch Results:', {
-        deviceId: filters.deviceId,
-        readingsCount: readings.length,
-        totalCount,
-        options,
-        hasError: !!error
-      })
-    } catch (err) {
-      console.error('Error fetching history data:', err)
-      
-      // For debugging: Log the exact error details
-      console.log('API Response Error Details:', {
-        error: err,
-        deviceId: filters.deviceId,
-        timeRange: filters.timeRange,
-        aggregation: filters.aggregation
-      })
-    }
-  }
-
-  const calculateSummary = (data: DeviceReading[]): HistorySummary => {
-    if (data.length === 0) {
-      return {
-        totalReadings: 0,
-        avgBatteryLevel: 0,
-        avgPowerOutput: 0,
-        avgTemperature: 0,
-        peakPowerOutput: 0,
-        lowestBatteryLevel: 0,
-        highestTemperature: 0,
-        timeSpan: '0 hours'
-      }
-    }
-
-    const batteryLevels = data.map(r => r.batteryLevel).filter((level): level is number => level !== null && level !== undefined && !isNaN(level))
-    const powerOutputs = data.map(r => r.outputWatts).filter((watts): watts is number => watts !== null && watts !== undefined && !isNaN(watts))
-    const temperatures = data.map(r => r.temperature).filter((temp): temp is number => temp !== null && temp !== undefined && !isNaN(temp))
-
-    const startTime = new Date(data[0].recordedAt)
-    const endTime = new Date(data[data.length - 1].recordedAt)
-    const timeDiff = endTime.getTime() - startTime.getTime()
-    const hoursDiff = Math.round(timeDiff / (1000 * 60 * 60))
-
-    return {
-      totalReadings: data.length,
-      avgBatteryLevel: batteryLevels.length > 0 ? batteryLevels.reduce((a, b) => a + b, 0) / batteryLevels.length : 0,
-      avgPowerOutput: powerOutputs.length > 0 ? powerOutputs.reduce((a, b) => a + b, 0) / powerOutputs.length : 0,
-      avgTemperature: temperatures.length > 0 ? temperatures.reduce((a, b) => a + b, 0) / temperatures.length : 0,
-      peakPowerOutput: powerOutputs.length > 0 ? Math.max(...powerOutputs) : 0,
-      lowestBatteryLevel: batteryLevels.length > 0 ? Math.min(...batteryLevels) : 0,
-      highestTemperature: temperatures.length > 0 ? Math.max(...temperatures) : 0,
-      timeSpan: hoursDiff >= 24 ? `${Math.round(hoursDiff / 24)} days` : `${hoursDiff} hours`
-    }
-  }
-
   const handleExportData = async () => {
     try {
       setIsExporting(true)
-      
-      // Convert local filters to store options format
-      const options: any = {
-        aggregation: filters.aggregation,
-      }
-
-      // Handle timeRange - skip 'custom' since store doesn't support it
-      if (filters.timeRange !== 'custom') {
-        options.timeRange = filters.timeRange
-      }
-
-      // Convert string dates to Date objects
-      if (filters.customStartDate) {
-        options.startDate = new Date(filters.customStartDate)
-      }
-      if (filters.customEndDate) {
-        options.endDate = new Date(filters.customEndDate)
-      }
-      
-      // Use store action to export readings
-      if (filters.deviceId !== 'all') {
-        await exportReadings(filters.deviceId, 'csv', options)
-      } else {
-        throw new Error('Export for all devices not yet supported')
-      }
-      
+      // Client-side CSV export from current readings
+      if (readings.length === 0) throw new Error('No data to export')
+      const headers = ['Timestamp', 'Battery %', 'Input W', 'Output W', 'AC Out', 'DC Out', 'USB Out', 'Temp °C', 'Status']
+      const rows = readings.map((r: any) => [
+        new Date(r.recordedAt).toISOString(),
+        r.batteryLevel ?? '',
+        r.inputWatts ?? '',
+        r.outputWatts ?? '',
+        r.acOutputWatts ?? '',
+        r.dcOutputWatts ?? '',
+        r.usbOutputWatts ?? '',
+        r.temperature ?? '',
+        r.status ?? '',
+      ].join(','))
+      const csv = [headers.join(','), ...rows].join('\n')
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `ecoflow-history-${new Date().toISOString().slice(0,10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
     } catch (err) {
       console.error('Export failed:', err)
       alert(err instanceof Error ? err.message : 'Failed to export data')
@@ -380,15 +269,6 @@ function HistoryPage() {
                 )}
                 Export CSV
               </button>
-
-              <button
-                onClick={fetchHistoryData}
-                disabled={isLoading}
-                className="flex items-center gap-2 px-4 py-2 bg-surface-2 border border-stroke-subtle hover:border-stroke-strong text-text-secondary rounded-pill transition-all duration-160 text-sm"
-              >
-                <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-                Refresh
-              </button>
             </div>
           </div>
 
@@ -488,7 +368,10 @@ function HistoryPage() {
                   </div>
                   <div className="flex justify-end">
                     <button
-                      onClick={fetchHistoryData}
+                      onClick={() => {
+                        // Setting filter state triggers the reactive query automatically
+                        setFilters(prev => ({ ...prev }))
+                      }}
                       disabled={!filters.customStartDate || !filters.customEndDate}
                       className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-bg-base rounded-pill text-sm font-medium hover:brightness-110 transition-all duration-160 ease-dashboard disabled:opacity-40 disabled:cursor-not-allowed"
                     >
@@ -518,7 +401,7 @@ function HistoryPage() {
               <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
                 <div className="flex items-center justify-between mb-2">
                   <Activity className="w-5 h-5 text-brand-tertiary" />
-                  <span className="text-xs text-text-muted">{summary.timeSpan || '0 hours'}</span>
+                  <span className="text-xs text-text-muted">{formatTimeSpan(summary.startTime, summary.endTime)}</span>
                 </div>
                 <div className="text-2xl font-medium text-text-primary mb-1">
                   {(summary.totalReadings || 0).toLocaleString()}
@@ -587,10 +470,7 @@ function HistoryPage() {
                   {error}
                 </p>
                 <button
-                  onClick={() => {
-                    console.log('Retrying data fetch...')
-                    fetchHistoryData()
-                  }}
+                  onClick={() => window.location.reload()}
                   className="flex items-center gap-2 bg-brand-primary hover:bg-brand-secondary text-bg-base font-medium py-2 px-4 rounded-pill transition-all duration-160 text-sm"
                 >
                   <RefreshCw size={16} />
@@ -630,12 +510,12 @@ function HistoryPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stroke-subtle">
-                    {paginatedReadings.map((reading, index) => {
+                    {paginatedReadings.map((reading: any, index: number) => {
                       const device = devices.find(d => d.id === reading.deviceId)
                       return (
-                        <tr key={reading.id || index} className="hover:bg-surface-2/50 transition-colors">
+                        <tr key={index} className="hover:bg-surface-2/50 transition-colors">
                           <td className="p-4 text-sm text-text-secondary">
-                            {reading.recordedAt.toLocaleString()}
+                            {new Date(reading.recordedAt).toLocaleString()}
                           </td>
                           <td className="p-4 text-sm text-text-secondary">
                             <div className="flex flex-col">

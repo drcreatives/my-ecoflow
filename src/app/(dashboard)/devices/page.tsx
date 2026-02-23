@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useDeviceStore } from "@/stores/deviceStore";
+import { useConvexDevices } from "@/hooks/useConvexData";
 import {
   Plus,
   Search,
@@ -30,8 +30,8 @@ import { formatRemainingTime, DeviceData } from "@/lib/data-utils";
 const DevicesPage = () => {
   const router = useRouter();
   
-  // Use Zustand store for devices, loading, and error state
-  const { devices, isLoading: loading, error, fetchDevices } = useDeviceStore();
+  // Use Convex reactive query for devices
+  const { devices, isLoading: loading, error } = useConvexDevices();
   
   // Keep local UI state for search and filtering
   const [searchTerm, setSearchTerm] = useState("");
@@ -39,10 +39,6 @@ const DevicesPage = () => {
     "all" | "online" | "offline"
   >("all");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-
-  useEffect(() => {
-    fetchDevices();
-  }, [fetchDevices]);
 
   // Filter devices based on search and status
   const filteredDevices = devices.filter((device) => {
@@ -394,7 +390,7 @@ const DevicesPage = () => {
             </div>
             <p className="text-text-secondary text-sm mt-1">{error}</p>
             <button
-              onClick={fetchDevices}
+              onClick={() => window.location.reload()}
               className="mt-3 text-brand-primary hover:text-brand-secondary text-sm font-medium transition-all duration-160"
             >
               Try again

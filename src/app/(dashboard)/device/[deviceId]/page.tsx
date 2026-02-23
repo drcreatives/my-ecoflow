@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, use } from 'react'
+import { use } from 'react'
 import { formatRemainingTime } from '@/lib/data-utils'
 import { useRouter } from 'next/navigation'
-import { useDeviceStore } from '@/stores/deviceStore'
+import { useConvexDevices, useConvexDeviceMutations } from '@/hooks/useConvexData'
 import Link from 'next/link'
 import { 
   ArrowLeft, 
@@ -29,18 +29,12 @@ export default function DevicePage({ params }: DevicePageProps) {
   const { deviceId } = use(params)
   const router = useRouter()
   
-  // Use Zustand store for device management
-  const { devices, isLoading: loading, error, fetchDevices, getDeviceById } = useDeviceStore()
+  // Use Convex reactive queries — no manual fetch needed
+  const { devices, isLoading: loading, error, getDeviceById } = useConvexDevices()
+  const { unregisterDevice, registerDevice } = useConvexDeviceMutations()
   
   // Get device from store
   const device = getDeviceById(deviceId)
-
-  useEffect(() => {
-    // Ensure devices are loaded
-    if (devices.length === 0 && !loading) {
-      fetchDevices()
-    }
-  }, [devices.length, loading, fetchDevices])
 
   const handleBack = () => {
     // Check if there's navigation history
@@ -249,13 +243,10 @@ export default function DevicePage({ params }: DevicePageProps) {
               <div className="ml-4">
                 {!device.id.startsWith('temp-') ? (
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       if (confirm('Are you sure you want to disable analytics for this device? This will stop data collection and remove historical data.')) {
-                        fetch('/api/unregister-device', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ deviceSn: device.deviceSn, userId: device.userId })
-                        }).then(() => window.location.reload())
+                        await unregisterDevice(device.id)
+                        router.push('/devices')
                       }
                     }}
                     className="px-4 py-2 border border-danger text-danger hover:bg-danger hover:text-text-primary rounded-pill transition-all duration-160 ease-dashboard text-sm font-medium"
@@ -264,12 +255,9 @@ export default function DevicePage({ params }: DevicePageProps) {
                   </button>
                 ) : (
                   <button
-                    onClick={() => {
-                      fetch('/api/register-device', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ deviceSn: device.deviceSn, userId: device.userId })
-                      }).then(() => window.location.reload())
+                    onClick={async () => {
+                      await registerDevice(device.deviceSn, device.deviceName)
+                      // Convex reactivity will update the view automatically
                     }}
                     className="px-4 py-2 border border-brand-primary text-brand-primary hover:bg-brand-primary hover:text-bg-base rounded-pill transition-all duration-160 ease-dashboard text-sm font-medium"
                   >
@@ -477,7 +465,7 @@ export default function DevicePage({ params }: DevicePageProps) {
                 <span>Device Settings</span>
               </Link>
               <button 
-                onClick={fetchDevices}
+                onClick={() => window.location.reload()}
                 className="w-full bg-brand-tertiary hover:bg-brand-tertiary/80 text-text-primary px-4 py-3 rounded-pill font-medium transition-all duration-160 ease-dashboard flex items-center justify-center space-x-2"
               >
                 <Activity className="w-4 h-4" />

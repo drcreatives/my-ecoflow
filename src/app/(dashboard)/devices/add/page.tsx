@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useDeviceStore } from "@/stores/deviceStore";
+import { useConvexDeviceMutations, useConvexDiscover } from '@/hooks/useConvexData';
 import { 
   ArrowLeft, 
   Plus, 
@@ -30,8 +30,9 @@ interface EcoFlowDevice {
 const AddDevicePage = () => {
   const router = useRouter();
   
-  // Use store actions for device management
-  const { discoverDevices, registerDevice: registerDeviceAction, isLoading: storeLoading } = useDeviceStore();
+  // Use Convex actions/mutations for device management
+  const { discoverDevices } = useConvexDiscover();
+  const { registerDevice: registerDeviceAction } = useConvexDeviceMutations();
   
   // Local state for UI and discovered devices
   const [devices, setDevices] = useState<EcoFlowDevice[]>([]);
@@ -46,16 +47,16 @@ const AddDevicePage = () => {
       setError(null);
       setSearchPerformed(true);
       
-      // Use store action for device discovery
+      // Use Convex action for device discovery
       const discoveredDevices = await discoverDevices();
       
-      // Transform the store response to match the local interface
-      const devicesWithRegistrationStatus = discoveredDevices.map(device => ({
-        sn: device.deviceSn,
-        deviceName: device.deviceName,
-        deviceType: device.deviceType,
-        online: device.onlineStatus ? 1 : 0,
-        isRegistered: false // Default to not registered, could check against current devices
+      // Transform the response to match the local interface
+      const devicesWithRegistrationStatus = discoveredDevices.map((device: any) => ({
+        sn: device.sn,
+        deviceName: device.productName ?? device.sn,
+        deviceType: device.productType,
+        online: device.online ? 1 : 0,
+        isRegistered: false
       }));
       
       setDevices(devicesWithRegistrationStatus);
@@ -71,7 +72,7 @@ const AddDevicePage = () => {
     try {
       setRegistering(deviceSn);
       
-      // Use store action for device registration
+      // Use Convex mutation for device registration
       await registerDeviceAction(deviceSn, deviceName);
 
       // Update the local device list to show it's now registered

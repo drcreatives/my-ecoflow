@@ -1,22 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { 
   Settings,
   User,
   Bell,
-  BellOff,
-  Smartphone,
   Mail,
   Database,
   Shield,
   Trash2,
   Download,
-  Upload,
   RefreshCw,
-  Clock,
   Zap,
   Save,
   Eye,
@@ -25,9 +20,9 @@ import {
   Loader2,
   AlertTriangle
 } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
-import { useUserStore } from '@/stores/userStore'
+import { useConvexProfile, useConvexSettings } from '@/hooks/useConvexData'
+import { useAuthActions } from '@convex-dev/auth/react'
 import { cn } from '@/lib/utils'
 
 interface UserProfile {
@@ -61,26 +56,25 @@ interface SecuritySettings {
 }
 
 function SettingsPage() {
-  // Store state management
-  const { user, logout } = useAuthStore()
-  const { notifications, clearAllNotifications } = useUIStore()
+  // Convex reactive queries — no manual fetch needed
+  const { profile: convexProfile, isLoading: profileLoading, updateProfile: convexUpdateProfile } = useConvexProfile()
   const {
-    profile,
-    notifications: userNotifications,
-    dataRetention,
-    fetchProfile,
-    updateProfile,
-    updateNotificationSettings,
-    changePassword,
-    exportData: exportUserData,
-    isLoading: userLoading
-  } = useUserStore()  // Keep local UI state
+    dataRetention: convexDataRetention,
+    notifications: convexNotifications,
+    isLoading: settingsLoading,
+    updateDataRetention: convexUpdateDataRetention,
+    updateNotifications: convexUpdateNotifications,
+  } = useConvexSettings()
+  const { signOut } = useAuthActions()
+  const { notifications, clearAllNotifications } = useUIStore()
+  const userLoading = profileLoading || settingsLoading
+  // Keep local UI state
   const [activeTab, setActiveTab] = useState('profile')
   const [saving, setSaving] = useState(false)
   
   // Initialize local settings from store on load
   const [userProfile, setUserProfile] = useState<UserProfile>({
-    email: user?.email || '',
+    email: '',
     firstName: '',
     lastName: '',
     createdAt: ''
@@ -122,99 +116,49 @@ function SettingsPage() {
     confirm: false
   })
 
-  // Debug: Log userProfile state changes
-  useEffect(() => {
-    console.log('userProfile state changed:', userProfile)
-  }, [userProfile])
-
   // Test email state
   const [testingEmail, setTestingEmail] = useState(false)
 
+  // Sync profile from Convex reactive query
   useEffect(() => {
-    loadUserSettings()
-  }, [])
-
-  // Update local state when store profile changes
-  useEffect(() => {
-    console.log('Profile data from store:', profile)
-    if (profile) {
-      console.log('Updating userProfile state with:', {
-        email: profile.email,
-        firstName: profile.firstName || '',
-        lastName: profile.lastName || '',
-        createdAt: profile.createdAt ? profile.createdAt : new Date().toISOString()
-      })
+    if (convexProfile) {
       setUserProfile({
-        email: profile.email,
-        firstName: profile.firstName || '',
-        lastName: profile.lastName || '',
-        createdAt: profile.createdAt ? (typeof profile.createdAt === 'string' ? profile.createdAt : profile.createdAt.toISOString()) : new Date().toISOString()
+        email: convexProfile.email || '',
+        firstName: convexProfile.firstName || '',
+        lastName: convexProfile.lastName || '',
+        createdAt: convexProfile.createdAt
+          ? new Date(convexProfile.createdAt).toISOString()
+          : new Date().toISOString()
       })
     }
-  }, [profile])
+  }, [convexProfile])
 
-  // Update local notification settings when store data changes
+  // Sync notification settings from Convex
   useEffect(() => {
-    if (userNotifications) {
+    if (convexNotifications) {
       setNotificationSettings({
-        deviceAlerts: userNotifications.deviceAlerts,
-        lowBattery: true,
-        powerThreshold: true,
-        systemUpdates: userNotifications.systemUpdates,
-        weeklyReports: userNotifications.weeklyReports,
-        emailNotifications: userNotifications.emailNotifications,
-        pushNotifications: userNotifications.pushNotifications
+        deviceAlerts: convexNotifications.deviceAlerts ?? true,
+        lowBattery: convexNotifications.lowBattery ?? true,
+        powerThreshold: convexNotifications.powerThreshold ?? false,
+        systemUpdates: convexNotifications.systemUpdates ?? true,
+        weeklyReports: convexNotifications.weeklyReports ?? false,
+        emailNotifications: convexNotifications.emailNotifications ?? true,
+        pushNotifications: convexNotifications.pushNotifications ?? false
       })
     }
-  }, [userNotifications])
+  }, [convexNotifications])
 
-  // Update local data settings when store data changes
+  // Sync data retention settings from Convex
   useEffect(() => {
-    if (dataRetention) {
-      const retentionDays = dataRetention.retentionPeriod === '30d' ? 30 :
-                           dataRetention.retentionPeriod === '90d' ? 90 :
-                           dataRetention.retentionPeriod === '1y' ? 365 : 90
-                           
+    if (convexDataRetention) {
       setDataSettings(prev => ({
         ...prev,
-        retentionPeriod: retentionDays,
-        autoBackup: dataRetention.autoCleanup,
+        retentionPeriod: convexDataRetention.retentionPeriodDays ?? 90,
+        autoBackup: convexDataRetention.backupEnabled ?? false,
+        collectInterval: convexDataRetention.collectionIntervalMinutes ?? 5,
       }))
     }
-  }, [dataRetention])
-
-  const loadUserSettings = async () => {
-    try {
-      // Use store action to fetch user profile
-      console.log('Loading user settings...')
-      await fetchProfile()
-      console.log('Profile fetched, current profile:', profile)
-      // Note: Local state will be updated via useEffect when profile data arrives
-
-      // Fetch data-retention settings directly from the API so we get the
-      // real collection_interval_minutes value (the Zustand store type
-      // doesn't carry it).
-      try {
-        const res = await fetch('/api/user/data-retention', { credentials: 'include' })
-        if (res.ok) {
-          const json = await res.json()
-          const s = json?.settings
-          if (s) {
-            setDataSettings(prev => ({
-              ...prev,
-              retentionPeriod: s.retention_period_days ?? prev.retentionPeriod,
-              autoBackup: s.backup_enabled ?? prev.autoBackup,
-              collectInterval: s.collection_interval_minutes ?? prev.collectInterval,
-            }))
-          }
-        }
-      } catch (e) {
-        console.error('Error fetching data-retention settings:', e)
-      }
-    } catch (err) {
-      console.error('Error loading user settings:', err)
-    }
-  }
+  }, [convexDataRetention])
 
   const saveSettings = async (settingsType: string, settings: any) => {
     setSaving(true)
@@ -253,38 +197,24 @@ function SettingsPage() {
           return
         }
 
-        // Save user profile via store action
-        await updateProfile({
+        // Save via Convex mutation
+        await convexUpdateProfile({
           firstName: settings.firstName.trim(),
           lastName: settings.lastName.trim()
         })
-        
-        // Update local state
-        setUserProfile(prev => ({
-          ...prev,
-          firstName: settings.firstName.trim(),
-          lastName: settings.lastName.trim()
-        }))
         
         toast.success('Profile updated successfully')
       } else if (settingsType === 'notificationSettings') {
-                // Save notification settings via store action
-        await updateNotificationSettings({
-          emailNotifications: settings.emailAlerts, // Map emailAlerts to emailNotifications
+        // Save via Convex mutation — pass all current toggle values
+        await convexUpdateNotifications({
+          deviceAlerts: settings.deviceAlerts,
+          lowBattery: settings.lowBattery,
+          powerThreshold: settings.powerThreshold,
+          systemUpdates: settings.systemUpdates,
+          weeklyReports: settings.weeklyReports,
+          emailNotifications: settings.emailNotifications,
           pushNotifications: settings.pushNotifications,
-          smsNotifications: false, // Default value for store interface
-          deviceAlerts: settings.alertTypes.includes('low-battery') || settings.alertTypes.includes('high-temperature'),
-          systemUpdates: settings.alertTypes.includes('maintenance'),
-          weeklyReports: settings.alertTypes.includes('weekly-report')
         })
-        
-        // Update local state
-        setNotificationSettings(prev => ({
-          ...prev,
-          emailAlerts: settings.emailAlerts,
-          pushNotifications: settings.pushNotifications,
-          alertTypes: settings.alertTypes
-        }))
         
         toast.success('Notification settings updated successfully')
       } else if (settingsType === 'dataSettings') {
@@ -299,62 +229,22 @@ function SettingsPage() {
           return
         }
 
-        // Save data retention settings via API
-        const response = await fetch('/api/user/data-retention', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            retentionPeriodDays: settings.retentionPeriod,
-            autoCleanupEnabled: true, // Default to enabled for automatic cleanup
-            backupEnabled: settings.autoBackup,
-            collectionIntervalMinutes: settings.collectInterval
-          })
+        // Save via Convex mutation
+        await convexUpdateDataRetention({
+          retentionPeriodDays: settings.retentionPeriod,
+          autoCleanupEnabled: true,
+          backupEnabled: settings.autoBackup,
+          collectionIntervalMinutes: settings.collectInterval,
         })
-        
-        if (response.ok) {
-          const { settings: updatedSettings } = await response.json()
-          setDataSettings({
-            retentionPeriod: updatedSettings.retention_period_days,
-            autoBackup: updatedSettings.backup_enabled,
-            exportFormat: dataSettings.exportFormat, // Keep current format preference
-            collectInterval: updatedSettings.collection_interval_minutes
-          })
-          toast.success('Data settings updated successfully')
-        } else {
-          const error = await response.json()
-          toast.error(error.error || 'Failed to update data settings')
-        }
+        toast.success('Data settings updated successfully')
       } else {
-        // Save other settings to localStorage for now (will be API later)
+        // Save other settings to localStorage for now
         localStorage.setItem(settingsType, JSON.stringify(settings))
         toast.success('Settings saved successfully')
       }
     } catch (error) {
       console.error('Failed to save settings:', error)
-      
-      // Enhanced error handling with specific error types
-      let errorMessage = 'Failed to save settings'
-      
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        errorMessage = 'Network error: Please check your internet connection'
-      } else if (error instanceof Error) {
-        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-          errorMessage = 'Session expired. Please log in again.'
-          // Optionally redirect to login
-          // window.location.href = '/login'
-        } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
-          errorMessage = 'You do not have permission to perform this action'
-        } else if (error.message.includes('500')) {
-          errorMessage = 'Server error. Please try again later.'
-        } else if (error.message.includes('400')) {
-          errorMessage = 'Invalid data provided. Please check your inputs.'
-        } else {
-          errorMessage = error.message
-        }
-      }
-      
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save settings'
       toast.error(errorMessage)
     } finally {
       setSaving(false)
@@ -402,20 +292,11 @@ function SettingsPage() {
     
     setSaving(true)
     try {
-      // Call the store action for password change
-      await changePassword(passwordForm.currentPassword, passwordForm.newPassword)
-      
-      setSecuritySettings(prev => ({
-        ...prev,
-        passwordLastChanged: new Date().toISOString().split('T')[0]
-      }))
-      
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-      setShowPasswordForm(false)
-      toast.success('Password changed successfully. Please sign in again with your new password.')
-      
-      // Optionally redirect to login after password change
-      // window.location.href = '/login'
+      // TODO: Password change not yet implemented with Convex Auth.
+      // @convex-dev/auth doesn't expose a direct password-change API.
+      // For now show a message; a future iteration can implement this via
+      // a custom Convex action + bcrypt verification.
+      toast.error('Password change is not yet available. Please use the forgot-password flow.')
       
     } catch (error) {
       console.error('Password change error:', error)
@@ -657,7 +538,7 @@ function SettingsPage() {
                           Export Account Data
                         </button>
                         <button
-                          onClick={() => logout()}
+                          onClick={() => signOut()}
                           className="flex items-center gap-2 text-danger hover:text-danger/80 transition-colors"
                         >
                           <RefreshCw size={16} />
