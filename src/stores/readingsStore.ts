@@ -181,7 +181,7 @@ export const useReadingsStore = create<ReadingsStore>()(
             // Build a map of deviceId → latest reading from the API
             const latestMap = new Map<string, DeviceReading>()
             for (const r of latestReadings) {
-              latestMap.set(r.deviceId, r)
+              if (r.deviceId) latestMap.set(r.deviceId, r)
             }
 
             // Replace / insert per-device latest, keep other readings intact.
@@ -193,7 +193,7 @@ export const useReadingsStore = create<ReadingsStore>()(
             // Pass 1: find the index & timestamp of the newest reading per device
             const perDevice = new Map<string, { idx: number; time: number }>()
             for (let i = 0; i < merged.length; i++) {
-              const did = merged[i].deviceId
+              const did = merged[i].deviceId ?? ''
               const t = new Date(merged[i].recordedAt).getTime()
               const existing = perDevice.get(did)
               if (!existing || t > existing.time) {

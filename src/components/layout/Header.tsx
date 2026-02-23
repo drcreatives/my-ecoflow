@@ -7,9 +7,9 @@ import {
   WifiOff,
   Settings,
 } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
-import { useDeviceStore } from '@/stores/deviceStore'
+import { useConvexDevices } from '@/hooks/useConvexData'
+import { useConvexProfile } from '@/hooks/useConvexData'
 import { useIsMobile } from '@/hooks/useBreakpoint'
 import LogoutButton from '@/components/LogoutButton'
 import { cn } from '@/lib/utils'
@@ -20,9 +20,9 @@ interface HeaderProps {
 }
 
 export const Header = ({ title }: HeaderProps) => {
-  const { user } = useAuthStore()
+  const { profile } = useConvexProfile()
   const { notifications, toggleSidebar } = useUIStore()
-  const { devices } = useDeviceStore()
+  const { devices } = useConvexDevices()
   const isMobile = useIsMobile()
 
   const unreadNotifications = notifications.filter(n => !n.isRead).length
@@ -51,7 +51,7 @@ export const Header = ({ title }: HeaderProps) => {
               {title || 'Dashboard'}
             </h1>
             <p className="text-xs text-text-secondary hidden sm:block">
-              Welcome back, {user?.email?.split('@')[0]}
+              Welcome back, {profile?.email?.split('@')[0] || profile?.firstName || 'User'}
             </p>
           </div>
         </div>

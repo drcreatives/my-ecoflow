@@ -7,33 +7,33 @@ export interface DeviceData {
   id: string
   deviceSn: string
   deviceName: string
-  deviceType: string
+  deviceType?: string
   isActive: boolean
   online: boolean
-  status: string
+  status?: string
   userId: string
-  createdAt?: string
-  updatedAt?: string
-  currentReading?: DeviceReading
+  createdAt?: string | number
+  updatedAt?: string | number
+  currentReading?: DeviceReading | null
 }
 
 export interface DeviceReading {
   id?: string
-  deviceId: string
-  batteryLevel?: number
-  inputWatts?: number
-  acInputWatts?: number    // AC wall charging input
-  dcInputWatts?: number    // DC/Solar/Car charging input (MPPT)
-  chargingType?: number    // 0=null, 1=Adapter/DC, 2=Solar, 3=AC, 4=Gas, 5=Wind
-  outputWatts?: number
-  acOutputWatts?: number
-  dcOutputWatts?: number
-  usbOutputWatts?: number
-  remainingTime?: number
-  temperature?: number
-  status?: string
+  deviceId?: string
+  batteryLevel?: number | null
+  inputWatts?: number | null
+  acInputWatts?: number | null    // AC wall charging input
+  dcInputWatts?: number | null    // DC/Solar/Car charging input (MPPT)
+  chargingType?: number | null    // 0=null, 1=Adapter/DC, 2=Solar, 3=AC, 4=Gas, 5=Wind
+  outputWatts?: number | null
+  acOutputWatts?: number | null
+  dcOutputWatts?: number | null
+  usbOutputWatts?: number | null
+  remainingTime?: number | null
+  temperature?: number | null
+  status?: string | null
   rawData?: Record<string, unknown>
-  recordedAt: Date
+  recordedAt: Date | number
 }
 
 export interface APIResponse<T> {

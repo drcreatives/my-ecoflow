@@ -12,7 +12,8 @@ import {
 } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { useAuthStore } from '@/stores/authStore'
+import { useConvexProfile } from '@/hooks/useConvexData'
+import { useAuthActions } from '@convex-dev/auth/react'
 import { useUIStore } from '@/stores/uiStore'
 import { useIsMobile } from '@/hooks/useBreakpoint'
 import { cn } from '@/lib/utils'
@@ -56,12 +57,13 @@ const navigationItems = [
 
 const SidebarContent = ({ onClose }: SidebarProps) => {
   const pathname = usePathname()
-  const { user, logout } = useAuthStore()
+  const { profile } = useConvexProfile()
+  const { signOut } = useAuthActions()
   const isMobile = useIsMobile()
   
   const handleLogout = async () => {
     try {
-      await logout()
+      await signOut()
       onClose?.()
     } catch (error) {
       console.error('Logout failed:', error)
@@ -110,20 +112,20 @@ const SidebarContent = ({ onClose }: SidebarProps) => {
 
       {/* User Profile & Logout */}
       <div className="p-4 border-t border-stroke-subtle">
-        {user && (
+        {profile && (
           <div className="flex items-center gap-3 mb-4">
             <div className={cn(
               "bg-surface-2 border border-stroke-subtle rounded-full flex items-center justify-center font-bold text-text-primary",
               isMobile ? "w-10 h-10 text-base" : "w-8 h-8 text-sm"
             )}>
-              {user.email?.[0]?.toUpperCase()}
+              {(profile.email?.[0] || profile.firstName?.[0] || 'U').toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
               <div className={cn(
                 "font-medium text-text-primary truncate",
                 isMobile ? "text-base" : "text-sm"
               )}>
-                {user.email}
+                {profile.email || profile.firstName || 'User'}
               </div>
               <div className={cn(
                 "text-text-muted",
@@ -153,12 +155,13 @@ const SidebarContent = ({ onClose }: SidebarProps) => {
 // Collapsed sidebar content component for desktop
 const CollapsedSidebar = () => {
   const pathname = usePathname()
-  const { user, logout } = useAuthStore()
+  const { profile } = useConvexProfile()
+  const { signOut } = useAuthActions()
   const { toggleSidebar } = useUIStore()
   
   const handleLogout = async () => {
     try {
-      await logout()
+      await signOut()
     } catch (error) {
       console.error('Logout failed:', error)
     }
@@ -205,9 +208,9 @@ const CollapsedSidebar = () => {
 
       {/* User profile collapsed */}
       <div className="p-4 border-t border-stroke-subtle flex flex-col items-center gap-2">
-        {user && (
-          <div className="w-8 h-8 bg-surface-2 border border-stroke-subtle rounded-full flex items-center justify-center font-bold text-text-primary text-sm" title={user.email}>
-            {user.email?.[0]?.toUpperCase()}
+        {profile && (
+          <div className="w-8 h-8 bg-surface-2 border border-stroke-subtle rounded-full flex items-center justify-center font-bold text-text-primary text-sm" title={profile.email || profile.firstName || 'User'}>
+            {(profile.email?.[0] || profile.firstName?.[0] || 'U').toUpperCase()}
           </div>
         )}
         <button
