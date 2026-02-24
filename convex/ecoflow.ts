@@ -252,6 +252,11 @@ function transformQuotaToReading(data: Record<string, number | string>) {
 export const collectAllUserReadings = internalAction({
   args: {},
   handler: async (ctx) => {
+    // Skip in dev deployment to save database bandwidth
+    if (process.env.DISABLE_CRONS === "true") {
+      return { success: true, skipped: true, reason: "DISABLE_CRONS is set" };
+    }
+
     const accessKey = process.env.ECOFLOW_ACCESS_KEY;
     const secretKey = process.env.ECOFLOW_SECRET_KEY;
 

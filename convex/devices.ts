@@ -216,6 +216,11 @@ export const remove = mutation({
 export const checkDeviceAlerts = internalMutation({
   args: {},
   handler: async (ctx) => {
+    // Skip in dev deployment to save database bandwidth
+    if (process.env.DISABLE_CRONS === "true") {
+      return { alertsCreated: 0, skipped: true };
+    }
+
     const allDevices = await ctx.db.query("devices").collect();
     let alertsCreated = 0;
 

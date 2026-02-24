@@ -7,6 +7,12 @@ import { internalMutation } from "./_generated/server";
 export const cleanupOldReadings = internalMutation({
   args: {},
   handler: async (ctx) => {
+    // Skip in dev deployment to save database bandwidth
+    if (process.env.DISABLE_CRONS === "true") {
+      console.log("Cron skipped: DISABLE_CRONS is set");
+      return { totalDeleted: 0, skipped: true };
+    }
+
     const allSettings = await ctx.db.query("dataRetentionSettings").collect();
     const now = Date.now();
     let totalDeleted = 0;

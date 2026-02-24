@@ -51,6 +51,11 @@ function backupEmailHtml(data: {
 export const checkAndRunBackups = internalAction({
   args: {},
   handler: async (ctx) => {
+    // Skip in dev deployment to save database bandwidth
+    if (process.env.DISABLE_CRONS === "true") {
+      return;
+    }
+
     const allSettings = await ctx.runQuery(
       internal.settings.getAllDataRetentionSettings
     );
