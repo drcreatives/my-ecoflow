@@ -148,8 +148,9 @@ The Delta 2 can simultaneously have input (e.g. solar) **and** output (e.g. load
 **Logic in `convex/ecoflow.ts` → `transformQuotaToReading()`:**
 ```typescript
 const netPower = totalInput - totalOutput;
-const isNetCharging = pdRemain > 0 ? true : netPower > 10;   // firmware sign > fallback
-const isNetDischarging = pdRemain < 0 ? true : netPower < -10;
+const hasPdRemainSign = pdRemain !== null && pdRemain !== 0;
+const isNetCharging = hasPdRemainSign ? pdRemain > 0 : netPower > 10;   // firmware sign > fallback
+const isNetDischarging = hasPdRemainSign ? pdRemain < 0 : netPower < -10;
 // Pick chgRemainTime (positive) when charging, -dsgRemainTime (negative) when discharging
 ```
 

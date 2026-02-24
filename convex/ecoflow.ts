@@ -199,14 +199,13 @@ function transformQuotaToReading(data: Record<string, number | string>) {
   // so we must compare them. pd.remainTime sign is the authoritative signal from
   // the firmware since it already accounts for net power.
   const netPower = totalInput - totalOutput;
-  const isNetCharging =
-    pdRemain !== null && pdRemain !== 0
-      ? pdRemain > 0           // firmware says charging (positive)
-      : netPower > 10;         // fallback: net input exceeds output by >10W
-  const isNetDischarging =
-    pdRemain !== null && pdRemain !== 0
-      ? pdRemain < 0           // firmware says discharging (negative)
-      : netPower < -10;        // fallback: net output exceeds input by >10W
+  const hasPdRemainSign = pdRemain !== null && pdRemain !== 0;
+  const isNetCharging = hasPdRemainSign
+    ? pdRemain > 0             // firmware says charging (positive)
+    : netPower > 10;           // fallback: net input exceeds output by >10W
+  const isNetDischarging = hasPdRemainSign
+    ? pdRemain < 0             // firmware says discharging (negative)
+    : netPower < -10;          // fallback: net output exceeds input by >10W
 
   if (isNetCharging && chgRemain && chgRemain > 0) {
     remainingTime = chgRemain; // positive = time until full charge
