@@ -10,6 +10,8 @@
 
 import type * as admin from "../admin.js";
 import type * as auth from "../auth.js";
+import type * as backup from "../backup.js";
+import type * as backup_queries from "../backup_queries.js";
 import type * as crons from "../crons.js";
 import type * as devices from "../devices.js";
 import type * as devices_internal from "../devices_internal.js";
@@ -31,6 +33,8 @@ import type {
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   auth: typeof auth;
+  backup: typeof backup;
+  backup_queries: typeof backup_queries;
   crons: typeof crons;
   devices: typeof devices;
   devices_internal: typeof devices_internal;

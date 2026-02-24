@@ -95,6 +95,8 @@ export default defineSchema({
     retentionPeriodDays: v.float64(),
     autoCleanupEnabled: v.boolean(),
     backupEnabled: v.boolean(),
+    backupIntervalHours: v.optional(v.float64()), // 24, 168 (weekly), 720 (monthly)
+    lastBackupAt: v.optional(v.float64()), // epoch ms of last backup email
     collectionIntervalMinutes: v.float64(),
     lastCleanup: v.optional(v.float64()),
     lastCollectionAt: v.optional(v.float64()), // track last cron collection per user

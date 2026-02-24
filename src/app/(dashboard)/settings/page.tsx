@@ -47,6 +47,7 @@ interface NotificationSettings {
 interface DataSettings {
   retentionPeriod: number // days
   autoBackup: boolean
+  backupInterval: number // hours
   exportFormat: 'json' | 'csv'
   collectInterval: number // minutes
 }
@@ -97,6 +98,7 @@ function SettingsPage() {
   const [dataSettings, setDataSettings] = useState<DataSettings>({
     retentionPeriod: 90,
     autoBackup: true,
+    backupInterval: 24,
     exportFormat: 'json',
     collectInterval: 5
   })
@@ -159,6 +161,7 @@ function SettingsPage() {
         ...prev,
         retentionPeriod: convexDataRetention.retentionPeriodDays ?? 90,
         autoBackup: convexDataRetention.backupEnabled ?? false,
+        backupInterval: convexDataRetention.backupIntervalHours ?? 24,
         collectInterval: convexDataRetention.collectionIntervalMinutes ?? 5,
       }))
     }
@@ -238,6 +241,7 @@ function SettingsPage() {
           retentionPeriodDays: settings.retentionPeriod,
           autoCleanupEnabled: true,
           backupEnabled: settings.autoBackup,
+          backupIntervalHours: settings.backupInterval,
           collectionIntervalMinutes: settings.collectInterval,
         })
         toast.success('Data settings updated successfully')
@@ -760,7 +764,7 @@ function SettingsPage() {
                         <div className="flex items-center justify-between p-4 bg-surface-2 rounded-inner">
                           <div>
                             <div className="font-medium text-text-primary">Automatic Backup</div>
-                            <div className="text-sm text-text-muted">Daily backup of device readings and settings</div>
+                            <div className="text-sm text-text-muted">Periodic email backup of device readings and settings</div>
                           </div>
                           <button
                             onClick={() => setDataSettings(prev => ({ ...prev, autoBackup: !prev.autoBackup }))}
@@ -775,6 +779,25 @@ function SettingsPage() {
                             )} />
                           </button>
                         </div>
+
+                        {dataSettings.autoBackup && (
+                          <div className="flex items-center justify-between p-4 bg-surface-2 rounded-inner">
+                            <div>
+                              <div className="font-medium text-text-primary">Backup Interval</div>
+                              <div className="text-sm text-text-muted">How often to email a data backup</div>
+                            </div>
+                            <select
+                              value={dataSettings.backupInterval}
+                              onChange={(e) => setDataSettings(prev => ({ ...prev, backupInterval: parseInt(e.target.value) }))}
+                              className="bg-surface-1 text-text-primary border border-stroke-subtle rounded-inner px-3 py-1.5 text-sm"
+                            >
+                              <option value={24}>Daily</option>
+                              <option value={168}>Weekly</option>
+                              <option value={336}>Every 2 Weeks</option>
+                              <option value={720}>Monthly</option>
+                            </select>
+                          </div>
+                        )}
                       </div>
 
                       <button

@@ -15,6 +15,7 @@ const DATA_RETENTION_DEFAULTS = {
   retentionPeriodDays: 90,
   autoCleanupEnabled: true,
   backupEnabled: false,
+  backupIntervalHours: 24,
   collectionIntervalMinutes: 5,
 };
 
@@ -37,7 +38,9 @@ export const getDataRetention = query({
       retentionPeriodDays: settings.retentionPeriodDays,
       autoCleanupEnabled: settings.autoCleanupEnabled,
       backupEnabled: settings.backupEnabled,
+      backupIntervalHours: settings.backupIntervalHours ?? DATA_RETENTION_DEFAULTS.backupIntervalHours,
       collectionIntervalMinutes: settings.collectionIntervalMinutes,
+      lastBackupAt: settings.lastBackupAt ?? null,
     };
   },
 });
@@ -47,6 +50,7 @@ export const updateDataRetention = mutation({
     retentionPeriodDays: v.optional(v.float64()),
     autoCleanupEnabled: v.optional(v.boolean()),
     backupEnabled: v.optional(v.boolean()),
+    backupIntervalHours: v.optional(v.float64()),
     collectionIntervalMinutes: v.optional(v.float64()),
   },
   handler: async (ctx, args) => {
@@ -71,6 +75,10 @@ export const updateDataRetention = mutation({
         args.backupEnabled ??
         existing?.backupEnabled ??
         DATA_RETENTION_DEFAULTS.backupEnabled,
+      backupIntervalHours:
+        args.backupIntervalHours ??
+        existing?.backupIntervalHours ??
+        DATA_RETENTION_DEFAULTS.backupIntervalHours,
       collectionIntervalMinutes:
         args.collectionIntervalMinutes ??
         existing?.collectionIntervalMinutes ??
@@ -120,6 +128,26 @@ export const updateLastCollection = internalMutation({
         ...DATA_RETENTION_DEFAULTS,
         lastCollectionAt: args.timestamp,
       });
+    }
+  },
+});
+
+/**
+ * Internal: update lastBackupAt after sending backup email.
+ */
+export const updateLastBackup = internalMutation({
+  args: {
+    userId: v.id("users"),
+    timestamp: v.float64(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("dataRetentionSettings")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, { lastBackupAt: args.timestamp });
     }
   },
 });
