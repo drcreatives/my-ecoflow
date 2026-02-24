@@ -74,16 +74,22 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
   // Check if device is registered (has real UUID vs temp ID)
   const isRegistered = !device.id.startsWith('temp-')
 
-  // Determine status color and text
+  // Determine status color and text based on NET power flow
+  // The device can have simultaneous input (e.g. solar) and output (e.g. loads),
+  // so we compare them to determine the actual charging state.
   const getStatusInfo = () => {
     if (!device.online) {
       return { color: 'text-text-muted', bg: 'bg-surface-2', text: 'Offline' }
     }
-    if (inputWatts > 10) {
+    const netPower = inputWatts - outputWatts
+    if (netPower > 10) {
       return { color: 'text-brand-primary', bg: 'bg-brand-primary/10', text: 'Charging' }
     }
-    if (outputWatts > 10) {
+    if (netPower < -10) {
       return { color: 'text-brand-tertiary', bg: 'bg-brand-tertiary/10', text: 'Discharging' }
+    }
+    if (inputWatts > 10 || outputWatts > 10) {
+      return { color: 'text-brand-secondary', bg: 'bg-brand-secondary/10', text: 'Pass-through' }
     }
     return { color: 'text-brand-primary', bg: 'bg-brand-primary/10', text: 'Standby' }
   }

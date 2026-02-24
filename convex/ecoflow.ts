@@ -194,12 +194,23 @@ function transformQuotaToReading(data: Record<string, number | string>) {
 
   let remainingTime: number | null = null;
 
-  // Determine charging vs discharging from pd.remainTime sign or status
-  const isCharging = (pdRemain !== null && pdRemain > 0) || (totalInput > 10);
+  // Determine charging vs discharging using NET power flow.
+  // The device can simultaneously have input (e.g. solar) and output (e.g. loads),
+  // so we must compare them. pd.remainTime sign is the authoritative signal from
+  // the firmware since it already accounts for net power.
+  const netPower = totalInput - totalOutput;
+  const isNetCharging =
+    pdRemain !== null && pdRemain !== 0
+      ? pdRemain > 0           // firmware says charging (positive)
+      : netPower > 10;         // fallback: net input exceeds output by >10W
+  const isNetDischarging =
+    pdRemain !== null && pdRemain !== 0
+      ? pdRemain < 0           // firmware says discharging (negative)
+      : netPower < -10;        // fallback: net output exceeds input by >10W
 
-  if (isCharging && chgRemain && chgRemain > 0) {
+  if (isNetCharging && chgRemain && chgRemain > 0) {
     remainingTime = chgRemain; // positive = time until full charge
-  } else if (!isCharging && dsgRemain && dsgRemain > 0) {
+  } else if (isNetDischarging && dsgRemain && dsgRemain > 0) {
     remainingTime = -dsgRemain; // negative = time until discharge
   } else if (pdRemain !== null && pdRemain !== 0) {
     remainingTime = pdRemain; // fallback to pd.remainTime (rounded but signed)
@@ -207,9 +218,10 @@ function transformQuotaToReading(data: Record<string, number | string>) {
     remainingTime = getQuotaValue(data, "bms_bmsStatus.remainTime");
   }
 
+  // Status based on net power flow, not raw input/output
   let status = "standby";
-  if (totalInput > 10) status = "charging";
-  else if (totalOutput > 10) status = "discharging";
+  if (isNetCharging) status = "charging";
+  else if (isNetDischarging) status = "discharging";
   else if ((batteryLevel ?? 0) > 95) status = "full";
   else if ((batteryLevel ?? 100) < 10) status = "low";
 
