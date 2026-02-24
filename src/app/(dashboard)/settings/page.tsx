@@ -21,8 +21,10 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { useUIStore } from '@/stores/uiStore'
-import { useConvexProfile, useConvexSettings } from '@/hooks/useConvexData'
+import { useConvexProfile, useConvexSettings, useConvexDevices } from '@/hooks/useConvexData'
 import { useAuthActions } from '@convex-dev/auth/react'
+import { useConvex } from 'convex/react'
+import { api } from '../../../../convex/_generated/api'
 import { cn } from '@/lib/utils'
 
 interface UserProfile {
@@ -66,6 +68,8 @@ function SettingsPage() {
     updateNotifications: convexUpdateNotifications,
   } = useConvexSettings()
   const { signOut } = useAuthActions()
+  const convex = useConvex()
+  const { devices } = useConvexDevices()
   const { notifications, clearAllNotifications } = useUIStore()
   const userLoading = profileLoading || settingsLoading
   // Keep local UI state
@@ -322,7 +326,6 @@ function SettingsPage() {
   }
 
   const exportData = async (format: string = 'json') => {
-    // Validate format
     if (!['json', 'csv'].includes(format)) {
       toast.error('Invalid export format. Only JSON and CSV are supported.')
       return
@@ -330,44 +333,75 @@ function SettingsPage() {
 
     setSaving(true)
     try {
-      // Call our data export API with backup endpoint
-      const response = await fetch(`/api/user/backup?format=${format}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
+      // Fetch readings from Convex (last 90 days by default)
+      const now = Date.now()
+      const startTime = now - (dataSettings.retentionPeriod * 24 * 60 * 60 * 1000)
+      const historyResult = await convex.query(api.readings.history, {
+        startTime,
+        endTime: now + 24 * 60 * 60 * 1000,
+        aggregation: 'raw',
       })
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to export data' }))
-        throw new Error(errorData.error || `HTTP ${response.status}: Failed to export data`)
-      }
 
-      // Check if response is actually file data
-      const contentType = response.headers.get('content-type')
-      if (!contentType || (!contentType.includes('application/json') && !contentType.includes('text/csv') && !contentType.includes('application/octet-stream'))) {
-        throw new Error('Invalid response format from server')
-      }
+      const readings = historyResult?.readings ?? []
 
-      // Get the filename from the response headers
-      const contentDisposition = response.headers.get('content-disposition')
-      let filename = `ecoflow-export-${new Date().toISOString().split('T')[0]}.${format}`
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="([^"]+)"/)
-        if (filenameMatch) {
-          filename = filenameMatch[1]
+      let content: string
+      let mimeType: string
+      const filename = `ecoflow-export-${new Date().toISOString().split('T')[0]}.${format}`
+
+      if (format === 'json') {
+        const exportPayload = {
+          exportedAt: new Date().toISOString(),
+          profile: convexProfile ? {
+            email: convexProfile.email,
+            firstName: convexProfile.firstName,
+            lastName: convexProfile.lastName,
+          } : null,
+          devices: (devices ?? []).map(d => ({
+            deviceSn: d.deviceSn,
+            deviceName: d.deviceName,
+            deviceType: d.deviceType,
+            isActive: d.isActive,
+          })),
+          settings: {
+            dataRetention: convexDataRetention,
+            notifications: convexNotifications,
+          },
+          readings: readings.map(r => ({
+            deviceSn: r.deviceSn,
+            deviceName: r.deviceName,
+            batteryLevel: r.batteryLevel,
+            inputWatts: r.inputWatts,
+            outputWatts: r.outputWatts,
+            acInputWatts: r.acInputWatts,
+            dcInputWatts: r.dcInputWatts,
+            acOutputWatts: r.acOutputWatts,
+            dcOutputWatts: r.dcOutputWatts,
+            usbOutputWatts: r.usbOutputWatts,
+            remainingTime: r.remainingTime,
+            temperature: r.temperature,
+            status: r.status,
+            recordedAt: new Date(r.recordedAt).toISOString(),
+          })),
+          totalReadings: readings.length,
         }
+        content = JSON.stringify(exportPayload, null, 2)
+        mimeType = 'application/json'
+      } else {
+        // CSV — readings only
+        const headers = ['deviceSn','deviceName','recordedAt','batteryLevel','inputWatts','outputWatts','acInputWatts','dcInputWatts','acOutputWatts','dcOutputWatts','usbOutputWatts','remainingTime','temperature','status']
+        const rows = readings.map(r => [
+          r.deviceSn, r.deviceName, new Date(r.recordedAt).toISOString(),
+          r.batteryLevel ?? '', r.inputWatts ?? '', r.outputWatts ?? '',
+          r.acInputWatts ?? '', r.dcInputWatts ?? '', r.acOutputWatts ?? '',
+          r.dcOutputWatts ?? '', r.usbOutputWatts ?? '', r.remainingTime ?? '',
+          r.temperature ?? '', r.status,
+        ].map(v => `"${v}"`).join(','))
+        content = [headers.join(','), ...rows].join('\n')
+        mimeType = 'text/csv'
       }
 
-      // Create download
-      const blob = await response.blob()
-      
-      // Validate blob size
-      if (blob.size === 0) {
-        throw new Error('Export file is empty')
-      }
-
+      // Trigger browser download
+      const blob = new Blob([content], { type: mimeType })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -377,7 +411,7 @@ function SettingsPage() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      
+
       toast.success(`Data exported successfully as ${format.toUpperCase()} (${(blob.size / 1024).toFixed(1)} KB)`)
     } catch (error) {
       console.error('Export error:', error)
