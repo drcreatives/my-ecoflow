@@ -172,7 +172,9 @@ const DevicesPage = () => {
             <div className="flex items-center gap-2 mb-4 p-3 bg-surface-2 rounded-inner">
               <Clock size={16} className="text-brand-primary" />
               <div>
-                <p className="text-xs text-text-muted">Estimated Runtime</p>
+                <p className="text-xs text-text-muted">
+                  {remainingTime > 0 ? 'Estimated Charge Time' : 'Estimated Runtime'}
+                </p>
                 <p className="text-sm font-medium text-text-primary">
                   {formatRemainingTime(remainingTime)}
                 </p>

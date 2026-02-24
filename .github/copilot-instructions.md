@@ -38,7 +38,7 @@ All data fetching, mutations, and background jobs run on Convex. No Next.js API 
 | `email.ts` | Resend email sending (internal actions) |
 | `email_log.ts` | Email log queries |
 | `admin.ts` | Data cleanup mutation |
-| `crons.ts` | 3 scheduled jobs: collect-readings (1min), device-monitor (15min), data-cleanup (24h) |
+| `crons.ts` | 4 scheduled jobs: collect-readings (1min), device-monitor (15min), data-cleanup (24h), backup-check (1h) |
 | `migrations.ts` | One-time Supabase→Convex data migration |
 
 ### Frontend (`src/`)
@@ -135,6 +135,30 @@ const baseURL = 'https://api-e.ecoflow.com'  // Must use api-e, not api
 // HMAC-SHA256 signature: sort params alphabetically, sign with secret key
 // See src/lib/ecoflow-api.ts for full implementation
 ```
+
+### Charging State & Remaining Time
+
+The Delta 2 can simultaneously have input (e.g. solar) **and** output (e.g. loads). Charging state must use **net power flow**, not raw `inputWatts > 0`.
+
+**Key raw API fields:**
+- `pd.remainTime` — signed: positive = charging, negative = discharging (authoritative firmware signal)
+- `bms_emsStatus.chgRemainTime` — minutes until full (only valid when actually net-charging)
+- `bms_emsStatus.dsgRemainTime` — minutes until empty (only valid when actually net-discharging)
+
+**Logic in `convex/ecoflow.ts` → `transformQuotaToReading()`:**
+```typescript
+const netPower = totalInput - totalOutput;
+const hasPdRemainSign = pdRemain !== null && pdRemain !== 0;
+const isNetCharging = hasPdRemainSign ? pdRemain > 0 : netPower > 10;   // firmware sign > fallback
+const isNetDischarging = hasPdRemainSign ? pdRemain < 0 : netPower < -10;
+// Pick chgRemainTime (positive) when charging, -dsgRemainTime (negative) when discharging
+```
+
+**`remainingTime` sign convention** (stored in DB, used by `formatRemainingTime()`):
+- **positive** → charging → "X until full"
+- **negative** → discharging → "X remaining"
+
+**Frontend `DeviceStatusCard.getStatusInfo()`** mirrors the same net-power logic to show Charging / Discharging / Pass-through / Standby status.
 
 ## Development
 

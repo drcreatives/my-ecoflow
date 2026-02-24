@@ -307,7 +307,7 @@ export default function DevicePage({ params }: DevicePageProps) {
               {reading?.inputWatts || 0}W
             </div>
             <div className="text-xs text-text-muted mt-1">
-              {(reading?.inputWatts || 0) > 0 ? 'Charging' : 'Not charging'}
+              {(reading?.inputWatts || 0) > 0 ? 'Receiving power' : 'No input'}
             </div>
           </div>
 
@@ -436,7 +436,9 @@ export default function DevicePage({ params }: DevicePageProps) {
               </div>
               {reading?.remainingTime && (
                 <div className="flex justify-between items-center">
-                  <span className="text-text-secondary">Remaining Time</span>
+                  <span className="text-text-secondary">
+                    {reading.remainingTime > 0 ? 'Charge Time' : 'Runtime'}
+                  </span>
                   <span className="text-text-primary font-medium flex items-center space-x-1">
                     <Clock className="w-4 h-4" />
                     <span>{formatRemainingTime(reading.remainingTime)}</span>
