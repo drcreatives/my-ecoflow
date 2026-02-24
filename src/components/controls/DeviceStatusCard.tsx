@@ -17,6 +17,7 @@ import {
 import { cn } from '@/lib/utils'
 import { formatRemainingTime } from '@/lib/data-utils'
 import { useState } from 'react'
+import { useConvexDeviceMutations } from '@/hooks/useConvexData'
 
 interface DeviceData {
   id: string
@@ -28,16 +29,17 @@ interface DeviceData {
   status?: string
   userId: string
   currentReading?: {
-    batteryLevel?: number
-    inputWatts?: number
-    acInputWatts?: number
-    dcInputWatts?: number
+    batteryLevel?: number | null
+    inputWatts?: number | null
+    acInputWatts?: number | null
+    dcInputWatts?: number | null
     chargingType?: number | null
-    outputWatts?: number
-    temperature?: number
-    remainingTime?: number
-    status?: string
-  }
+    outputWatts?: number | null
+    temperature?: number | null
+    remainingTime?: number | null
+    status?: string | null
+    [key: string]: unknown
+  } | null
 }
 
 interface DeviceStatusCardProps {
@@ -61,6 +63,7 @@ function getInputLabel(chargingType?: number | null, inputWatts?: number): strin
 export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCardProps) => {
   const [isRegistering, setIsRegistering] = useState(false)
   const [isUnregistering, setIsUnregistering] = useState(false)
+  const { registerDevice, unregisterDevice } = useConvexDeviceMutations()
   
   const batteryLevel = device.currentReading?.batteryLevel ?? 0
   const inputWatts = device.currentReading?.inputWatts ?? 0
@@ -88,23 +91,8 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
   const handleRegisterDevice = async () => {
     setIsRegistering(true)
     try {
-      const response = await fetch('/api/register-device', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          deviceSn: device.deviceSn,
-          userId: device.userId
-        })
-      })
-
-      if (response.ok) {
-        // Refresh the page or update state to show the device as registered
-        window.location.reload()
-      } else {
-        throw new Error('Failed to register device')
-      }
+      await registerDevice(device.deviceSn, device.deviceName)
+      // Convex is reactive — UI will update automatically
     } catch (error) {
       console.error('Registration error:', error)
       alert('Failed to register device for analytics. Please try again.')
@@ -116,23 +104,8 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
   const handleUnregisterDevice = async () => {
     setIsUnregistering(true)
     try {
-      const response = await fetch('/api/unregister-device', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          deviceSn: device.deviceSn,
-          userId: device.userId
-        })
-      })
-
-      if (response.ok) {
-        // Refresh the page or update state to show the device as unregistered
-        window.location.reload()
-      } else {
-        throw new Error('Failed to unregister device')
-      }
+      await unregisterDevice(device.id)
+      // Convex is reactive — UI will update automatically
     } catch (error) {
       console.error('Unregistration error:', error)
       alert('Failed to unregister device. Please try again.')

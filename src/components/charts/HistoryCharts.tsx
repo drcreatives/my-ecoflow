@@ -38,22 +38,25 @@ interface ChartDataPoint {
 
 // Convert DeviceReading[] to chart-friendly format
 export const transformReadingsToChartData = (readings: DeviceReading[]): ChartDataPoint[] => {
-  return readings.map(reading => ({
-    timestamp: reading.recordedAt.toISOString(),
-    formattedTime: format(reading.recordedAt, 'MMM dd HH:mm'),
-    batteryLevel: reading.batteryLevel,
-    inputWatts: reading.inputWatts,
-    acInputWatts: reading.acInputWatts,
-    dcInputWatts: reading.dcInputWatts,
-    chargingType: reading.chargingType,
-    outputWatts: reading.outputWatts,
-    acOutputWatts: reading.acOutputWatts,
-    dcOutputWatts: reading.dcOutputWatts,
-    usbOutputWatts: reading.usbOutputWatts,
-    temperature: reading.temperature,
-    totalOutput: (reading.acOutputWatts || 0) + (reading.dcOutputWatts || 0) + (reading.usbOutputWatts || 0),
-    totalInput: (reading.acInputWatts || 0) + (reading.dcInputWatts || 0)
-  }))
+  return readings.map(reading => {
+    const dateObj = reading.recordedAt instanceof Date ? reading.recordedAt : new Date(reading.recordedAt)
+    return {
+      timestamp: dateObj.toISOString(),
+      formattedTime: format(dateObj, 'MMM dd HH:mm'),
+      batteryLevel: reading.batteryLevel ?? undefined,
+      inputWatts: reading.inputWatts ?? undefined,
+      acInputWatts: reading.acInputWatts ?? undefined,
+      dcInputWatts: reading.dcInputWatts ?? undefined,
+      chargingType: reading.chargingType ?? undefined,
+      outputWatts: reading.outputWatts ?? undefined,
+      acOutputWatts: reading.acOutputWatts ?? undefined,
+      dcOutputWatts: reading.dcOutputWatts ?? undefined,
+      usbOutputWatts: reading.usbOutputWatts ?? undefined,
+      temperature: reading.temperature ?? undefined,
+      totalOutput: (reading.acOutputWatts || 0) + (reading.dcOutputWatts || 0) + (reading.usbOutputWatts || 0),
+      totalInput: (reading.acInputWatts || 0) + (reading.dcInputWatts || 0)
+    }
+  })
 }
 
 // Custom tooltip component

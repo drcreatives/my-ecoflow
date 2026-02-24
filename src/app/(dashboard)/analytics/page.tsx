@@ -1,10 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react";
-import { useDeviceStore } from "@/stores/deviceStore";
-import { DeviceReading } from "@/lib/data-utils";
+import { useEffect, useState, useMemo } from "react";
+import { useConvexDevices, useConvexHistoryReadings } from "@/hooks/useConvexData";
 import { CombinedChart, BatteryLevelChart, TemperatureChart, transformReadingsToChartData } from "@/components/charts/HistoryCharts";
-import { Loader2, Battery, Thermometer, BarChart3, ExternalLink, Filter, RefreshCw, ChevronDown, Search } from "lucide-react";
+import { Loader2, Battery, Thermometer, BarChart3, ExternalLink, Filter, ChevronDown, Search } from "lucide-react";
 import Link from "next/link";
 import { DateTimePicker } from '@/components/ui/DateTimePicker';
 
@@ -17,6 +16,16 @@ interface HistoryFilters {
   aggregation: 'raw' | '5m' | '1h' | '1d'
 }
 
+function formatTimeSpan(startTime: number, endTime: number): string {
+  const diffMs = endTime - startTime;
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours} hours`;
+  const mins = Math.floor(diffMs / (1000 * 60));
+  return `${mins} minutes`;
+}
+
 interface HistorySummary {
 	totalReadings: number;
 	avgBatteryLevel: number;
@@ -25,7 +34,8 @@ interface HistorySummary {
 	peakPowerOutput: number;
 	lowestBatteryLevel: number;
 	highestTemperature: number;
-	timeSpan: string;
+	startTime: number;
+	endTime: number;
 }
 
 interface DeviceOption {
@@ -36,12 +46,7 @@ interface DeviceOption {
 }
 
 function AnalyticsPage() {
-	const { devices, fetchDevices, isLoading: devicesLoading } = useDeviceStore();
-	const [readings, setReadings] = useState<DeviceReading[]>([]);
-	const [summary, setSummary] = useState<HistorySummary | null>(null);
-	const [isLoading, setIsLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+	const { devices, isLoading: devicesLoading } = useConvexDevices();
 
 	// Filter state
 	const [filters, setFilters] = useState<HistoryFilters>({
@@ -66,54 +71,42 @@ function AnalyticsPage() {
 
 	const selectedDevice = deviceOptions.find(d => d.id === filters.deviceId);
 
+	// Set default device when devices load
 	useEffect(() => {
-		fetchDevices();
-	}, [fetchDevices]);
-
-	// Skip auto-fetching for 'custom' range — user must click "Apply" to avoid
-	// firing API calls on every date/time picker interaction
-	useEffect(() => {
-		if (devices.length > 0 && filters.timeRange !== 'custom') {
-			fetchAnalyticsData();
+		if (devices.length > 0 && filters.deviceId === 'all') {
+			setFilters(prev => ({ ...prev, deviceId: devices[0].id }));
 		}
-	}, [devices, filters]);
+	}, [devices, filters.deviceId]);
 
-	const fetchAnalyticsData = async () => {
-		try {
-			setIsLoading(true);
-			setError(null);
-			
-			// Build query parameters based on filters
-			const params = new URLSearchParams({
-				timeRange: filters.timeRange,
-				aggregation: filters.aggregation
-			});
+	// ─── Convex reactive query for analytics data ──────────────────────────
+	const shouldQuery =
+		filters.deviceId !== 'all' &&
+		(filters.timeRange !== 'custom' ||
+			(!!filters.customStartDate && !!filters.customEndDate));
 
-			if (filters.deviceId !== 'all') {
-				params.set('deviceId', filters.deviceId);
-			}
-
-			if (filters.timeRange === 'custom') {
-				if (filters.customStartDate) params.set('startDate', filters.customStartDate);
-				if (filters.customEndDate) params.set('endDate', filters.customEndDate);
-			}
-
-			const response = await fetch(`/api/history/readings?${params.toString()}`);
-			const data = await response.json();
-			if (!data.success) throw new Error(data.error || "Failed to fetch analytics data");
-			const apiReadings = data.data.readings.map((reading: any) => ({
-				...reading,
-				recordedAt: new Date(reading.recordedAt),
-			}));
-			setReadings(apiReadings);
-			setSummary(data.data.summary);
-			setLastUpdated(new Date());
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to load analytics data");
-		} finally {
-			setIsLoading(false);
+	const {
+		readings,
+		summary,
+		isLoading,
+		error,
+	} = useConvexHistoryReadings(
+		shouldQuery ? filters.deviceId : null,
+		{
+			timeRange: filters.timeRange !== 'custom' ? filters.timeRange : undefined,
+			customStartDate: filters.customStartDate,
+			customEndDate: filters.customEndDate,
+			aggregation: filters.aggregation,
 		}
-	};
+	);
+
+	// Convert readings to chart-compatible format (Date objects for recordedAt)
+	const chartReadings = useMemo(() =>
+		readings.map((r: any) => ({
+			...r,
+			recordedAt: new Date(r.recordedAt),
+		})),
+		[readings]
+	);
 
 	const formatValue = (value: number | null | undefined, unit: string) => {
 		if (value === null || value === undefined || isNaN(value)) return "0" + unit;
@@ -147,9 +140,6 @@ function AnalyticsPage() {
 						</div>
 						
 						<div className="flex items-center gap-2">
-							{lastUpdated && (
-								<span className="text-xs text-text-muted">Last updated: {lastUpdated.toLocaleString()}</span>
-							)}
 							<button
 								onClick={() => setShowFilters(!showFilters)}
 								className="flex items-center gap-2 px-3 py-2 bg-surface-2 hover:bg-surface-2/80 border border-stroke-subtle rounded-pill text-text-primary transition-all duration-160 text-sm"
@@ -157,14 +147,9 @@ function AnalyticsPage() {
 								<Filter size={16} />
 								Filters
 							</button>
-							<button
-								onClick={fetchAnalyticsData}
-								disabled={isLoading}
-								className="flex items-center gap-2 px-3 py-2 bg-brand-primary hover:bg-brand-secondary disabled:opacity-50 disabled:cursor-not-allowed text-bg-base font-medium rounded-pill transition-all duration-160 text-sm"
-							>
-								<RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-								Refresh
-							</button>
+							{isLoading && (
+								<Loader2 size={16} className="animate-spin text-text-muted" />
+							)}
 						</div>
 					</div>
 
@@ -264,7 +249,7 @@ function AnalyticsPage() {
 									</div>
 									<div className="flex justify-end">
 										<button
-											onClick={fetchAnalyticsData}
+											onClick={() => setFilters(prev => ({ ...prev }))}
 											disabled={!filters.customStartDate || !filters.customEndDate}
 											className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-bg-base rounded-pill text-sm font-medium hover:brightness-110 transition-all duration-160 ease-dashboard disabled:opacity-40 disabled:cursor-not-allowed"
 										>
@@ -290,7 +275,7 @@ function AnalyticsPage() {
 							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
 								<div className="flex items-center justify-between mb-2">
 									<BarChart3 className="w-5 h-5 text-brand-tertiary" />
-									<span className="text-xs text-text-muted">{summary.timeSpan || "0 hours"}</span>
+									<span className="text-xs text-text-muted">{formatTimeSpan(summary.startTime, summary.endTime)}</span>
 								</div>
 								<div className="text-2xl font-medium text-text-primary mb-1">
 									{(summary.totalReadings || 0).toLocaleString()}
@@ -340,7 +325,7 @@ function AnalyticsPage() {
 									<p className="text-text-secondary">Loading chart data...</p>
 								</div>
 							</div>
-						) : readings.length === 0 ? (
+						) : chartReadings.length === 0 ? (
 							<div className="flex flex-col items-center justify-center h-64 text-center">
 								<BarChart3 className="w-16 h-16 text-text-muted mb-4" />
 								<h3 className="text-lg font-medium text-text-secondary mb-2">No Analytics Data</h3>
@@ -357,7 +342,7 @@ function AnalyticsPage() {
 							</div>
 						) : (
 							<CombinedChart
-								data={transformReadingsToChartData(readings)}
+								data={transformReadingsToChartData(chartReadings)}
 								height={400}
 								defaultChart="power"
 							/>
@@ -365,7 +350,7 @@ function AnalyticsPage() {
 					</div>
 
 					{/* Additional Chart Views */}
-					{readings.length > 0 && (
+					{chartReadings.length > 0 && (
 						<div className="grid grid-cols-1 lg:grid-cols-2 gap-[18px] mt-6">
 							{/* Battery Level Chart */}
 							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
@@ -374,7 +359,7 @@ function AnalyticsPage() {
 									<h3 className="text-section-title font-medium text-text-primary">Battery Level</h3>
 								</div>
 								<BatteryLevelChart
-									data={transformReadingsToChartData(readings)}
+									data={transformReadingsToChartData(chartReadings)}
 									height={250}
 								/>
 							</div>
@@ -386,7 +371,7 @@ function AnalyticsPage() {
 									<h3 className="text-section-title font-medium text-text-primary">Temperature</h3>
 								</div>
 								<TemperatureChart
-									data={transformReadingsToChartData(readings)}
+									data={transformReadingsToChartData(chartReadings)}
 									height={250}
 								/>
 							</div>

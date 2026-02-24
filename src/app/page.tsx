@@ -2,34 +2,22 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase'
+import { useConvexAuth } from 'convex/react'
 import { Loader2 } from 'lucide-react'
 
 export default function Home() {
   const router = useRouter()
-  const supabase = createClient()
+  const { isLoading, isAuthenticated } = useConvexAuth()
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        if (session?.user) {
-          // User is authenticated, redirect to dashboard
-          router.push('/dashboard')
-        } else {
-          // User is not authenticated, redirect to login
-          router.push('/login')
-        }
-      } catch (error) {
-        console.error('Auth check error:', error)
-        // On error, redirect to login
-        router.push('/login')
-      }
-    }
+    if (isLoading) return
 
-    checkAuth()
-  }, [router, supabase.auth])
+    if (isAuthenticated) {
+      router.push('/dashboard')
+    } else {
+      router.push('/login')
+    }
+  }, [isLoading, isAuthenticated, router])
 
   // Show loading state while checking authentication
   return (

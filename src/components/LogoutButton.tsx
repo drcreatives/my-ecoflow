@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase'
+import { useAuthActions } from '@convex-dev/auth/react'
 import { LogOut, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -13,12 +13,12 @@ interface LogoutButtonProps {
 export default function LogoutButton({ isMobile = false }: LogoutButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const { signOut } = useAuthActions()
 
   const handleLogout = async () => {
     setIsLoading(true)
     try {
-      await supabase.auth.signOut()
+      await signOut()
       router.push('/login')
     } catch (error) {
       console.error('Logout error:', error)

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import { Toaster } from 'sonner'
+import { ConvexClientProvider } from '@/components/ConvexClientProvider'
 import './globals.css'
 
 const neueMontreal = localFont({
@@ -49,24 +50,26 @@ export default function RootLayout({
         className={`${neueMontreal.variable} font-sans antialiased bg-bg-base text-text-primary min-h-screen`}
         suppressHydrationWarning={true}
       >
-        {children}
-        <Toaster 
-          theme="dark"
-          position="top-right"
-          richColors
-          closeButton
-          expand={false}
-          visibleToasts={4}
-          toastOptions={{
-            style: {
-              background: '#1f201f',
-              border: '1px solid rgba(255,255,255,0.10)',
-              color: 'rgba(255,255,255,0.92)',
-              borderRadius: '18px',
-            },
-            className: 'sonner-toast',
-          }}
-        />
+        <ConvexClientProvider>
+          {children}
+          <Toaster 
+            theme="dark"
+            position="top-right"
+            richColors
+            closeButton
+            expand={false}
+            visibleToasts={4}
+            toastOptions={{
+              style: {
+                background: '#1f201f',
+                border: '1px solid rgba(255,255,255,0.10)',
+                color: 'rgba(255,255,255,0.92)',
+                borderRadius: '18px',
+              },
+              className: 'sonner-toast',
+            }}
+          />
+        </ConvexClientProvider>
       </body>
     </html>
   )

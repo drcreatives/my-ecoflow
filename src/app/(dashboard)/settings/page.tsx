@@ -1,22 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { 
   Settings,
   User,
   Bell,
-  BellOff,
-  Smartphone,
   Mail,
   Database,
   Shield,
   Trash2,
   Download,
-  Upload,
   RefreshCw,
-  Clock,
   Zap,
   Save,
   Eye,
@@ -25,9 +20,11 @@ import {
   Loader2,
   AlertTriangle
 } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
-import { useUserStore } from '@/stores/userStore'
+import { useConvexProfile, useConvexSettings, useConvexDevices } from '@/hooks/useConvexData'
+import { useAuthActions } from '@convex-dev/auth/react'
+import { useConvex } from 'convex/react'
+import { api } from '../../../../convex/_generated/api'
 import { cn } from '@/lib/utils'
 
 interface UserProfile {
@@ -50,6 +47,7 @@ interface NotificationSettings {
 interface DataSettings {
   retentionPeriod: number // days
   autoBackup: boolean
+  backupInterval: number // hours
   exportFormat: 'json' | 'csv'
   collectInterval: number // minutes
 }
@@ -61,26 +59,27 @@ interface SecuritySettings {
 }
 
 function SettingsPage() {
-  // Store state management
-  const { user, logout } = useAuthStore()
-  const { notifications, clearAllNotifications } = useUIStore()
+  // Convex reactive queries — no manual fetch needed
+  const { profile: convexProfile, isLoading: profileLoading, updateProfile: convexUpdateProfile } = useConvexProfile()
   const {
-    profile,
-    notifications: userNotifications,
-    dataRetention,
-    fetchProfile,
-    updateProfile,
-    updateNotificationSettings,
-    changePassword,
-    exportData: exportUserData,
-    isLoading: userLoading
-  } = useUserStore()  // Keep local UI state
+    dataRetention: convexDataRetention,
+    notifications: convexNotifications,
+    isLoading: settingsLoading,
+    updateDataRetention: convexUpdateDataRetention,
+    updateNotifications: convexUpdateNotifications,
+  } = useConvexSettings()
+  const { signOut } = useAuthActions()
+  const convex = useConvex()
+  const { devices } = useConvexDevices()
+  const { notifications, clearAllNotifications } = useUIStore()
+  const userLoading = profileLoading || settingsLoading
+  // Keep local UI state
   const [activeTab, setActiveTab] = useState('profile')
   const [saving, setSaving] = useState(false)
   
   // Initialize local settings from store on load
   const [userProfile, setUserProfile] = useState<UserProfile>({
-    email: user?.email || '',
+    email: '',
     firstName: '',
     lastName: '',
     createdAt: ''
@@ -99,6 +98,7 @@ function SettingsPage() {
   const [dataSettings, setDataSettings] = useState<DataSettings>({
     retentionPeriod: 90,
     autoBackup: true,
+    backupInterval: 24,
     exportFormat: 'json',
     collectInterval: 5
   })
@@ -122,99 +122,50 @@ function SettingsPage() {
     confirm: false
   })
 
-  // Debug: Log userProfile state changes
-  useEffect(() => {
-    console.log('userProfile state changed:', userProfile)
-  }, [userProfile])
-
   // Test email state
   const [testingEmail, setTestingEmail] = useState(false)
 
+  // Sync profile from Convex reactive query
   useEffect(() => {
-    loadUserSettings()
-  }, [])
-
-  // Update local state when store profile changes
-  useEffect(() => {
-    console.log('Profile data from store:', profile)
-    if (profile) {
-      console.log('Updating userProfile state with:', {
-        email: profile.email,
-        firstName: profile.firstName || '',
-        lastName: profile.lastName || '',
-        createdAt: profile.createdAt ? profile.createdAt : new Date().toISOString()
-      })
+    if (convexProfile) {
       setUserProfile({
-        email: profile.email,
-        firstName: profile.firstName || '',
-        lastName: profile.lastName || '',
-        createdAt: profile.createdAt ? (typeof profile.createdAt === 'string' ? profile.createdAt : profile.createdAt.toISOString()) : new Date().toISOString()
+        email: convexProfile.email || '',
+        firstName: convexProfile.firstName || '',
+        lastName: convexProfile.lastName || '',
+        createdAt: convexProfile.createdAt
+          ? new Date(convexProfile.createdAt).toISOString()
+          : new Date().toISOString()
       })
     }
-  }, [profile])
+  }, [convexProfile])
 
-  // Update local notification settings when store data changes
+  // Sync notification settings from Convex
   useEffect(() => {
-    if (userNotifications) {
+    if (convexNotifications) {
       setNotificationSettings({
-        deviceAlerts: userNotifications.deviceAlerts,
-        lowBattery: true,
-        powerThreshold: true,
-        systemUpdates: userNotifications.systemUpdates,
-        weeklyReports: userNotifications.weeklyReports,
-        emailNotifications: userNotifications.emailNotifications,
-        pushNotifications: userNotifications.pushNotifications
+        deviceAlerts: convexNotifications.deviceAlerts ?? true,
+        lowBattery: convexNotifications.lowBattery ?? true,
+        powerThreshold: convexNotifications.powerThreshold ?? false,
+        systemUpdates: convexNotifications.systemUpdates ?? true,
+        weeklyReports: convexNotifications.weeklyReports ?? false,
+        emailNotifications: convexNotifications.emailNotifications ?? true,
+        pushNotifications: convexNotifications.pushNotifications ?? false
       })
     }
-  }, [userNotifications])
+  }, [convexNotifications])
 
-  // Update local data settings when store data changes
+  // Sync data retention settings from Convex
   useEffect(() => {
-    if (dataRetention) {
-      const retentionDays = dataRetention.retentionPeriod === '30d' ? 30 :
-                           dataRetention.retentionPeriod === '90d' ? 90 :
-                           dataRetention.retentionPeriod === '1y' ? 365 : 90
-                           
+    if (convexDataRetention) {
       setDataSettings(prev => ({
         ...prev,
-        retentionPeriod: retentionDays,
-        autoBackup: dataRetention.autoCleanup,
+        retentionPeriod: convexDataRetention.retentionPeriodDays ?? 90,
+        autoBackup: convexDataRetention.backupEnabled ?? false,
+        backupInterval: convexDataRetention.backupIntervalHours ?? 24,
+        collectInterval: convexDataRetention.collectionIntervalMinutes ?? 5,
       }))
     }
-  }, [dataRetention])
-
-  const loadUserSettings = async () => {
-    try {
-      // Use store action to fetch user profile
-      console.log('Loading user settings...')
-      await fetchProfile()
-      console.log('Profile fetched, current profile:', profile)
-      // Note: Local state will be updated via useEffect when profile data arrives
-
-      // Fetch data-retention settings directly from the API so we get the
-      // real collection_interval_minutes value (the Zustand store type
-      // doesn't carry it).
-      try {
-        const res = await fetch('/api/user/data-retention', { credentials: 'include' })
-        if (res.ok) {
-          const json = await res.json()
-          const s = json?.settings
-          if (s) {
-            setDataSettings(prev => ({
-              ...prev,
-              retentionPeriod: s.retention_period_days ?? prev.retentionPeriod,
-              autoBackup: s.backup_enabled ?? prev.autoBackup,
-              collectInterval: s.collection_interval_minutes ?? prev.collectInterval,
-            }))
-          }
-        }
-      } catch (e) {
-        console.error('Error fetching data-retention settings:', e)
-      }
-    } catch (err) {
-      console.error('Error loading user settings:', err)
-    }
-  }
+  }, [convexDataRetention])
 
   const saveSettings = async (settingsType: string, settings: any) => {
     setSaving(true)
@@ -253,38 +204,24 @@ function SettingsPage() {
           return
         }
 
-        // Save user profile via store action
-        await updateProfile({
+        // Save via Convex mutation
+        await convexUpdateProfile({
           firstName: settings.firstName.trim(),
           lastName: settings.lastName.trim()
         })
-        
-        // Update local state
-        setUserProfile(prev => ({
-          ...prev,
-          firstName: settings.firstName.trim(),
-          lastName: settings.lastName.trim()
-        }))
         
         toast.success('Profile updated successfully')
       } else if (settingsType === 'notificationSettings') {
-                // Save notification settings via store action
-        await updateNotificationSettings({
-          emailNotifications: settings.emailAlerts, // Map emailAlerts to emailNotifications
+        // Save via Convex mutation — pass all current toggle values
+        await convexUpdateNotifications({
+          deviceAlerts: settings.deviceAlerts,
+          lowBattery: settings.lowBattery,
+          powerThreshold: settings.powerThreshold,
+          systemUpdates: settings.systemUpdates,
+          weeklyReports: settings.weeklyReports,
+          emailNotifications: settings.emailNotifications,
           pushNotifications: settings.pushNotifications,
-          smsNotifications: false, // Default value for store interface
-          deviceAlerts: settings.alertTypes.includes('low-battery') || settings.alertTypes.includes('high-temperature'),
-          systemUpdates: settings.alertTypes.includes('maintenance'),
-          weeklyReports: settings.alertTypes.includes('weekly-report')
         })
-        
-        // Update local state
-        setNotificationSettings(prev => ({
-          ...prev,
-          emailAlerts: settings.emailAlerts,
-          pushNotifications: settings.pushNotifications,
-          alertTypes: settings.alertTypes
-        }))
         
         toast.success('Notification settings updated successfully')
       } else if (settingsType === 'dataSettings') {
@@ -299,62 +236,23 @@ function SettingsPage() {
           return
         }
 
-        // Save data retention settings via API
-        const response = await fetch('/api/user/data-retention', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            retentionPeriodDays: settings.retentionPeriod,
-            autoCleanupEnabled: true, // Default to enabled for automatic cleanup
-            backupEnabled: settings.autoBackup,
-            collectionIntervalMinutes: settings.collectInterval
-          })
+        // Save via Convex mutation
+        await convexUpdateDataRetention({
+          retentionPeriodDays: settings.retentionPeriod,
+          autoCleanupEnabled: true,
+          backupEnabled: settings.autoBackup,
+          backupIntervalHours: settings.backupInterval,
+          collectionIntervalMinutes: settings.collectInterval,
         })
-        
-        if (response.ok) {
-          const { settings: updatedSettings } = await response.json()
-          setDataSettings({
-            retentionPeriod: updatedSettings.retention_period_days,
-            autoBackup: updatedSettings.backup_enabled,
-            exportFormat: dataSettings.exportFormat, // Keep current format preference
-            collectInterval: updatedSettings.collection_interval_minutes
-          })
-          toast.success('Data settings updated successfully')
-        } else {
-          const error = await response.json()
-          toast.error(error.error || 'Failed to update data settings')
-        }
+        toast.success('Data settings updated successfully')
       } else {
-        // Save other settings to localStorage for now (will be API later)
+        // Save other settings to localStorage for now
         localStorage.setItem(settingsType, JSON.stringify(settings))
         toast.success('Settings saved successfully')
       }
     } catch (error) {
       console.error('Failed to save settings:', error)
-      
-      // Enhanced error handling with specific error types
-      let errorMessage = 'Failed to save settings'
-      
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        errorMessage = 'Network error: Please check your internet connection'
-      } else if (error instanceof Error) {
-        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-          errorMessage = 'Session expired. Please log in again.'
-          // Optionally redirect to login
-          // window.location.href = '/login'
-        } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
-          errorMessage = 'You do not have permission to perform this action'
-        } else if (error.message.includes('500')) {
-          errorMessage = 'Server error. Please try again later.'
-        } else if (error.message.includes('400')) {
-          errorMessage = 'Invalid data provided. Please check your inputs.'
-        } else {
-          errorMessage = error.message
-        }
-      }
-      
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save settings'
       toast.error(errorMessage)
     } finally {
       setSaving(false)
@@ -402,20 +300,11 @@ function SettingsPage() {
     
     setSaving(true)
     try {
-      // Call the store action for password change
-      await changePassword(passwordForm.currentPassword, passwordForm.newPassword)
-      
-      setSecuritySettings(prev => ({
-        ...prev,
-        passwordLastChanged: new Date().toISOString().split('T')[0]
-      }))
-      
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-      setShowPasswordForm(false)
-      toast.success('Password changed successfully. Please sign in again with your new password.')
-      
-      // Optionally redirect to login after password change
-      // window.location.href = '/login'
+      // TODO: Password change not yet implemented with Convex Auth.
+      // @convex-dev/auth doesn't expose a direct password-change API.
+      // For now show a message; a future iteration can implement this via
+      // a custom Convex action + bcrypt verification.
+      toast.error('Password change is not yet available. Please use the forgot-password flow.')
       
     } catch (error) {
       console.error('Password change error:', error)
@@ -429,17 +318,9 @@ function SettingsPage() {
   const handleTestEmail = async () => {
     setTestingEmail(true)
     try {
-      const response = await fetch('/api/email/test', {
-        method: 'GET'
-      })
-      
-      if (response.ok) {
-        const result = await response.json()
-        toast.success('Test email sent successfully! Check your inbox.')
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to send test email')
-      }
+      // Test emails are sent via Convex internal actions (triggered by device alerts)
+      // A manual test can be triggered from the Convex Dashboard
+      toast.info('Test emails are sent automatically when device alerts trigger. Check the Convex Dashboard for email logs.')
     } catch (error) {
       console.error('Test email error:', error)
       toast.error('Failed to send test email')
@@ -449,7 +330,6 @@ function SettingsPage() {
   }
 
   const exportData = async (format: string = 'json') => {
-    // Validate format
     if (!['json', 'csv'].includes(format)) {
       toast.error('Invalid export format. Only JSON and CSV are supported.')
       return
@@ -457,44 +337,75 @@ function SettingsPage() {
 
     setSaving(true)
     try {
-      // Call our data export API with backup endpoint
-      const response = await fetch(`/api/user/backup?format=${format}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
+      // Fetch readings from Convex (last 90 days by default)
+      const now = Date.now()
+      const startTime = now - (dataSettings.retentionPeriod * 24 * 60 * 60 * 1000)
+      const historyResult = await convex.query(api.readings.history, {
+        startTime,
+        endTime: now + 24 * 60 * 60 * 1000,
+        aggregation: 'raw',
       })
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to export data' }))
-        throw new Error(errorData.error || `HTTP ${response.status}: Failed to export data`)
-      }
 
-      // Check if response is actually file data
-      const contentType = response.headers.get('content-type')
-      if (!contentType || (!contentType.includes('application/json') && !contentType.includes('text/csv') && !contentType.includes('application/octet-stream'))) {
-        throw new Error('Invalid response format from server')
-      }
+      const readings = historyResult?.readings ?? []
 
-      // Get the filename from the response headers
-      const contentDisposition = response.headers.get('content-disposition')
-      let filename = `ecoflow-export-${new Date().toISOString().split('T')[0]}.${format}`
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="([^"]+)"/)
-        if (filenameMatch) {
-          filename = filenameMatch[1]
+      let content: string
+      let mimeType: string
+      const filename = `ecoflow-export-${new Date().toISOString().split('T')[0]}.${format}`
+
+      if (format === 'json') {
+        const exportPayload = {
+          exportedAt: new Date().toISOString(),
+          profile: convexProfile ? {
+            email: convexProfile.email,
+            firstName: convexProfile.firstName,
+            lastName: convexProfile.lastName,
+          } : null,
+          devices: (devices ?? []).map(d => ({
+            deviceSn: d.deviceSn,
+            deviceName: d.deviceName,
+            deviceType: d.deviceType,
+            isActive: d.isActive,
+          })),
+          settings: {
+            dataRetention: convexDataRetention,
+            notifications: convexNotifications,
+          },
+          readings: readings.map(r => ({
+            deviceSn: r.deviceSn,
+            deviceName: r.deviceName,
+            batteryLevel: r.batteryLevel,
+            inputWatts: r.inputWatts,
+            outputWatts: r.outputWatts,
+            acInputWatts: r.acInputWatts,
+            dcInputWatts: r.dcInputWatts,
+            acOutputWatts: r.acOutputWatts,
+            dcOutputWatts: r.dcOutputWatts,
+            usbOutputWatts: r.usbOutputWatts,
+            remainingTime: r.remainingTime,
+            temperature: r.temperature,
+            status: r.status,
+            recordedAt: new Date(r.recordedAt).toISOString(),
+          })),
+          totalReadings: readings.length,
         }
+        content = JSON.stringify(exportPayload, null, 2)
+        mimeType = 'application/json'
+      } else {
+        // CSV — readings only
+        const headers = ['deviceSn','deviceName','recordedAt','batteryLevel','inputWatts','outputWatts','acInputWatts','dcInputWatts','acOutputWatts','dcOutputWatts','usbOutputWatts','remainingTime','temperature','status']
+        const rows = readings.map(r => [
+          r.deviceSn, r.deviceName, new Date(r.recordedAt).toISOString(),
+          r.batteryLevel ?? '', r.inputWatts ?? '', r.outputWatts ?? '',
+          r.acInputWatts ?? '', r.dcInputWatts ?? '', r.acOutputWatts ?? '',
+          r.dcOutputWatts ?? '', r.usbOutputWatts ?? '', r.remainingTime ?? '',
+          r.temperature ?? '', r.status,
+        ].map(v => `"${v}"`).join(','))
+        content = [headers.join(','), ...rows].join('\n')
+        mimeType = 'text/csv'
       }
 
-      // Create download
-      const blob = await response.blob()
-      
-      // Validate blob size
-      if (blob.size === 0) {
-        throw new Error('Export file is empty')
-      }
-
+      // Trigger browser download
+      const blob = new Blob([content], { type: mimeType })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -504,7 +415,7 @@ function SettingsPage() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      
+
       toast.success(`Data exported successfully as ${format.toUpperCase()} (${(blob.size / 1024).toFixed(1)} KB)`)
     } catch (error) {
       console.error('Export error:', error)
@@ -657,7 +568,7 @@ function SettingsPage() {
                           Export Account Data
                         </button>
                         <button
-                          onClick={() => logout()}
+                          onClick={() => signOut()}
                           className="flex items-center gap-2 text-danger hover:text-danger/80 transition-colors"
                         >
                           <RefreshCw size={16} />
@@ -853,7 +764,7 @@ function SettingsPage() {
                         <div className="flex items-center justify-between p-4 bg-surface-2 rounded-inner">
                           <div>
                             <div className="font-medium text-text-primary">Automatic Backup</div>
-                            <div className="text-sm text-text-muted">Daily backup of device readings and settings</div>
+                            <div className="text-sm text-text-muted">Periodic email backup of device readings and settings</div>
                           </div>
                           <button
                             onClick={() => setDataSettings(prev => ({ ...prev, autoBackup: !prev.autoBackup }))}
@@ -868,6 +779,25 @@ function SettingsPage() {
                             )} />
                           </button>
                         </div>
+
+                        {dataSettings.autoBackup && (
+                          <div className="flex items-center justify-between p-4 bg-surface-2 rounded-inner">
+                            <div>
+                              <div className="font-medium text-text-primary">Backup Interval</div>
+                              <div className="text-sm text-text-muted">How often to email a data backup</div>
+                            </div>
+                            <select
+                              value={dataSettings.backupInterval}
+                              onChange={(e) => setDataSettings(prev => ({ ...prev, backupInterval: parseInt(e.target.value) }))}
+                              className="bg-surface-1 text-text-primary border border-stroke-subtle rounded-inner px-3 py-1.5 text-sm"
+                            >
+                              <option value={24}>Daily</option>
+                              <option value={168}>Weekly</option>
+                              <option value={336}>Every 2 Weeks</option>
+                              <option value={720}>Monthly</option>
+                            </select>
+                          </div>
+                        )}
                       </div>
 
                       <button

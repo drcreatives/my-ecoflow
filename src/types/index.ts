@@ -143,45 +143,6 @@ export interface DeviceRegistration {
   deviceName: string
 }
 
-// Store types
-export interface DeviceStore {
-  devices: Device[]
-  currentDevice: Device | null
-  readings: DeviceReading[]
-  isLoading: boolean
-  error: string | null
-  
-  // Actions
-  fetchDevices: () => Promise<void>
-  selectDevice: (deviceId: string) => void
-  updateDeviceStatus: (deviceId: string, status: Partial<Device>) => void
-  addReading: (reading: DeviceReading) => void
-  clearError: () => void
-}
-
-export interface AuthStore {
-  user: User | null
-  isAuthenticated: boolean
-  isLoading: boolean
-  
-  // Actions
-  login: (credentials: LoginCredentials) => Promise<void>
-  logout: () => void
-  checkAuth: () => Promise<void>
-}
-
-export interface UIStore {
-  theme: 'dark'
-  sidebarOpen: boolean
-  notifications: Alert[]
-  
-  // Actions
-  toggleSidebar: () => void
-  addNotification: (notification: Alert) => void
-  removeNotification: (id: string) => void
-  markNotificationAsRead: (id: string) => void
-}
-
 // API Error types
 export interface APIError {
   message: string

@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Plus, Zap, Battery, TrendingUp, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { useDeviceStore } from '@/stores/deviceStore';
-import { useReadingsStore } from '@/stores/readingsStore';
+import { useConvexDevices, useConvexReadings } from '@/hooks/useConvexData';
 import { DeviceStatusCard } from '@/components/controls';
 import CollectionStatusControl from '@/components/ReadingCollector';
 import { cn } from '@/lib/utils';
@@ -12,24 +11,14 @@ import { Card } from '@/components/ui';
 import { ReactElement } from 'react';
 
 export default function DashboardPage() {
-  const { devices, fetchDevices, isLoading, error } = useDeviceStore();
-  const { readings, getLatestReading } = useReadingsStore();
-
-  useEffect(() => {
-    fetchDevices();
-  }, [fetchDevices]);
+  const { devices, isLoading, error } = useConvexDevices();
+  const { getLatestReading } = useConvexReadings();
 
   // Calculate live statistics from devices and readings
   const stats = useMemo(() => {
     // Get active devices count
     const activeDevices = devices.filter(device => device.isActive);
     const totalDevices = activeDevices.length;
-
-    console.log('Dashboard stats calculation:', {
-      activeDevices: activeDevices.map(d => ({ id: d.id, name: d.deviceName, type: d.deviceType })),
-      readingsInStore: readings.length,
-      readingsStoreData: readings.slice(0, 2) // First 2 readings for debugging
-    });
 
     // Calculate totals from latest readings
     let totalEnergyStored = 0;
@@ -38,20 +27,7 @@ export default function DashboardPage() {
     let devicesWithReadings = 0;
 
     activeDevices.forEach(device => {
-      console.log(`Device ${device.deviceName} full object:`, device);
-      
-      const latestReading = getLatestReading(device.id);
-      // Also check if device has currentReading embedded
-      const deviceReading = (device as any).currentReading;
-      
-      console.log(`Device ${device.deviceName} (${device.id}):`, {
-        latestReadingFromStore: latestReading,
-        deviceCurrentReading: deviceReading,
-        usingReading: latestReading || deviceReading
-      });
-      
-      // Use either store reading or device embedded reading
-      const reading = latestReading || deviceReading;
+      const reading = getLatestReading(device.id) ?? (device as any).currentReading;
       
       if (reading) {
         // Add energy stored (assuming battery capacity based on device type)
@@ -67,17 +43,6 @@ export default function DashboardPage() {
         totalCurrentOutput += reading.outputWatts || 0;
         devicesWithReadings++;
       }
-    });
-
-    console.log('Calculated totals:', {
-      totalEnergyStored,
-      totalCurrentOutput,
-      devicesWithReadings,
-      averageBatteryLevel: devicesWithReadings > 0 ? 
-        activeDevices.reduce((sum, device) => {
-          const reading = getLatestReading(device.id);
-          return sum + (reading?.batteryLevel || 0);
-        }, 0) / devicesWithReadings : 0
     });
 
     // Calculate efficiency (simplified as average battery level)
@@ -122,11 +87,7 @@ export default function DashboardPage() {
         icon: <TrendingUp size={24} />,
       },
     ];
-  }, [devices, readings, getLatestReading]);
-
-  useEffect(() => {
-    fetchDevices();
-  }, [fetchDevices]);
+  }, [devices, getLatestReading]);
 
   return (
     <div className="p-4 sm:p-5">
@@ -188,12 +149,6 @@ export default function DashboardPage() {
                 <p className="text-danger text-base sm:text-lg">
                   Error loading devices: {error}
                 </p>
-                <button 
-                  onClick={() => fetchDevices()} 
-                  className="border border-danger text-danger hover:bg-danger/10 px-4 py-2 rounded-pill text-sm transition-all duration-160 touch-manipulation"
-                >
-                  Try Again
-                </button>
               </div>
             </Card>
           ) : devices.length === 0 ? (
