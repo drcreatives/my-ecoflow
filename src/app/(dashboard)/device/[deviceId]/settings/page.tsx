@@ -51,8 +51,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
   });
 
   // Initialize form data when device is available
-  const formReady = !!device;
-  if (device && formData.deviceName === '' && formReady) {
+  if (device && formData.deviceName === '') {
     setFormData({
       deviceName: device.deviceName,
       notifications: true,

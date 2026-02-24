@@ -18,6 +18,11 @@ import { useUIStore } from '@/stores/uiStore'
 import { useIsMobile } from '@/hooks/useBreakpoint'
 import { cn } from '@/lib/utils'
 
+/** Get the first character for the user avatar initial. */
+function getAvatarInitial(profile: { email?: string; firstName?: string | null } | null): string {
+  return (profile?.email?.[0] || profile?.firstName?.[0] || 'U').toUpperCase()
+}
+
 interface SidebarProps {
   onClose?: () => void
 }
@@ -118,7 +123,7 @@ const SidebarContent = ({ onClose }: SidebarProps) => {
               "bg-surface-2 border border-stroke-subtle rounded-full flex items-center justify-center font-bold text-text-primary",
               isMobile ? "w-10 h-10 text-base" : "w-8 h-8 text-sm"
             )}>
-              {(profile.email?.[0] || profile.firstName?.[0] || 'U').toUpperCase()}
+              {getAvatarInitial(profile)}
             </div>
             <div className="flex-1 min-w-0">
               <div className={cn(
@@ -210,7 +215,7 @@ const CollapsedSidebar = () => {
       <div className="p-4 border-t border-stroke-subtle flex flex-col items-center gap-2">
         {profile && (
           <div className="w-8 h-8 bg-surface-2 border border-stroke-subtle rounded-full flex items-center justify-center font-bold text-text-primary text-sm" title={profile.email || profile.firstName || 'User'}>
-            {(profile.email?.[0] || profile.firstName?.[0] || 'U').toUpperCase()}
+            {getAvatarInitial(profile)}
           </div>
         )}
         <button

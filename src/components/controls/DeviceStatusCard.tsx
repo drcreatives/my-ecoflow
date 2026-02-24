@@ -29,15 +29,15 @@ interface DeviceData {
   status?: string
   userId: string
   currentReading?: {
-    batteryLevel?: number | null
-    inputWatts?: number | null
-    acInputWatts?: number | null
-    dcInputWatts?: number | null
-    chargingType?: number | null
-    outputWatts?: number | null
-    temperature?: number | null
-    remainingTime?: number | null
-    status?: string | null
+    batteryLevel?: number
+    inputWatts?: number
+    acInputWatts?: number
+    dcInputWatts?: number
+    chargingType?: number
+    outputWatts?: number
+    temperature?: number
+    remainingTime?: number
+    status?: string
     [key: string]: unknown
   } | null
 }
