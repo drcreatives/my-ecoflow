@@ -110,6 +110,10 @@ export const history = query({
     const userId = await auth.getUserId(ctx);
     if (!userId) return { readings: [], summary: null };
 
+    // Cap endTime to now to prevent reactive re-execution when new readings
+    // are inserted in the future. This is the #1 bandwidth optimization.
+    const effectiveEndTime = Math.min(args.endTime, Date.now());
+
     // Get user's devices to scope the query
     const userDevices = await ctx.db
       .query("devices")
@@ -125,6 +129,11 @@ export const history = query({
       const owned = userDevices.some((d) => d._id === args.deviceId);
       if (!owned) return { readings: [], summary: null };
     }
+
+    // Adaptive row cap: when aggregation is enabled, we need fewer raw rows
+    // since they'll be bucketed. This saves significant DB bandwidth.
+    const agg = args.aggregation ?? "raw";
+    const rowCap = agg === "raw" ? 4000 : 2000;
 
     const allReadings: Array<{
       deviceId: Id<"devices">;
@@ -152,20 +161,19 @@ export const history = query({
       const device = deviceMap.get(devId);
       if (!device) continue;
 
-      // Use .take() with a safe cap to stay within Convex query limits.
-      // 1-minute collection ≈ 1,440/day, so 4000 covers ~2.8 days of raw data.
       // Fetch DESC so we always keep the NEWEST readings for large ranges,
       // then reverse to chronological order for aggregation/charts.
+      // Row cap is adaptive based on aggregation level.
       const rawReadings = await ctx.db
         .query("deviceReadings")
         .withIndex("by_deviceId_recordedAt", (q) =>
           q
             .eq("deviceId", devId)
             .gte("recordedAt", args.startTime)
-            .lte("recordedAt", args.endTime)
+            .lte("recordedAt", effectiveEndTime)
         )
         .order("desc")
-        .take(4000);
+        .take(rowCap);
 
       // Reverse to chronological order (oldest → newest)
       const readings = rawReadings.reverse();
@@ -193,11 +201,10 @@ export const history = query({
     }
 
     // If aggregation is requested, bucket the data
-    const agg = args.aggregation ?? "raw";
     const finalReadings = agg === "raw" ? allReadings : aggregateReadings(allReadings, agg);
 
     // Compute summary
-    const summary = computeSummary(finalReadings, args.startTime, args.endTime);
+    const summary = computeSummary(finalReadings, args.startTime, effectiveEndTime);
 
     return { readings: finalReadings, summary };
   },

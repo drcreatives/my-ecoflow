@@ -106,7 +106,7 @@ export function useConvexReadingHistory(
       ? {
           deviceId: deviceId as Id<"devices">,
           startTime: options?.startTime ?? Date.now() - 24 * 60 * 60 * 1000,
-          endTime: options?.endTime ?? Date.now() + 24 * 60 * 60 * 1000,
+          endTime: options?.endTime ?? Date.now(),
           aggregation: options?.aggregation,
         }
       : "skip"
@@ -180,9 +180,10 @@ function timeRangeToEpoch(timeRange: string): { startDate: number; endDate: numb
   };
   return {
     startDate: now - (rangeMs[timeRange] ?? rangeMs["24h"]),
-    // Use a generous future buffer so Convex reactive queries include
-    // new readings that arrive after the page loads (cron inserts every minute).
-    endDate: now + 24 * 60 * 60 * 1000,
+    // Cap to current time — the server-side query also caps to Date.now().
+    // This prevents reactive re-execution when new readings are inserted,
+    // which was the #1 source of DB bandwidth consumption.
+    endDate: now,
   };
 }
 
