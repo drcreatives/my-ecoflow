@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 
 /**
  * Bridge hook replacing useDeviceStore for page components.
@@ -100,13 +100,20 @@ export function useConvexReadingHistory(
     aggregation?: "raw" | "5m" | "15m" | "1h" | "1d";
   }
 ) {
+  // Memoize default time window so unrelated re-renders don't produce new
+  // Date.now() values that trigger fresh Convex queries (extra bandwidth).
+  const defaultTimesRef = useRef({
+    startTime: Date.now() - 24 * 60 * 60 * 1000,
+    endTime: Date.now(),
+  });
+
   const result = useQuery(
     api.readings.history,
     deviceId
       ? {
           deviceId: deviceId as Id<"devices">,
-          startTime: options?.startTime ?? Date.now() - 24 * 60 * 60 * 1000,
-          endTime: options?.endTime ?? Date.now(),
+          startTime: options?.startTime ?? defaultTimesRef.current.startTime,
+          endTime: options?.endTime ?? defaultTimesRef.current.endTime,
           aggregation: options?.aggregation,
         }
       : "skip"

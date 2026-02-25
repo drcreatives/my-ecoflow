@@ -130,10 +130,21 @@ export const history = query({
       if (!owned) return { readings: [], summary: null };
     }
 
-    // Adaptive row cap: when aggregation is enabled, we need fewer raw rows
-    // since they'll be bucketed. This saves significant DB bandwidth.
+    // Adaptive row cap: derive from the requested time span and expected
+    // collection interval (~5 min) so long ranges (7d/30d) don't silently
+    // drop older readings, while still capping bandwidth.
     const agg = args.aggregation ?? "raw";
-    const rowCap = agg === "raw" ? 4000 : 2000;
+    let rowCap: number;
+    if (agg === "raw") {
+      rowCap = 4000;
+    } else {
+      const durationMs = effectiveEndTime - args.startTime;
+      const approxIntervalMs = 5 * 60 * 1000; // 5 minutes
+      const estimatedRows =
+        durationMs > 0 ? Math.ceil(durationMs / approxIntervalMs) : 0;
+      // Clamp between 2000 (min for aggregates) and 4000 (previous global cap)
+      rowCap = Math.min(4000, Math.max(2000, estimatedRows));
+    }
 
     const allReadings: Array<{
       deviceId: Id<"devices">;
