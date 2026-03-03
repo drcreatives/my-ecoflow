@@ -26,17 +26,17 @@ function formatTimeSpan(startTime: number, endTime: number): string {
   return `${mins} minutes`;
 }
 
-interface HistorySummary {
-	totalReadings: number;
-	avgBatteryLevel: number;
-	avgPowerOutput: number;
-	avgTemperature: number;
-	peakPowerOutput: number;
-	lowestBatteryLevel: number;
-	highestTemperature: number;
-	startTime: number;
-	endTime: number;
-}
+// interface HistorySummary {
+// 	totalReadings: number;
+// 	avgBatteryLevel: number;
+// 	avgPowerOutput: number;
+// 	avgTemperature: number;
+// 	peakPowerOutput: number;
+// 	lowestBatteryLevel: number;
+// 	highestTemperature: number;
+// 	startTime: number;
+// 	endTime: number;
+// }
 
 interface DeviceOption {
   id: string
@@ -69,7 +69,7 @@ function AnalyticsPage() {
 		}))
 	];
 
-	const selectedDevice = deviceOptions.find(d => d.id === filters.deviceId);
+	// const selectedDevice = deviceOptions.find(d => d.id === filters.deviceId);
 
 	// Set default device when devices load
 	useEffect(() => {
