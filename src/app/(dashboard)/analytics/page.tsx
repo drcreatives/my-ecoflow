@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useConvexDevices, useConvexHistoryReadings } from "@/hooks/useConvexData";
 import { CombinedChart, BatteryLevelChart, TemperatureChart, transformReadingsToChartData } from "@/components/charts/HistoryCharts";
-import { Loader2, Battery, Thermometer, BarChart3, ExternalLink, Filter, ChevronDown, Search } from "lucide-react";
+import { Loader2, Battery, Thermometer, BarChart3, ExternalLink, Filter, ChevronDown, Search, Zap, Plug, Sun } from "lucide-react";
 import Link from "next/link";
 import { DateTimePicker } from '@/components/ui/DateTimePicker';
 
@@ -26,16 +26,38 @@ function formatTimeSpan(startTime: number, endTime: number): string {
   return `${mins} minutes`;
 }
 
-interface HistorySummary {
-	totalReadings: number;
-	avgBatteryLevel: number;
-	avgPowerOutput: number;
-	avgTemperature: number;
-	peakPowerOutput: number;
-	lowestBatteryLevel: number;
-	highestTemperature: number;
-	startTime: number;
-	endTime: number;
+// interface HistorySummary {
+// 	totalReadings: number;
+// 	avgBatteryLevel: number;
+// 	avgPowerOutput: number;
+// 	avgTemperature: number;
+// 	peakPowerOutput: number;
+// 	lowestBatteryLevel: number;
+// 	highestTemperature: number;
+// 	startTime: number;
+// 	endTime: number;
+// }
+
+const MS_PER_HOUR = 3_600_000;
+
+/** Shape of a single reading returned by the Convex history query. */
+interface HistoryReading {
+  deviceId: string;
+  deviceName: string;
+  deviceSn: string;
+  batteryLevel: number | null;
+  inputWatts: number | null;
+  acInputWatts: number | null;
+  dcInputWatts: number | null;
+  chargingType: number | null;
+  outputWatts: number | null;
+  acOutputWatts: number | null;
+  dcOutputWatts: number | null;
+  usbOutputWatts: number | null;
+  remainingTime: number | null;
+  temperature: number | null;
+  status: string;
+  recordedAt: number;
 }
 
 interface DeviceOption {
@@ -69,7 +91,7 @@ function AnalyticsPage() {
 		}))
 	];
 
-	const selectedDevice = deviceOptions.find(d => d.id === filters.deviceId);
+	// const selectedDevice = deviceOptions.find(d => d.id === filters.deviceId);
 
 	// Set default device when devices load
 	useEffect(() => {
@@ -101,17 +123,75 @@ function AnalyticsPage() {
 
 	// Convert readings to chart-compatible format (Date objects for recordedAt)
 	const chartReadings = useMemo(() =>
-		readings.map((r: any) => ({
+		(readings as HistoryReading[]).map((r) => ({
 			...r,
 			recordedAt: new Date(r.recordedAt),
 		})),
 		[readings]
 	);
 
+	// ─── Energy Totals (trapezoidal integration of watts → kWh) ──────────
+	const energyTotals = useMemo(() => {
+		if (readings.length < 2) return { consumed: 0, acInput: 0, solarInput: 0 };
+
+		// Max allowed gap between consecutive points (in hours) used for energy integration.
+		// Rationale:
+		// - "raw": up to 1h — primary cron is 1 min; allow short outages / retries without
+		//   stitching across long offline periods.
+		// - "5m": up to 0.5h — 5‑minute buckets should be relatively dense; we exclude wider
+		//   gaps to avoid over‑estimating when data is sparse.
+		// - "1h": up to 3h — hourly aggregation tolerates some jitter and the occasional
+		//   missing point while still capturing realistic daily totals.
+		// - "1d": up to 36h — daily aggregation can span a missed day (e.g. temporary outage)
+		//   without discarding nearby intervals, but we still cut off pathological gaps.
+		const maxGapHours: Record<HistoryFilters['aggregation'], number> = {
+			raw: 1,
+			'5m': 0.5,
+			'1h': 3,
+			'1d': 36,
+		};
+		const maxGap = maxGapHours[filters.aggregation];
+
+		let consumedWh = 0;
+		let acInputWh = 0;
+		let solarInputWh = 0;
+
+		for (let i = 1; i < readings.length; i++) {
+			const prev = readings[i - 1] as HistoryReading;
+			const curr = readings[i] as HistoryReading;
+			const dtHours = (curr.recordedAt - prev.recordedAt) / MS_PER_HOUR;
+			if (dtHours <= 0 || dtHours > maxGap) continue;
+
+			// Only integrate intervals where both endpoints have a valid numeric value;
+			// null readings are excluded to avoid skewing totals with false zeros.
+			if (prev.outputWatts != null && curr.outputWatts != null) {
+				consumedWh += ((prev.outputWatts + curr.outputWatts) / 2) * dtHours;
+			}
+
+			if (prev.acInputWatts != null && curr.acInputWatts != null) {
+				acInputWh += ((prev.acInputWatts + curr.acInputWatts) / 2) * dtHours;
+			}
+
+			if (prev.dcInputWatts != null && curr.dcInputWatts != null) {
+				solarInputWh += ((prev.dcInputWatts + curr.dcInputWatts) / 2) * dtHours;
+			}
+		}
+
+		return {
+			consumed: consumedWh / 1000,
+			acInput: acInputWh / 1000,
+			solarInput: solarInputWh / 1000,
+		};
+	}, [readings, filters.aggregation]);
+
 	const formatValue = (value: number | null | undefined, unit: string) => {
 		if (value === null || value === undefined || isNaN(value)) return "0" + unit;
 		return value.toFixed(1) + unit;
 	};
+
+	/** Format energy value: 2 decimal places under 10 kWh, 1 above. */
+	const formatEnergy = (value: number) =>
+		value < 10 ? value.toFixed(2) : value.toFixed(1);
 
 	if (devicesLoading) {
 		return (
@@ -188,7 +268,7 @@ function AnalyticsPage() {
 									<div className="relative">
 										<select
 											value={filters.timeRange}
-											onChange={(e) => setFilters(prev => ({ ...prev, timeRange: e.target.value as any }))}
+											onChange={(e) => setFilters(prev => ({ ...prev, timeRange: e.target.value as HistoryFilters['timeRange'] }))}
 											className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 appearance-none pr-10"
 										>
 											<option value="1h">Last Hour</option>
@@ -210,7 +290,7 @@ function AnalyticsPage() {
 									<div className="relative">
 										<select
 											value={filters.aggregation}
-											onChange={(e) => setFilters(prev => ({ ...prev, aggregation: e.target.value as any }))}
+											onChange={(e) => setFilters(prev => ({ ...prev, aggregation: e.target.value as HistoryFilters['aggregation'] }))}
 											className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 appearance-none pr-10"
 										>
 											<option value="raw">Raw Data</option>
@@ -311,6 +391,47 @@ function AnalyticsPage() {
 									{formatValue(summary.avgTemperature, "°C")}
 								</div>
 								<div className="text-sm text-text-secondary">Avg Temperature</div>
+							</div>
+						</div>
+					)}
+
+					{/* Energy Totals Cards */}
+					{summary && (
+						<div className="grid grid-cols-1 sm:grid-cols-3 gap-[18px]">
+							{/* Energy Consumed */}
+							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 flex flex-col gap-2">
+								<div className="flex items-center gap-2 mb-1">
+									<Zap className="w-6 h-6 text-warning" />
+									<span className="text-sm text-text-secondary">Energy Consumed</span>
+								</div>
+								<div className="text-metric text-text-primary">
+									{formatEnergy(energyTotals.consumed)}
+								</div>
+								<span className="text-sm text-text-muted">kWh</span>
+							</div>
+
+							{/* AC Input */}
+							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 flex flex-col gap-2">
+								<div className="flex items-center gap-2 mb-1">
+									<Plug className="w-6 h-6 text-brand-tertiary" />
+									<span className="text-sm text-text-secondary">AC Input</span>
+								</div>
+								<div className="text-metric text-text-primary">
+									{formatEnergy(energyTotals.acInput)}
+								</div>
+								<span className="text-sm text-text-muted">kWh</span>
+							</div>
+
+							{/* DC Input (Solar/Car) */}
+							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 flex flex-col gap-2">
+								<div className="flex items-center gap-2 mb-1">
+									<Sun className="w-6 h-6 text-brand-secondary" />
+									<span className="text-sm text-text-secondary">DC Input (Solar/Car)</span>
+								</div>
+								<div className="text-metric text-text-primary">
+									{formatEnergy(energyTotals.solarInput)}
+								</div>
+								<span className="text-sm text-text-muted">kWh</span>
 							</div>
 						</div>
 					)}
