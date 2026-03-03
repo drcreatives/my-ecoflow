@@ -38,6 +38,8 @@ function formatTimeSpan(startTime: number, endTime: number): string {
 // 	endTime: number;
 // }
 
+const MS_PER_HOUR = 3_600_000;
+
 interface DeviceOption {
   id: string
   name: string
@@ -109,8 +111,6 @@ function AnalyticsPage() {
 	);
 
 	// ─── Energy Totals (trapezoidal integration of watts → kWh) ──────────
-	const MS_PER_HOUR = 3_600_000;
-
 	const energyTotals = useMemo(() => {
 		if (readings.length < 2) return { consumed: 0, acInput: 0, solarInput: 0 };
 
