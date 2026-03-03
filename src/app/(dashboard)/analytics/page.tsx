@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useConvexDevices, useConvexHistoryReadings } from "@/hooks/useConvexData";
 import { CombinedChart, BatteryLevelChart, TemperatureChart, transformReadingsToChartData } from "@/components/charts/HistoryCharts";
-import { Loader2, Battery, Thermometer, BarChart3, ExternalLink, Filter, ChevronDown, Search } from "lucide-react";
+import { Loader2, Battery, Thermometer, BarChart3, ExternalLink, Filter, ChevronDown, Search, Zap, Plug, Sun } from "lucide-react";
 import Link from "next/link";
 import { DateTimePicker } from '@/components/ui/DateTimePicker';
 
@@ -108,10 +108,80 @@ function AnalyticsPage() {
 		[readings]
 	);
 
+	// ─── Energy Totals (trapezoidal integration of watts → kWh) ──────────
+	const MS_PER_HOUR = 3_600_000;
+
+	const energyTotals = useMemo(() => {
+		if (readings.length < 2) return { consumed: 0, acInput: 0, solarInput: 0 };
+
+		// Max allowed gap between consecutive points (in hours) used for energy integration.
+		// Rationale:
+		// - "raw": up to 1h — primary cron is 1 min; allow short outages / retries without
+		//   stitching across long offline periods.
+		// - "5m": up to 0.5h — 5‑minute buckets should be relatively dense; we exclude wider
+		//   gaps to avoid over‑estimating when data is sparse.
+		// - "1h": up to 3h — hourly aggregation tolerates some jitter and the occasional
+		//   missing point while still capturing realistic daily totals.
+		// - "1d": up to 36h — daily aggregation can span a missed day (e.g. temporary outage)
+		//   without discarding nearby intervals, but we still cut off pathological gaps.
+		const maxGapHours: Record<string, number> = {
+			raw: 1,
+			'5m': 0.5,
+			'1h': 3,
+			'1d': 36,
+		};
+		// Default to 1h as a conservative fallback if a new/unknown aggregation key is used.
+		const maxGap = maxGapHours[filters.aggregation] ?? 1;
+
+		let consumedWh = 0;
+		let acInputWh = 0;
+		let solarInputWh = 0;
+
+		for (let i = 1; i < readings.length; i++) {
+			const prev = readings[i - 1] as any;
+			const curr = readings[i] as any;
+			const dtHours = (curr.recordedAt - prev.recordedAt) / MS_PER_HOUR;
+			if (dtHours <= 0 || dtHours > maxGap) continue;
+
+			// Only integrate intervals where both endpoints have a valid numeric value;
+			// null readings are excluded to avoid skewing totals with false zeros.
+			const hasOutput =
+				typeof prev.outputWatts === "number" &&
+				typeof curr.outputWatts === "number";
+			if (hasOutput) {
+				consumedWh += ((prev.outputWatts + curr.outputWatts) / 2) * dtHours;
+			}
+
+			const hasAcInput =
+				typeof prev.acInputWatts === "number" &&
+				typeof curr.acInputWatts === "number";
+			if (hasAcInput) {
+				acInputWh += ((prev.acInputWatts + curr.acInputWatts) / 2) * dtHours;
+			}
+
+			const hasSolarInput =
+				typeof prev.dcInputWatts === "number" &&
+				typeof curr.dcInputWatts === "number";
+			if (hasSolarInput) {
+				solarInputWh += ((prev.dcInputWatts + curr.dcInputWatts) / 2) * dtHours;
+			}
+		}
+
+		return {
+			consumed: consumedWh / 1000,
+			acInput: acInputWh / 1000,
+			solarInput: solarInputWh / 1000,
+		};
+	}, [readings, filters.aggregation]);
+
 	const formatValue = (value: number | null | undefined, unit: string) => {
 		if (value === null || value === undefined || isNaN(value)) return "0" + unit;
 		return value.toFixed(1) + unit;
 	};
+
+	/** Format energy value: 2 decimal places under 10 kWh, 1 above. */
+	const formatEnergy = (value: number) =>
+		value < 10 ? value.toFixed(2) : value.toFixed(1);
 
 	if (devicesLoading) {
 		return (
@@ -311,6 +381,47 @@ function AnalyticsPage() {
 									{formatValue(summary.avgTemperature, "°C")}
 								</div>
 								<div className="text-sm text-text-secondary">Avg Temperature</div>
+							</div>
+						</div>
+					)}
+
+					{/* Energy Totals Cards */}
+					{summary && (
+						<div className="grid grid-cols-1 sm:grid-cols-3 gap-[18px]">
+							{/* Energy Consumed */}
+							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 flex flex-col gap-2">
+								<div className="flex items-center gap-2 mb-1">
+									<Zap className="w-6 h-6 text-warning" />
+									<span className="text-sm text-text-secondary">Energy Consumed</span>
+								</div>
+								<div className="text-metric text-text-primary">
+									{formatEnergy(energyTotals.consumed)}
+								</div>
+								<span className="text-sm text-text-muted">kWh</span>
+							</div>
+
+							{/* AC Input */}
+							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 flex flex-col gap-2">
+								<div className="flex items-center gap-2 mb-1">
+									<Plug className="w-6 h-6 text-brand-tertiary" />
+									<span className="text-sm text-text-secondary">AC Input</span>
+								</div>
+								<div className="text-metric text-text-primary">
+									{formatEnergy(energyTotals.acInput)}
+								</div>
+								<span className="text-sm text-text-muted">kWh</span>
+							</div>
+
+							{/* Solar Input */}
+							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 flex flex-col gap-2">
+								<div className="flex items-center gap-2 mb-1">
+									<Sun className="w-6 h-6 text-brand-secondary" />
+									<span className="text-sm text-text-secondary">Solar Input</span>
+								</div>
+								<div className="text-metric text-text-primary">
+									{formatEnergy(energyTotals.solarInput)}
+								</div>
+								<span className="text-sm text-text-muted">kWh</span>
 							</div>
 						</div>
 					)}
