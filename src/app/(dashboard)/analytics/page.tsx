@@ -40,6 +40,26 @@ function formatTimeSpan(startTime: number, endTime: number): string {
 
 const MS_PER_HOUR = 3_600_000;
 
+/** Shape of a single reading returned by the Convex history query. */
+interface HistoryReading {
+  deviceId: string;
+  deviceName: string;
+  deviceSn: string;
+  batteryLevel: number | null;
+  inputWatts: number | null;
+  acInputWatts: number | null;
+  dcInputWatts: number | null;
+  chargingType: number | null;
+  outputWatts: number | null;
+  acOutputWatts: number | null;
+  dcOutputWatts: number | null;
+  usbOutputWatts: number | null;
+  remainingTime: number | null;
+  temperature: number | null;
+  status: string;
+  recordedAt: number;
+}
+
 interface DeviceOption {
   id: string
   name: string
@@ -103,7 +123,7 @@ function AnalyticsPage() {
 
 	// Convert readings to chart-compatible format (Date objects for recordedAt)
 	const chartReadings = useMemo(() =>
-		readings.map((r: any) => ({
+		(readings as HistoryReading[]).map((r) => ({
 			...r,
 			recordedAt: new Date(r.recordedAt),
 		})),
@@ -124,45 +144,35 @@ function AnalyticsPage() {
 		//   missing point while still capturing realistic daily totals.
 		// - "1d": up to 36h — daily aggregation can span a missed day (e.g. temporary outage)
 		//   without discarding nearby intervals, but we still cut off pathological gaps.
-		const maxGapHours: Record<string, number> = {
+		const maxGapHours: Record<HistoryFilters['aggregation'], number> = {
 			raw: 1,
 			'5m': 0.5,
 			'1h': 3,
 			'1d': 36,
 		};
-		// Default to 1h as a conservative fallback if a new/unknown aggregation key is used.
-		const maxGap = maxGapHours[filters.aggregation] ?? 1;
+		const maxGap = maxGapHours[filters.aggregation];
 
 		let consumedWh = 0;
 		let acInputWh = 0;
 		let solarInputWh = 0;
 
 		for (let i = 1; i < readings.length; i++) {
-			const prev = readings[i - 1] as any;
-			const curr = readings[i] as any;
+			const prev = readings[i - 1] as HistoryReading;
+			const curr = readings[i] as HistoryReading;
 			const dtHours = (curr.recordedAt - prev.recordedAt) / MS_PER_HOUR;
 			if (dtHours <= 0 || dtHours > maxGap) continue;
 
 			// Only integrate intervals where both endpoints have a valid numeric value;
 			// null readings are excluded to avoid skewing totals with false zeros.
-			const hasOutput =
-				typeof prev.outputWatts === "number" &&
-				typeof curr.outputWatts === "number";
-			if (hasOutput) {
+			if (prev.outputWatts != null && curr.outputWatts != null) {
 				consumedWh += ((prev.outputWatts + curr.outputWatts) / 2) * dtHours;
 			}
 
-			const hasAcInput =
-				typeof prev.acInputWatts === "number" &&
-				typeof curr.acInputWatts === "number";
-			if (hasAcInput) {
+			if (prev.acInputWatts != null && curr.acInputWatts != null) {
 				acInputWh += ((prev.acInputWatts + curr.acInputWatts) / 2) * dtHours;
 			}
 
-			const hasSolarInput =
-				typeof prev.dcInputWatts === "number" &&
-				typeof curr.dcInputWatts === "number";
-			if (hasSolarInput) {
+			if (prev.dcInputWatts != null && curr.dcInputWatts != null) {
 				solarInputWh += ((prev.dcInputWatts + curr.dcInputWatts) / 2) * dtHours;
 			}
 		}
@@ -258,7 +268,7 @@ function AnalyticsPage() {
 									<div className="relative">
 										<select
 											value={filters.timeRange}
-											onChange={(e) => setFilters(prev => ({ ...prev, timeRange: e.target.value as any }))}
+											onChange={(e) => setFilters(prev => ({ ...prev, timeRange: e.target.value as HistoryFilters['timeRange'] }))}
 											className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 appearance-none pr-10"
 										>
 											<option value="1h">Last Hour</option>
@@ -280,7 +290,7 @@ function AnalyticsPage() {
 									<div className="relative">
 										<select
 											value={filters.aggregation}
-											onChange={(e) => setFilters(prev => ({ ...prev, aggregation: e.target.value as any }))}
+											onChange={(e) => setFilters(prev => ({ ...prev, aggregation: e.target.value as HistoryFilters['aggregation'] }))}
 											className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 appearance-none pr-10"
 										>
 											<option value="raw">Raw Data</option>
@@ -412,11 +422,11 @@ function AnalyticsPage() {
 								<span className="text-sm text-text-muted">kWh</span>
 							</div>
 
-							{/* Solar Input */}
+							{/* DC Input (Solar/Car) */}
 							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 flex flex-col gap-2">
 								<div className="flex items-center gap-2 mb-1">
 									<Sun className="w-6 h-6 text-brand-secondary" />
-									<span className="text-sm text-text-secondary">Solar Input</span>
+									<span className="text-sm text-text-secondary">DC Input (Solar/Car)</span>
 								</div>
 								<div className="text-metric text-text-primary">
 									{formatEnergy(energyTotals.solarInput)}
