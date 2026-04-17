@@ -3,6 +3,7 @@
 import {
   Bell,
   Menu,
+  RefreshCw,
   Wifi,
   WifiOff,
   Settings,
@@ -17,9 +18,11 @@ import Link from 'next/link'
 
 interface HeaderProps {
   title?: string
+  onRefresh?: () => void
+  isRefreshing?: boolean
 }
 
-export const Header = ({ title }: HeaderProps) => {
+export const Header = ({ title, onRefresh, isRefreshing }: HeaderProps) => {
   const { profile } = useConvexProfile()
   const { notifications, toggleSidebar } = useUIStore()
   const { devices } = useConvexDevices()
@@ -89,6 +92,18 @@ export const Header = ({ title }: HeaderProps) => {
               </span>
             )}
           </div>
+
+          {/* Refresh */}
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="p-2 text-icon hover:text-text-primary hover:bg-surface-2 rounded-inner transition-all duration-160 touch-manipulation disabled:opacity-50"
+              aria-label="Refresh device data"
+            >
+              <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+            </button>
+          )}
 
           {/* Notifications */}
           <button 
