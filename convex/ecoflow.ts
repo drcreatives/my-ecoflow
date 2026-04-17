@@ -960,9 +960,9 @@ export const setBuzzer = action({
     });
     if (!result.success) throw new Error(`EcoFlow SET failed: ${result.message}`);
 
-    // Optimistic: buzzerSilent=true means device IS silent, args.enabled=true means buzzer beeps
+    // Optimistic: buzzerSilent in DB = true means buzzer beeps (enabled)
     await ctx.runMutation(internal.readings.patchLatestReading, {
-      deviceId: device._id, fields: { buzzerSilent: !args.enabled },
+      deviceId: device._id, fields: { buzzerSilent: args.enabled },
     });
 
     await ctx.scheduler.runAfter(5000, internal.ecoflow.refreshDeviceReading, {

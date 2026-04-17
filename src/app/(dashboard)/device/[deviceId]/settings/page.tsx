@@ -694,17 +694,16 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                     <div className="space-y-3">
                       <div className="flex items-center justify-between p-3 bg-surface-2/50 rounded-inner">
                         <div>
-                          <span className="text-sm font-medium text-text-primary">Silent Mode</span>
-                          <p className="text-xs text-text-muted">Mute device beep sounds</p>
+                          <span className="text-sm font-medium text-text-primary">Buzzer</span>
+                          <p className="text-xs text-text-muted">Device beep sounds</p>
                         </div>
                         <Toggle
                           checked={reading?.buzzerSilent ?? false}
                           disabled={deviceControl.isLoading || !device.online}
-                          onToggle={async (buzzerSilent) => {
+                          onToggle={async (checked) => {
                             try {
-                              const buzzerEnabled = !buzzerSilent;
-                              await deviceControl.setBuzzer({ deviceSn: device.deviceSn, enabled: buzzerEnabled });
-                              toast.success(`Silent mode ${buzzerSilent ? 'enabled' : 'disabled'}`);
+                              await deviceControl.setBuzzer({ deviceSn: device.deviceSn, enabled: !checked });
+                              toast.success(`Buzzer ${checked ? 'silenced' : 'enabled'}`);
                             } catch (err) {
                               toast.error(err instanceof Error ? err.message : 'Failed');
                             }
@@ -819,8 +818,8 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                             dcOff: { moduleType: 1, operateType: "dcOutCfg", params: { enabled: 0 } },
                             carOn: { moduleType: 5, operateType: "mpptCar", params: { enabled: 1 } },
                             carOff: { moduleType: 5, operateType: "mpptCar", params: { enabled: 0 } },
-                            buzzerOn: { moduleType: 5, operateType: "quietMode", params: { enabled: 0 } },
-                            buzzerOff: { moduleType: 5, operateType: "quietMode", params: { enabled: 1 } },
+                            buzzerOn: { moduleType: 5, operateType: "quietMode", params: { enabled: 1 } },
+                            buzzerOff: { moduleType: 5, operateType: "quietMode", params: { enabled: 0 } },
                           };
                           try {
                             await createSchedule({

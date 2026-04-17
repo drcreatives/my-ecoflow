@@ -532,16 +532,16 @@ export default function DevicePage({ params }: DevicePageProps) {
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-sm font-medium text-text-primary">Silent Mode</span>
-                  <p className="text-xs text-text-muted">Mute device beep sounds</p>
+                  <span className="text-sm font-medium text-text-primary">Buzzer</span>
+                  <p className="text-xs text-text-muted">Device beep sounds</p>
                 </div>
                 <Toggle
                   checked={reading?.buzzerSilent ?? false}
                   disabled={controlLoading || !device.online}
-                  onToggle={async (buzzerSilent) => {
+                  onToggle={async (checked) => {
                     try {
-                      await setBuzzer({ deviceSn: device.deviceSn, enabled: !buzzerSilent })
-                      toast.success(`Silent mode ${buzzerSilent ? 'enabled' : 'disabled'}`)
+                      await setBuzzer({ deviceSn: device.deviceSn, enabled: checked })
+                      toast.success(`Buzzer ${checked ? 'enabled' : 'silenced'}`)
                     } catch (err) {
                       toast.error(err instanceof Error ? err.message : 'Failed to toggle buzzer')
                     }
