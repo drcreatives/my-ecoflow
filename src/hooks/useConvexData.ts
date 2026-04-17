@@ -294,16 +294,17 @@ export function useConvexDeviceControl() {
   const setSmartGenerator = useAction(api.ecoflow.setSmartGenerator);
   const setBuzzer = useAction(api.ecoflow.setBuzzer);
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [inFlightCount, setInFlightCount] = useState(0);
+  const isLoading = inFlightCount > 0;
 
   const wrapAction = useCallback(
     <T extends (...args: never[]) => Promise<unknown>>(fn: T) => {
       return async (...args: Parameters<T>) => {
-        setIsLoading(true);
+        setInFlightCount((c) => c + 1);
         try {
           return await fn(...args);
         } finally {
-          setIsLoading(false);
+          setInFlightCount((c) => c - 1);
         }
       };
     },

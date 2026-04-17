@@ -819,8 +819,8 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                             dcOff: { moduleType: 1, operateType: "dcOutCfg", params: { enabled: 0 } },
                             carOn: { moduleType: 5, operateType: "mpptCar", params: { enabled: 1 } },
                             carOff: { moduleType: 5, operateType: "mpptCar", params: { enabled: 0 } },
-                            buzzerOn: { moduleType: 5, operateType: "quietMode", params: { enabled: 1 } },
-                            buzzerOff: { moduleType: 5, operateType: "quietMode", params: { enabled: 0 } },
+                            buzzerOn: { moduleType: 5, operateType: "quietMode", params: { enabled: 0 } },
+                            buzzerOff: { moduleType: 5, operateType: "quietMode", params: { enabled: 1 } },
                           };
                           try {
                             await createSchedule({

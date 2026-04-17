@@ -144,8 +144,9 @@ export const remove = mutation({
 export const listAllEnabled = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const allSchedules = await ctx.db.query("deviceSchedules").collect();
-    return allSchedules.filter((s) => s.enabled);
+    return await ctx.db.query("deviceSchedules")
+      .filter((q) => q.eq(q.field("enabled"), true))
+      .collect();
   },
 });
 

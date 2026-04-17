@@ -188,7 +188,7 @@ export interface DeviceSchedule {
     params: Record<string, unknown>
   }
   timezone: string
-  lastExecutedAt: Date | null
-  createdAt: Date
-  updatedAt: Date
+  lastExecutedAt: number | null
+  createdAt: number
+  updatedAt: number
 }
