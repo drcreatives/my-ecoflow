@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "node -e \"const t=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); if(t.toolName==='run_in_terminal' && /git\\s+commit/.test(t.input?.command||'')) { const r=require('child_process').execSync('npm run lint && npm run type-check',{cwd:t.workspaceFolder,encoding:'utf8',timeout:60000}); process.stdout.write(JSON.stringify({decision:'continue',systemMessage:'Lint and type-check passed.'})); } else { process.stdout.write(JSON.stringify({decision:'continue'})); }\"",
+        "windows": "node -e \"const t=JSON.parse(require('fs').readFileSync(0,'utf8')); if(t.toolName==='run_in_terminal' && /git\\s+commit/.test(t.input?.command||'')) { try { require('child_process').execSync('npm run lint && npm run type-check',{cwd:t.workspaceFolder,encoding:'utf8',timeout:60000}); process.stdout.write(JSON.stringify({decision:'continue',systemMessage:'Lint and type-check passed.'})); } catch(e) { process.stdout.write(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'deny',permissionDecisionReason:'Lint or type-check failed. Fix errors before committing.'}})); }} else { process.stdout.write(JSON.stringify({decision:'continue'})); }\"",
+        "timeout": 60
+      }
+    ]
+  }
+}
