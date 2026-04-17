@@ -2,8 +2,10 @@
 
 import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { useConvexDevices, useConvexDeviceMutations } from '@/hooks/useConvexData';
+import { useConvexDevices, useConvexDeviceMutations, useConvexDeviceControl, useConvexSchedules } from '@/hooks/useConvexData';
 import Link from 'next/link';
+import { Toggle } from '@/components/ui/Toggle';
+import { toast } from 'sonner';
 import { 
   ArrowLeft,
   Settings,
@@ -18,7 +20,11 @@ import {
   Info,
   Bell,
   Wifi,
-  WifiOff
+  WifiOff,
+  Zap,
+  Clock,
+  Plus,
+  Calendar,
 } from 'lucide-react';
 
 interface DeviceSettingsPageProps {
@@ -32,13 +38,24 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
   // Use Convex reactive queries — no manual fetch needed
   const { devices, isLoading: loading, error, getDeviceById } = useConvexDevices();
   const { updateDevice, unregisterDevice } = useConvexDeviceMutations();
+  const deviceControl = useConvexDeviceControl();
+  const { schedules, createSchedule, updateSchedule, removeSchedule } = useConvexSchedules(deviceId);
   
   // Get device from store
   const device = getDeviceById(deviceId);
+  const reading = device?.currentReading;
   
   // Keep local UI state for form management
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
+  const [newSchedule, setNewSchedule] = useState({
+    name: '',
+    time: '08:00',
+    daysOfWeek: [] as number[],
+    action: 'acOn' as string,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
   const [formData, setFormData] = useState({
     deviceName: '',
     notifications: true,
@@ -442,6 +459,453 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Device Configuration */}
+              <div className="bg-surface-1 rounded-card border border-stroke-subtle shadow-card p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <Zap className="w-5 h-5 text-brand-primary" />
+                  <h2 className="text-lg font-medium text-text-primary">Device Configuration</h2>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Port Controls */}
+                  <div>
+                    <h3 className="text-sm font-medium text-text-muted mb-3">Port Controls</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-surface-2/50 rounded-inner">
+                        <div>
+                          <span className="text-sm font-medium text-text-primary">AC Output</span>
+                          <p className="text-xs text-text-muted">Alternating current outlets</p>
+                        </div>
+                        <Toggle
+                          checked={reading?.acEnabled ?? false}
+                          disabled={deviceControl.isLoading || !device.online}
+                          onToggle={async (checked) => {
+                            try {
+                              await deviceControl.setPortState({ deviceSn: device.deviceSn, port: "ac" as const, enabled: checked });
+                              toast.success(`AC output ${checked ? 'enabled' : 'disabled'}`);
+                            } catch (err) {
+                              toast.error(err instanceof Error ? err.message : 'Failed');
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-surface-2/50 rounded-inner">
+                        <div>
+                          <span className="text-sm font-medium text-text-primary">DC / USB Output</span>
+                          <p className="text-xs text-text-muted">12V car port & USB ports</p>
+                        </div>
+                        <Toggle
+                          checked={reading?.dcOutEnabled ?? false}
+                          disabled={deviceControl.isLoading || !device.online}
+                          onToggle={async (checked) => {
+                            try {
+                              await deviceControl.setPortState({ deviceSn: device.deviceSn, port: "dcUsb" as const, enabled: checked });
+                              toast.success(`DC/USB output ${checked ? 'enabled' : 'disabled'}`);
+                            } catch (err) {
+                              toast.error(err instanceof Error ? err.message : 'Failed');
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-surface-2/50 rounded-inner">
+                        <div>
+                          <span className="text-sm font-medium text-text-primary">Car Charger</span>
+                          <p className="text-xs text-text-muted">12V car charging port</p>
+                        </div>
+                        <Toggle
+                          checked={reading?.carChargerEnabled ?? false}
+                          disabled={deviceControl.isLoading || !device.online}
+                          onToggle={async (checked) => {
+                            try {
+                              await deviceControl.setPortState({ deviceSn: device.deviceSn, port: "car" as const, enabled: checked });
+                              toast.success(`Car charger ${checked ? 'enabled' : 'disabled'}`);
+                            } catch (err) {
+                              toast.error(err instanceof Error ? err.message : 'Failed');
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* AC Configuration */}
+                  <div>
+                    <h3 className="text-sm font-medium text-text-muted mb-3">AC Configuration</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-surface-2/50 rounded-inner">
+                        <div>
+                          <span className="text-sm font-medium text-text-primary">X-Boost</span>
+                          <p className="text-xs text-text-muted">Extend AC output to 1800W</p>
+                        </div>
+                        <Toggle
+                          checked={reading?.acXboost ?? false}
+                          disabled={deviceControl.isLoading || !device.online}
+                          onToggle={async (checked) => {
+                            try {
+                              await deviceControl.setAcConfig({ deviceSn: device.deviceSn, xboost: checked });
+                              toast.success(`X-Boost ${checked ? 'enabled' : 'disabled'}`);
+                            } catch (err) {
+                              toast.error(err instanceof Error ? err.message : 'Failed');
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Charging Configuration */}
+                  <div>
+                    <h3 className="text-sm font-medium text-text-muted mb-3">Charging</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="p-3 bg-surface-2/50 rounded-inner">
+                        <label className="block text-sm font-medium text-text-primary mb-1">
+                          AC Charging Watts
+                        </label>
+                        <p className="text-xs text-text-muted mb-2">Max AC charging speed (200-1200W)</p>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            min={200}
+                            max={1200}
+                            step={100}
+                            defaultValue={reading?.acChargingWatts ?? 600}
+                            disabled={!device.online}
+                            className="flex-1 px-3 py-2 bg-surface-2 border border-stroke-subtle rounded-inner focus:border-brand-primary focus:outline-none text-text-primary text-sm disabled:opacity-50"
+                            onBlur={async (e) => {
+                              const val = parseInt(e.target.value);
+                              if (isNaN(val) || val < 200 || val > 1200) return;
+                              try {
+                                await deviceControl.setChargingConfig({ deviceSn: device.deviceSn, chgWatts: val });
+                                toast.success(`AC charging set to ${val}W`);
+                              } catch (err) {
+                                toast.error(err instanceof Error ? err.message : 'Failed');
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="p-3 bg-surface-2/50 rounded-inner">
+                        <label className="block text-sm font-medium text-text-primary mb-1">
+                          Max Charge Level
+                        </label>
+                        <p className="text-xs text-text-muted mb-2">Stop charging at this % (50-100)</p>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            min={50}
+                            max={100}
+                            defaultValue={reading?.maxChargeSoc ?? 100}
+                            disabled={!device.online}
+                            className="flex-1 px-3 py-2 bg-surface-2 border border-stroke-subtle rounded-inner focus:border-brand-primary focus:outline-none text-text-primary text-sm disabled:opacity-50"
+                            onBlur={async (e) => {
+                              const val = parseInt(e.target.value);
+                              if (isNaN(val) || val < 50 || val > 100) return;
+                              try {
+                                await deviceControl.setBmsConfig({ deviceSn: device.deviceSn, maxChargeSoc: val });
+                                toast.success(`Max charge level set to ${val}%`);
+                              } catch (err) {
+                                toast.error(err instanceof Error ? err.message : 'Failed');
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Standby Timers */}
+                  <div>
+                    <h3 className="text-sm font-medium text-text-muted mb-3">Standby Timers</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="p-3 bg-surface-2/50 rounded-inner">
+                        <label className="block text-sm font-medium text-text-primary mb-1">AC Standby</label>
+                        <p className="text-xs text-text-muted mb-2">Minutes (0=never off)</p>
+                        <input
+                          type="number"
+                          min={0}
+                          max={720}
+                          defaultValue={reading?.acStandbyMins ?? 0}
+                          disabled={!device.online}
+                          className="w-full px-3 py-2 bg-surface-2 border border-stroke-subtle rounded-inner focus:border-brand-primary focus:outline-none text-text-primary text-sm disabled:opacity-50"
+                          onBlur={async (e) => {
+                            const val = parseInt(e.target.value);
+                            if (isNaN(val) || val < 0) return;
+                            try {
+                              await deviceControl.setStandbyTimers({ deviceSn: device.deviceSn, acStandbyMins: val });
+                              toast.success(`AC standby set to ${val} min`);
+                            } catch (err) {
+                              toast.error(err instanceof Error ? err.message : 'Failed');
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="p-3 bg-surface-2/50 rounded-inner">
+                        <label className="block text-sm font-medium text-text-primary mb-1">DC Standby</label>
+                        <p className="text-xs text-text-muted mb-2">Minutes (0=never off)</p>
+                        <input
+                          type="number"
+                          min={0}
+                          max={720}
+                          defaultValue={reading?.carStandbyMins ?? 0}
+                          disabled={!device.online}
+                          className="w-full px-3 py-2 bg-surface-2 border border-stroke-subtle rounded-inner focus:border-brand-primary focus:outline-none text-text-primary text-sm disabled:opacity-50"
+                          onBlur={async (e) => {
+                            const val = parseInt(e.target.value);
+                            if (isNaN(val) || val < 0) return;
+                            try {
+                              await deviceControl.setStandbyTimers({ deviceSn: device.deviceSn, carStandbyMins: val });
+                              toast.success(`DC standby set to ${val} min`);
+                            } catch (err) {
+                              toast.error(err instanceof Error ? err.message : 'Failed');
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="p-3 bg-surface-2/50 rounded-inner">
+                        <label className="block text-sm font-medium text-text-primary mb-1">Unit Standby</label>
+                        <p className="text-xs text-text-muted mb-2">Minutes (0=never off)</p>
+                        <input
+                          type="number"
+                          min={0}
+                          max={720}
+                          defaultValue={reading?.unitStandbyMins ?? 0}
+                          disabled={!device.online}
+                          className="w-full px-3 py-2 bg-surface-2 border border-stroke-subtle rounded-inner focus:border-brand-primary focus:outline-none text-text-primary text-sm disabled:opacity-50"
+                          onBlur={async (e) => {
+                            const val = parseInt(e.target.value);
+                            if (isNaN(val) || val < 0) return;
+                            try {
+                              await deviceControl.setStandbyTimers({ deviceSn: device.deviceSn, unitStandbyMins: val });
+                              toast.success(`Unit standby set to ${val} min`);
+                            } catch (err) {
+                              toast.error(err instanceof Error ? err.message : 'Failed');
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Other */}
+                  <div>
+                    <h3 className="text-sm font-medium text-text-muted mb-3">Other</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-surface-2/50 rounded-inner">
+                        <div>
+                          <span className="text-sm font-medium text-text-primary">Buzzer</span>
+                          <p className="text-xs text-text-muted">Device beep sounds</p>
+                        </div>
+                        <Toggle
+                          checked={reading?.buzzerSilent ?? false}
+                          disabled={deviceControl.isLoading || !device.online}
+                          onToggle={async (checked) => {
+                            try {
+                              await deviceControl.setBuzzer({ deviceSn: device.deviceSn, enabled: !checked });
+                              toast.success(`Buzzer ${checked ? 'silenced' : 'enabled'}`);
+                            } catch (err) {
+                              toast.error(err instanceof Error ? err.message : 'Failed');
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Scheduled Rules */}
+              <div className="bg-surface-1 rounded-card border border-stroke-subtle shadow-card p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <Calendar className="w-5 h-5 text-brand-primary" />
+                    <h2 className="text-lg font-medium text-text-primary">Scheduled Rules</h2>
+                  </div>
+                  <button
+                    onClick={() => setShowScheduleForm(!showScheduleForm)}
+                    className="flex items-center gap-2 px-3 py-2 bg-brand-primary hover:bg-brand-primary/90 text-bg-base rounded-pill transition-all duration-160 ease-dashboard text-sm font-medium"
+                  >
+                    <Plus size={16} />
+                    Add Rule
+                  </button>
+                </div>
+
+                {/* New Schedule Form */}
+                {showScheduleForm && (
+                  <div className="mb-6 p-4 bg-surface-2/50 rounded-inner border border-stroke-subtle space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-1">Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Morning AC On"
+                        value={newSchedule.name}
+                        onChange={(e) => setNewSchedule(prev => ({ ...prev, name: e.target.value }))}
+                        className="w-full px-3 py-2 bg-surface-2 border border-stroke-subtle rounded-inner focus:border-brand-primary focus:outline-none text-text-primary text-sm"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-text-primary mb-1">Time</label>
+                        <input
+                          type="time"
+                          value={newSchedule.time}
+                          onChange={(e) => setNewSchedule(prev => ({ ...prev, time: e.target.value }))}
+                          className="w-full px-3 py-2 bg-surface-2 border border-stroke-subtle rounded-inner focus:border-brand-primary focus:outline-none text-text-primary text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-text-primary mb-1">Action</label>
+                        <select
+                          value={newSchedule.action}
+                          onChange={(e) => setNewSchedule(prev => ({ ...prev, action: e.target.value }))}
+                          className="w-full px-3 py-2 bg-surface-2 border border-stroke-subtle rounded-inner focus:border-brand-primary focus:outline-none text-text-primary text-sm"
+                        >
+                          <option value="acOn">Turn AC On</option>
+                          <option value="acOff">Turn AC Off</option>
+                          <option value="dcOn">Turn DC/USB On</option>
+                          <option value="dcOff">Turn DC/USB Off</option>
+                          <option value="carOn">Turn Car Charger On</option>
+                          <option value="carOff">Turn Car Charger Off</option>
+                          <option value="buzzerOn">Buzzer On</option>
+                          <option value="buzzerOff">Buzzer Off (Silent)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-text-primary mb-2">Days</label>
+                      <div className="flex gap-2">
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, i) => (
+                          <button
+                            key={day}
+                            onClick={() => {
+                              setNewSchedule(prev => ({
+                                ...prev,
+                                daysOfWeek: prev.daysOfWeek.includes(i)
+                                  ? prev.daysOfWeek.filter(d => d !== i)
+                                  : [...prev.daysOfWeek, i],
+                              }));
+                            }}
+                            className={`px-3 py-1.5 rounded-pill text-xs font-medium transition-all duration-160 ${
+                              newSchedule.daysOfWeek.includes(i)
+                                ? 'bg-brand-primary text-bg-base'
+                                : 'bg-surface-2 text-text-secondary border border-stroke-subtle'
+                            }`}
+                          >
+                            {day}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-text-muted mt-1">Leave empty for every day</p>
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => setShowScheduleForm(false)}
+                        className="px-4 py-2 bg-surface-2 hover:bg-surface-2/80 text-text-primary rounded-pill transition-all duration-160 text-sm"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!newSchedule.name.trim()) {
+                            toast.error('Schedule name is required');
+                            return;
+                          }
+                          const actionMap: Record<string, { moduleType: number; operateType: string; params: Record<string, unknown> }> = {
+                            acOn: { moduleType: 5, operateType: "acOutCfg", params: { enabled: 1, xboost: reading?.acXboost ? 1 : 0, out_voltage: reading?.acOutVoltage ?? 220, out_freq: reading?.acOutFrequency ?? 50 } },
+                            acOff: { moduleType: 5, operateType: "acOutCfg", params: { enabled: 0, xboost: reading?.acXboost ? 1 : 0, out_voltage: reading?.acOutVoltage ?? 220, out_freq: reading?.acOutFrequency ?? 50 } },
+                            dcOn: { moduleType: 1, operateType: "dcOutCfg", params: { enabled: 1 } },
+                            dcOff: { moduleType: 1, operateType: "dcOutCfg", params: { enabled: 0 } },
+                            carOn: { moduleType: 5, operateType: "mpptCar", params: { enabled: 1 } },
+                            carOff: { moduleType: 5, operateType: "mpptCar", params: { enabled: 0 } },
+                            buzzerOn: { moduleType: 5, operateType: "quietMode", params: { enabled: 1 } },
+                            buzzerOff: { moduleType: 5, operateType: "quietMode", params: { enabled: 0 } },
+                          };
+                          try {
+                            await createSchedule({
+                              deviceId,
+                              name: newSchedule.name,
+                              time: newSchedule.time,
+                              daysOfWeek: newSchedule.daysOfWeek,
+                              action: actionMap[newSchedule.action],
+                              timezone: newSchedule.timezone,
+                            });
+                            toast.success('Schedule created');
+                            setShowScheduleForm(false);
+                            setNewSchedule({ name: '', time: '08:00', daysOfWeek: [], action: 'acOn', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : 'Failed to create schedule');
+                          }
+                        }}
+                        className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/90 text-bg-base rounded-pill transition-all duration-160 text-sm font-medium"
+                      >
+                        Create Schedule
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Schedule List */}
+                {schedules.length === 0 && !showScheduleForm ? (
+                  <div className="text-center py-8">
+                    <Clock className="w-10 h-10 text-text-muted mx-auto mb-3" />
+                    <p className="text-text-secondary text-sm">No scheduled rules yet</p>
+                    <p className="text-text-muted text-xs mt-1">Create rules to automate device actions on a schedule</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {schedules.map((schedule) => (
+                      <div key={schedule.id} className="flex items-center justify-between p-3 bg-surface-2/50 rounded-inner">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-text-primary truncate">{schedule.name}</span>
+                            <span className="text-xs text-text-muted">{schedule.time}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-text-muted">
+                              {schedule.daysOfWeek.length === 0
+                                ? 'Every day'
+                                : schedule.daysOfWeek.map(d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join(', ')}
+                            </span>
+                            {schedule.lastExecutedAt && (
+                              <span className="text-xs text-text-muted">
+                                • Last: {new Date(schedule.lastExecutedAt).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                          <Toggle
+                            checked={schedule.enabled}
+                            onToggle={async (checked) => {
+                              try {
+                                await updateSchedule({ scheduleId: schedule.id, enabled: checked });
+                                toast.success(`Schedule ${checked ? 'enabled' : 'disabled'}`);
+                              } catch (err) {
+                                toast.error(err instanceof Error ? err.message : 'Failed');
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={async () => {
+                              if (!confirm('Delete this schedule?')) return;
+                              try {
+                                await removeSchedule(schedule.id);
+                                toast.success('Schedule deleted');
+                              } catch (err) {
+                                toast.error(err instanceof Error ? err.message : 'Failed');
+                              }
+                            }}
+                            className="p-1.5 hover:bg-danger/10 rounded transition-colors"
+                            title="Delete schedule"
+                          >
+                            <Trash2 size={14} className="text-danger" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Danger Zone */}

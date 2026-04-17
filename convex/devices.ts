@@ -200,6 +200,15 @@ export const remove = mutation({
       await ctx.db.delete(s._id);
     }
 
+    // Delete related schedules
+    const schedules = await ctx.db
+      .query("deviceSchedules")
+      .withIndex("by_deviceId", (q) => q.eq("deviceId", args.deviceId))
+      .collect();
+    for (const s of schedules) {
+      await ctx.db.delete(s._id);
+    }
+
     // Delete the device itself
     await ctx.db.delete(args.deviceId);
 

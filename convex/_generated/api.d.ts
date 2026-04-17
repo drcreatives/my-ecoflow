@@ -21,6 +21,8 @@ import type * as email_log from "../email_log.js";
 import type * as http from "../http.js";
 import type * as migrations from "../migrations.js";
 import type * as readings from "../readings.js";
+import type * as schedules from "../schedules.js";
+import type * as schedules_internal from "../schedules_internal.js";
 import type * as settings from "../settings.js";
 import type * as users from "../users.js";
 
@@ -44,6 +46,8 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   migrations: typeof migrations;
   readings: typeof readings;
+  schedules: typeof schedules;
+  schedules_internal: typeof schedules_internal;
   settings: typeof settings;
   users: typeof users;
 }>;

@@ -48,6 +48,29 @@ export default defineSchema({
     status: v.optional(v.string()),
     rawData: v.optional(v.any()),
     recordedAt: v.float64(), // epoch ms
+    // ─── Config state (extracted from quota) ─────────────────────────────────
+    acEnabled: v.optional(v.boolean()),
+    dcOutEnabled: v.optional(v.boolean()),
+    carChargerEnabled: v.optional(v.boolean()),
+    acXboost: v.optional(v.boolean()),
+    acOutVoltage: v.optional(v.float64()),
+    acOutFrequency: v.optional(v.float64()),
+    acChargingWatts: v.optional(v.float64()),
+    dcChargingCurrent: v.optional(v.float64()),
+    acStandbyMins: v.optional(v.float64()),
+    carStandbyMins: v.optional(v.float64()),
+    unitStandbyMins: v.optional(v.float64()),
+    maxChargeSoc: v.optional(v.float64()),
+    minDischargeSoc: v.optional(v.float64()),
+    solarPriority: v.optional(v.boolean()),
+    energyMgmtEnabled: v.optional(v.boolean()),
+    backupReserveSoc: v.optional(v.float64()),
+    acAutoOutEnabled: v.optional(v.boolean()),
+    minAcOutSoc: v.optional(v.float64()),
+    smartGenOnSoc: v.optional(v.float64()),
+    smartGenOffSoc: v.optional(v.float64()),
+    lcdOffSeconds: v.optional(v.float64()),
+    buzzerSilent: v.optional(v.boolean()),
   })
     .index("by_deviceId", ["deviceId"])
     .index("by_deviceId_recordedAt", ["deviceId", "recordedAt"]),
@@ -147,4 +170,25 @@ export default defineSchema({
     ipAddress: v.optional(v.string()),
     userAgent: v.optional(v.string()),
   }).index("by_userId", ["userId"]),
+
+  // ─── Device Schedules ─────────────────────────────────────────────────────
+  deviceSchedules: defineTable({
+    deviceId: v.id("devices"),
+    userId: v.id("users"),
+    name: v.string(),
+    enabled: v.boolean(),
+    time: v.string(), // "HH:MM" in 24h format
+    daysOfWeek: v.array(v.float64()), // 0=Sun..6=Sat; empty = every day
+    action: v.object({
+      moduleType: v.float64(),
+      operateType: v.string(),
+      params: v.any(),
+    }),
+    timezone: v.string(), // e.g. "America/New_York"
+    lastExecutedAt: v.optional(v.float64()),
+    createdAt: v.float64(),
+    updatedAt: v.float64(),
+  })
+    .index("by_deviceId", ["deviceId"])
+    .index("by_userId", ["userId"]),
 });

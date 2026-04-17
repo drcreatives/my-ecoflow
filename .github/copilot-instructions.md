@@ -190,3 +190,14 @@ RESEND_API_KEY=...
 # Set in Convex Dashboard (not .env.local):
 # ECOFLOW_ACCESS_KEY, ECOFLOW_SECRET_KEY, RESEND_API_KEY
 ```
+
+## Customization Files
+
+Additional instructions, hooks, and prompts that extend this document:
+
+| File | Type | Purpose |
+|---|---|---|
+| `.github/instructions/convex-patterns.instructions.md` | Instruction | Auth guards, error handling, argument validation, function organization for `convex/**/*.ts` |
+| `.github/instructions/testing-and-commits.instructions.md` | Instruction | Phase-based dev workflow (backend → frontend), testing strategy, commit conventions |
+| `.github/hooks/pre-commit-lint.json` | Hook | Auto-runs `npm run lint` + `npm run type-check` before any `git commit` |
+| `.github/prompts/generate-tests.prompt.md` | Prompt | `/generate-tests` — generates test boilerplate for a Convex module or React component |

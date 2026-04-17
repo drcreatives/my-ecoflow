@@ -35,4 +35,13 @@ crons.interval(
   internal.backup.checkAndRunBackups
 );
 
+// ─── Process device schedules every minute ────────────────────────────────────
+// Checks all enabled schedule rules and fires matching ones based on
+// local time and day-of-week.
+crons.interval(
+  "process-schedules",
+  { minutes: 1 },
+  internal.schedules_internal.processSchedules
+);
+
 export default crons;

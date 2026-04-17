@@ -35,6 +35,29 @@ export interface DeviceReading {
   status?: string
   rawData?: Record<string, unknown>
   recordedAt: Date
+  // Config state fields (populated from device quota)
+  acEnabled?: boolean
+  dcOutEnabled?: boolean
+  carChargerEnabled?: boolean
+  acXboost?: boolean
+  acOutVoltage?: number
+  acOutFrequency?: number
+  acChargingWatts?: number
+  dcChargingCurrent?: number
+  acStandbyMins?: number
+  carStandbyMins?: number
+  unitStandbyMins?: number
+  maxChargeSoc?: number
+  minDischargeSoc?: number
+  solarPriority?: boolean
+  energyMgmtEnabled?: boolean
+  backupReserveSoc?: number
+  acAutoOutEnabled?: boolean
+  minAcOutSoc?: number
+  smartGenOnSoc?: number
+  smartGenOffSoc?: number
+  lcdOffSeconds?: number
+  buzzerSilent?: boolean
 }
 
 export interface DeviceSetting {
@@ -149,4 +172,23 @@ export interface APIError {
   code?: string
   statusCode?: number
   details?: Record<string, unknown>
+}
+
+// Device schedule types
+export interface DeviceSchedule {
+  id: string
+  deviceId: string
+  name: string
+  enabled: boolean
+  time: string // "HH:MM"
+  daysOfWeek: number[] // 0=Sun..6=Sat; empty = every day
+  action: {
+    moduleType: number
+    operateType: string
+    params: Record<string, unknown>
+  }
+  timezone: string
+  lastExecutedAt: number | null
+  createdAt: number
+  updatedAt: number
 }

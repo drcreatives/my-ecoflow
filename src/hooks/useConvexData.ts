@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 /**
  * Bridge hook replacing useDeviceStore for page components.
@@ -276,5 +276,110 @@ export function useConvexProfile() {
     profile: profile ?? null,
     isLoading: profile === undefined,
     updateProfile,
+  };
+}
+
+/**
+ * Hook for device control actions (SET commands).
+ * Provides typed wrappers for all EcoFlow SET operations.
+ */
+export function useConvexDeviceControl() {
+  const setPortState = useAction(api.ecoflow.setPortState);
+  const setAcConfig = useAction(api.ecoflow.setAcConfig);
+  const setChargingConfig = useAction(api.ecoflow.setChargingConfig);
+  const setStandbyTimers = useAction(api.ecoflow.setStandbyTimers);
+  const setLcdConfig = useAction(api.ecoflow.setLcdConfig);
+  const setEnergyManagement = useAction(api.ecoflow.setEnergyManagement);
+  const setBmsConfig = useAction(api.ecoflow.setBmsConfig);
+  const setSmartGenerator = useAction(api.ecoflow.setSmartGenerator);
+  const setBuzzer = useAction(api.ecoflow.setBuzzer);
+
+  const [inFlightCount, setInFlightCount] = useState(0);
+  const isLoading = inFlightCount > 0;
+
+  const wrapAction = useCallback(
+    <T extends (...args: never[]) => Promise<unknown>>(fn: T) => {
+      return async (...args: Parameters<T>) => {
+        setInFlightCount((c) => c + 1);
+        try {
+          return await fn(...args);
+        } finally {
+          setInFlightCount((c) => c - 1);
+        }
+      };
+    },
+    []
+  );
+
+  return {
+    setPortState: useMemo(() => wrapAction(setPortState), [wrapAction, setPortState]),
+    setAcConfig: useMemo(() => wrapAction(setAcConfig), [wrapAction, setAcConfig]),
+    setChargingConfig: useMemo(() => wrapAction(setChargingConfig), [wrapAction, setChargingConfig]),
+    setStandbyTimers: useMemo(() => wrapAction(setStandbyTimers), [wrapAction, setStandbyTimers]),
+    setLcdConfig: useMemo(() => wrapAction(setLcdConfig), [wrapAction, setLcdConfig]),
+    setEnergyManagement: useMemo(() => wrapAction(setEnergyManagement), [wrapAction, setEnergyManagement]),
+    setBmsConfig: useMemo(() => wrapAction(setBmsConfig), [wrapAction, setBmsConfig]),
+    setSmartGenerator: useMemo(() => wrapAction(setSmartGenerator), [wrapAction, setSmartGenerator]),
+    setBuzzer: useMemo(() => wrapAction(setBuzzer), [wrapAction, setBuzzer]),
+    isLoading,
+  };
+}
+
+/**
+ * Hook for device schedule CRUD.
+ */
+export function useConvexSchedules(deviceId: string | null) {
+  const schedules = useQuery(
+    api.schedules.list,
+    deviceId ? { deviceId: deviceId as Id<"devices"> } : "skip"
+  );
+  const createSchedule = useMutation(api.schedules.create);
+  const updateSchedule = useMutation(api.schedules.update);
+  const removeSchedule = useMutation(api.schedules.remove);
+
+  return {
+    schedules: schedules ?? [],
+    isLoading: schedules === undefined && deviceId !== null,
+    createSchedule: useCallback(
+      async (args: {
+        deviceId: string;
+        name: string;
+        time: string;
+        daysOfWeek: number[];
+        action: { moduleType: number; operateType: string; params: Record<string, unknown> };
+        timezone: string;
+      }) => {
+        return createSchedule({
+          ...args,
+          deviceId: args.deviceId as Id<"devices">,
+        });
+      },
+      [createSchedule]
+    ),
+    updateSchedule: useCallback(
+      async (args: {
+        scheduleId: string;
+        name?: string;
+        enabled?: boolean;
+        time?: string;
+        daysOfWeek?: number[];
+        action?: { moduleType: number; operateType: string; params: Record<string, unknown> };
+        timezone?: string;
+      }) => {
+        return updateSchedule({
+          ...args,
+          scheduleId: args.scheduleId as Id<"deviceSchedules">,
+        });
+      },
+      [updateSchedule]
+    ),
+    removeSchedule: useCallback(
+      async (scheduleId: string) => {
+        return removeSchedule({
+          scheduleId: scheduleId as Id<"deviceSchedules">,
+        });
+      },
+      [removeSchedule]
+    ),
   };
 }
