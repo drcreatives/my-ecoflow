@@ -40,9 +40,10 @@ Every task follows two phases. Complete and test each phase before moving to the
 - **E2E**: Playwright
 - **Test scripts**:
   - `npm run test` — all unit/integration tests
-  - `npm run test:backend` — Convex function tests only
-  - `npm run test:frontend` — React component tests only
-  - `npm run test:e2e` — Playwright E2E tests
+  - `npm run test:watch` — Vitest in watch mode
+  - `npm run test:backend` — Convex function tests only (`convex/__tests__/`)
+  - `npm run test:frontend` — React component tests only (`src/**/*.test.*`)
+  - `npm run test:e2e` — Playwright E2E tests (`e2e/`)
 
 ## Convex Backend Testing
 
