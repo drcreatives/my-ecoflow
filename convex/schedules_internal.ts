@@ -23,14 +23,21 @@ export const processSchedules = internalAction({
 
     for (const schedule of schedules) {
       try {
-        // Compute current local time in the schedule's timezone
-        const localDate = new Date(
-          new Date(now).toLocaleString("en-US", { timeZone: schedule.timezone })
-        );
-        const localHH = String(localDate.getHours()).padStart(2, "0");
-        const localMM = String(localDate.getMinutes()).padStart(2, "0");
+        // Compute current local time in the schedule's timezone using Intl.DateTimeFormat
+        const formatter = new Intl.DateTimeFormat("en-US", {
+          timeZone: schedule.timezone,
+          hour: "2-digit",
+          minute: "2-digit",
+          weekday: "short",
+          hour12: false,
+        });
+        const parts = formatter.formatToParts(new Date(now));
+        const localHH = parts.find((p) => p.type === "hour")?.value ?? "00";
+        const localMM = parts.find((p) => p.type === "minute")?.value ?? "00";
         const localTime = `${localHH}:${localMM}`;
-        const localDay = localDate.getDay(); // 0=Sun..6=Sat
+        const weekdayStr = parts.find((p) => p.type === "weekday")?.value ?? "";
+        const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+        const localDay = dayMap[weekdayStr] ?? new Date(now).getDay();
 
         // Check time match
         if (localTime !== schedule.time) continue;
@@ -40,16 +47,33 @@ export const processSchedules = internalAction({
 
         // Prevent double-execution within the same minute
         if (schedule.lastExecutedAt) {
-          const lastLocal = new Date(
-            new Date(schedule.lastExecutedAt).toLocaleString("en-US", {
-              timeZone: schedule.timezone,
-            })
-          );
-          const lastHH = String(lastLocal.getHours()).padStart(2, "0");
-          const lastMM = String(lastLocal.getMinutes()).padStart(2, "0");
+          const lastFormatter = new Intl.DateTimeFormat("en-US", {
+            timeZone: schedule.timezone,
+            hour: "2-digit",
+            minute: "2-digit",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour12: false,
+          });
+          const lastParts = lastFormatter.formatToParts(new Date(schedule.lastExecutedAt));
+          const lastHH = lastParts.find((p) => p.type === "hour")?.value ?? "";
+          const lastMM = lastParts.find((p) => p.type === "minute")?.value ?? "";
+          const lastDate = `${lastParts.find((p) => p.type === "year")?.value}-${lastParts.find((p) => p.type === "month")?.value}-${lastParts.find((p) => p.type === "day")?.value}`;
+
+          const nowFormatter = new Intl.DateTimeFormat("en-US", {
+            timeZone: schedule.timezone,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour12: false,
+          });
+          const nowParts = nowFormatter.formatToParts(new Date(now));
+          const nowDate = `${nowParts.find((p) => p.type === "year")?.value}-${nowParts.find((p) => p.type === "month")?.value}-${nowParts.find((p) => p.type === "day")?.value}`;
+
           if (
             `${lastHH}:${lastMM}` === localTime &&
-            lastLocal.toDateString() === localDate.toDateString()
+            lastDate === nowDate
           ) {
             continue;
           }
@@ -81,10 +105,6 @@ export const processSchedules = internalAction({
         console.error(msg);
         errors.push(msg);
       }
-    }
-
-    if (fired > 0 || errors.length > 0) {
-      console.log(`Schedules processed: ${fired} fired, ${errors.length} errors`);
     }
 
     return { success: true, fired, errors };

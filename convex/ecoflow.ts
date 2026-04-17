@@ -163,11 +163,6 @@ async function setDeviceQuotaRequest(
   const flatBody = flattenParams(fullBody as unknown as Record<string, unknown>);
   const signature = generateSignature(secretKey, accessKey, flatBody, timestamp, nonce);
 
-  console.log("[EcoFlow SET] URL:", `${baseURL}/iot-open/sign/device/quota`);
-  console.log("[EcoFlow SET] Full body:", JSON.stringify(fullBody, null, 2));
-  console.log("[EcoFlow SET] Flattened params for signature:", JSON.stringify(flatBody, null, 2));
-  console.log("[EcoFlow SET] Headers:", JSON.stringify({ accessKey: accessKey.slice(0, 8) + "...", nonce, timestamp: timestamp.toString(), sign: signature }));
-
   const response = await fetch(`${baseURL}/iot-open/sign/device/quota`, {
     method: "PUT",
     headers: {
@@ -181,15 +176,12 @@ async function setDeviceQuotaRequest(
   });
 
   const responseText = await response.text();
-  console.log("[EcoFlow SET] Response status:", response.status, response.statusText);
-  console.log("[EcoFlow SET] Response body:", responseText);
 
   if (!response.ok) {
     throw new Error(`EcoFlow SET API HTTP ${response.status}: ${response.statusText} — ${responseText}`);
   }
 
   const data: APIResponse = JSON.parse(responseText);
-  console.log("[EcoFlow SET] Parsed response — code:", data.code, "message:", data.message);
   return {
     success: data.code === "0",
     code: data.code,
@@ -481,10 +473,6 @@ export const collectAllUserReadings = internalAction({
       }
     }
 
-    console.log(
-      `Cron collection complete: ${usersCollected} users, ${totalReadings} readings, ${errors.length} errors`
-    );
-
     return { success: true, usersCollected, totalReadings, errors };
   },
 });
@@ -598,13 +586,21 @@ export const setPortState = action({
       case "ac": {
         // acOutCfg requires all 4 params — read current values for the ones not being changed
         const currentConfig = await ctx.runQuery(internal.readings.getLatestAcConfig, { deviceId: device._id });
+        const outVoltage =
+          typeof currentConfig?.acOutVoltage === "number" && currentConfig.acOutVoltage >= 100
+            ? currentConfig.acOutVoltage
+            : 220;
+        const outFrequency =
+          currentConfig?.acOutFrequency === 50 || currentConfig?.acOutFrequency === 60
+            ? currentConfig.acOutFrequency
+            : 50;
         body = {
           sn: args.deviceSn, moduleType: 5, operateType: "acOutCfg",
           params: {
             enabled: enabledVal,
             xboost: currentConfig?.acXboost ? 1 : 0,
-            out_voltage: currentConfig?.acOutVoltage ?? 30,
-            out_freq: currentConfig?.acOutFrequency ?? 1,
+            out_voltage: outVoltage,
+            out_freq: outFrequency,
           },
         };
         break;
@@ -617,9 +613,7 @@ export const setPortState = action({
         break;
     }
 
-    console.log(`[setPortState] port=${args.port} enabled=${args.enabled} body=`, JSON.stringify(body));
     const result = await setDeviceQuotaRequest(accessKey, secretKey, body);
-    console.log(`[setPortState] result=`, JSON.stringify(result));
     if (!result.success) throw new Error(`EcoFlow SET failed: ${result.message}`);
 
     // Optimistic: patch latest reading so UI updates instantly
@@ -666,8 +660,14 @@ export const setAcConfig = action({
       xboost: args.xboost !== undefined
         ? (args.xboost ? 1 : 0)
         : (currentConfig?.acXboost ? 1 : 0),
-      out_voltage: args.outVoltage ?? currentConfig?.acOutVoltage ?? 30,
-      out_freq: args.outFrequency ?? currentConfig?.acOutFrequency ?? 1,
+      out_voltage: args.outVoltage
+        ?? (typeof currentConfig?.acOutVoltage === "number" && currentConfig.acOutVoltage >= 100
+          ? currentConfig.acOutVoltage
+          : 220),
+      out_freq: args.outFrequency
+        ?? (currentConfig?.acOutFrequency === 50 || currentConfig?.acOutFrequency === 60
+          ? currentConfig.acOutFrequency
+          : 50),
     };
 
     const result = await setDeviceQuotaRequest(accessKey, secretKey, {
@@ -1017,16 +1017,12 @@ export const refreshDeviceReading = internalAction({
     if (!accessKey || !secretKey) return;
 
     try {
-      console.log("[refreshDeviceReading] Fetching quota for", args.deviceSn);
       const quotaData = await getDeviceQuota(accessKey, secretKey, args.deviceSn);
       if (!quotaData) {
         console.warn("[refreshDeviceReading] No quota data returned");
         return;
       }
-      console.log("[refreshDeviceReading] Got quota, acEnabled:", quotaData["mppt.outState"], "dcEnabled:", quotaData["pd.dcOutState"], "carEnabled:", quotaData["mppt.carState"]);
-
       const reading = transformQuotaToReading(quotaData);
-      console.log("[refreshDeviceReading] Transformed reading — acEnabled:", reading.acEnabled, "dcOutEnabled:", reading.dcOutEnabled, "buzzerSilent:", reading.buzzerSilent);
       await ctx.runMutation(internal.readings.insertReading, {
         deviceId: args.deviceId,
         batteryLevel: reading.batteryLevel,
@@ -1198,10 +1194,6 @@ export const refreshReadings = action({
         devicesSkipped++;
       }
     }
-
-    console.log(
-      `[refreshReadings] Done: ${devicesRefreshed} refreshed, ${devicesSkipped} skipped`
-    );
 
     return { success: true, devicesRefreshed, devicesSkipped };
   },

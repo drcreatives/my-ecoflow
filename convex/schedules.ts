@@ -70,9 +70,9 @@ export const create = mutation({
       throw new Error(`Maximum of ${MAX_SCHEDULES_PER_DEVICE} schedules per device`);
     }
 
-    // Validate time format HH:MM
-    if (!/^\d{2}:\d{2}$/.test(args.time)) {
-      throw new Error("Time must be in HH:MM format");
+    // Validate time format HH:MM with valid ranges
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(args.time)) {
+      throw new Error("Time must be in HH:MM format (00:00–23:59)");
     }
 
     const now = Date.now();
@@ -108,8 +108,8 @@ export const update = mutation({
     const schedule = await ctx.db.get(args.scheduleId);
     if (!schedule || schedule.userId !== userId) throw new Error("Schedule not found");
 
-    if (args.time !== undefined && !/^\d{2}:\d{2}$/.test(args.time)) {
-      throw new Error("Time must be in HH:MM format");
+    if (args.time !== undefined && !/^([01]\d|2[0-3]):[0-5]\d$/.test(args.time)) {
+      throw new Error("Time must be in HH:MM format (00:00–23:59)");
     }
 
     const updates: Record<string, unknown> = { updatedAt: Date.now() };
