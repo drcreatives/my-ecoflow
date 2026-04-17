@@ -1,4 +1,4 @@
-import { query, mutation, internalMutation } from "./_generated/server";
+import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { auth } from "./auth";
 import { Id } from "./_generated/dataModel";
@@ -48,6 +48,29 @@ export const latest = query({
               temperature: reading.temperature ?? null,
               status: reading.status ?? "unknown",
               recordedAt: reading.recordedAt,
+              // Config state
+              acEnabled: reading.acEnabled ?? null,
+              dcOutEnabled: reading.dcOutEnabled ?? null,
+              carChargerEnabled: reading.carChargerEnabled ?? null,
+              acXboost: reading.acXboost ?? null,
+              acOutVoltage: reading.acOutVoltage ?? null,
+              acOutFrequency: reading.acOutFrequency ?? null,
+              acChargingWatts: reading.acChargingWatts ?? null,
+              dcChargingCurrent: reading.dcChargingCurrent ?? null,
+              acStandbyMins: reading.acStandbyMins ?? null,
+              carStandbyMins: reading.carStandbyMins ?? null,
+              unitStandbyMins: reading.unitStandbyMins ?? null,
+              maxChargeSoc: reading.maxChargeSoc ?? null,
+              minDischargeSoc: reading.minDischargeSoc ?? null,
+              solarPriority: reading.solarPriority ?? null,
+              energyMgmtEnabled: reading.energyMgmtEnabled ?? null,
+              backupReserveSoc: reading.backupReserveSoc ?? null,
+              acAutoOutEnabled: reading.acAutoOutEnabled ?? null,
+              minAcOutSoc: reading.minAcOutSoc ?? null,
+              smartGenOnSoc: reading.smartGenOnSoc ?? null,
+              smartGenOffSoc: reading.smartGenOffSoc ?? null,
+              lcdOffSeconds: reading.lcdOffSeconds ?? null,
+              buzzerSilent: reading.buzzerSilent ?? null,
             }
           : null,
       });
@@ -90,6 +113,29 @@ export const latestForDevice = query({
           temperature: reading.temperature ?? null,
           status: reading.status ?? "unknown",
           recordedAt: reading.recordedAt,
+          // Config state
+          acEnabled: reading.acEnabled ?? null,
+          dcOutEnabled: reading.dcOutEnabled ?? null,
+          carChargerEnabled: reading.carChargerEnabled ?? null,
+          acXboost: reading.acXboost ?? null,
+          acOutVoltage: reading.acOutVoltage ?? null,
+          acOutFrequency: reading.acOutFrequency ?? null,
+          acChargingWatts: reading.acChargingWatts ?? null,
+          dcChargingCurrent: reading.dcChargingCurrent ?? null,
+          acStandbyMins: reading.acStandbyMins ?? null,
+          carStandbyMins: reading.carStandbyMins ?? null,
+          unitStandbyMins: reading.unitStandbyMins ?? null,
+          maxChargeSoc: reading.maxChargeSoc ?? null,
+          minDischargeSoc: reading.minDischargeSoc ?? null,
+          solarPriority: reading.solarPriority ?? null,
+          energyMgmtEnabled: reading.energyMgmtEnabled ?? null,
+          backupReserveSoc: reading.backupReserveSoc ?? null,
+          acAutoOutEnabled: reading.acAutoOutEnabled ?? null,
+          minAcOutSoc: reading.minAcOutSoc ?? null,
+          smartGenOnSoc: reading.smartGenOnSoc ?? null,
+          smartGenOffSoc: reading.smartGenOffSoc ?? null,
+          lcdOffSeconds: reading.lcdOffSeconds ?? null,
+          buzzerSilent: reading.buzzerSilent ?? null,
         }
       : null;
   },
@@ -262,6 +308,63 @@ export const count = query({
 // ─── Internal Mutations (for cron / ecoflow action) ──────────────────────────
 
 /**
+ * Get current AC config from the latest reading for a device.
+ * Used by setAcConfig/setPortState to include all required acOutCfg params.
+ */
+export const getLatestAcConfig = internalQuery({
+  args: { deviceId: v.id("devices") },
+  handler: async (ctx, args) => {
+    const latest = await ctx.db
+      .query("deviceReadings")
+      .withIndex("by_deviceId_recordedAt", (q) => q.eq("deviceId", args.deviceId))
+      .order("desc")
+      .first();
+    if (!latest) return null;
+    return {
+      acEnabled: latest.acEnabled ?? true,
+      acXboost: latest.acXboost ?? false,
+      acOutVoltage: latest.acOutVoltage ?? undefined,
+      acOutFrequency: latest.acOutFrequency ?? undefined,
+    };
+  },
+});
+
+/**
+ * Optimistically patch config fields on the latest reading for a device.
+ * Called immediately after a SET command succeeds so the UI updates instantly
+ * (the EcoFlow API takes several seconds to reflect changes).
+ */
+export const patchLatestReading = internalMutation({
+  args: {
+    deviceId: v.id("devices"),
+    fields: v.object({
+      acEnabled: v.optional(v.boolean()),
+      dcOutEnabled: v.optional(v.boolean()),
+      carChargerEnabled: v.optional(v.boolean()),
+      acXboost: v.optional(v.boolean()),
+      buzzerSilent: v.optional(v.boolean()),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const latest = await ctx.db
+      .query("deviceReadings")
+      .withIndex("by_deviceId_recordedAt", (q) => q.eq("deviceId", args.deviceId))
+      .order("desc")
+      .first();
+    if (!latest) return;
+
+    const patch: Record<string, boolean> = {};
+    if (args.fields.acEnabled !== undefined) patch.acEnabled = args.fields.acEnabled;
+    if (args.fields.dcOutEnabled !== undefined) patch.dcOutEnabled = args.fields.dcOutEnabled;
+    if (args.fields.carChargerEnabled !== undefined) patch.carChargerEnabled = args.fields.carChargerEnabled;
+    if (args.fields.acXboost !== undefined) patch.acXboost = args.fields.acXboost;
+    if (args.fields.buzzerSilent !== undefined) patch.buzzerSilent = args.fields.buzzerSilent;
+
+    await ctx.db.patch(latest._id, patch);
+  },
+});
+
+/**
  * Insert a single reading — called from the ecoflow action after fetching quota.
  */
 export const insertReading = internalMutation({
@@ -281,6 +384,29 @@ export const insertReading = internalMutation({
     status: v.optional(v.string()),
     rawData: v.optional(v.any()),
     recordedAt: v.float64(),
+    // Config state fields
+    acEnabled: v.optional(v.boolean()),
+    dcOutEnabled: v.optional(v.boolean()),
+    carChargerEnabled: v.optional(v.boolean()),
+    acXboost: v.optional(v.boolean()),
+    acOutVoltage: v.optional(v.float64()),
+    acOutFrequency: v.optional(v.float64()),
+    acChargingWatts: v.optional(v.float64()),
+    dcChargingCurrent: v.optional(v.float64()),
+    acStandbyMins: v.optional(v.float64()),
+    carStandbyMins: v.optional(v.float64()),
+    unitStandbyMins: v.optional(v.float64()),
+    maxChargeSoc: v.optional(v.float64()),
+    minDischargeSoc: v.optional(v.float64()),
+    solarPriority: v.optional(v.boolean()),
+    energyMgmtEnabled: v.optional(v.boolean()),
+    backupReserveSoc: v.optional(v.float64()),
+    acAutoOutEnabled: v.optional(v.boolean()),
+    minAcOutSoc: v.optional(v.float64()),
+    smartGenOnSoc: v.optional(v.float64()),
+    smartGenOffSoc: v.optional(v.float64()),
+    lcdOffSeconds: v.optional(v.float64()),
+    buzzerSilent: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("deviceReadings", {
@@ -299,7 +425,46 @@ export const insertReading = internalMutation({
       status: args.status,
       rawData: args.rawData,
       recordedAt: args.recordedAt,
+      // Config state
+      acEnabled: args.acEnabled,
+      dcOutEnabled: args.dcOutEnabled,
+      carChargerEnabled: args.carChargerEnabled,
+      acXboost: args.acXboost,
+      acOutVoltage: args.acOutVoltage,
+      acOutFrequency: args.acOutFrequency,
+      acChargingWatts: args.acChargingWatts,
+      dcChargingCurrent: args.dcChargingCurrent,
+      acStandbyMins: args.acStandbyMins,
+      carStandbyMins: args.carStandbyMins,
+      unitStandbyMins: args.unitStandbyMins,
+      maxChargeSoc: args.maxChargeSoc,
+      minDischargeSoc: args.minDischargeSoc,
+      solarPriority: args.solarPriority,
+      energyMgmtEnabled: args.energyMgmtEnabled,
+      backupReserveSoc: args.backupReserveSoc,
+      acAutoOutEnabled: args.acAutoOutEnabled,
+      minAcOutSoc: args.minAcOutSoc,
+      smartGenOnSoc: args.smartGenOnSoc,
+      smartGenOffSoc: args.smartGenOffSoc,
+      lcdOffSeconds: args.lcdOffSeconds,
+      buzzerSilent: args.buzzerSilent,
     });
+  },
+});
+
+/**
+ * Get the recordedAt timestamp of the latest reading for a device.
+ * Used by refreshReadings to check staleness before hitting the EcoFlow API.
+ */
+export const getLatestTimestamp = internalQuery({
+  args: { deviceId: v.id("devices") },
+  handler: async (ctx, args) => {
+    const latest = await ctx.db
+      .query("deviceReadings")
+      .withIndex("by_deviceId_recordedAt", (q) => q.eq("deviceId", args.deviceId))
+      .order("desc")
+      .first();
+    return latest?.recordedAt ?? null;
   },
 });
 
