@@ -3,8 +3,10 @@
 import { use } from 'react'
 import { formatRemainingTime } from '@/lib/data-utils'
 import { useRouter } from 'next/navigation'
-import { useConvexDevices, useConvexDeviceMutations } from '@/hooks/useConvexData'
+import { useConvexDevices, useConvexDeviceMutations, useConvexDeviceControl } from '@/hooks/useConvexData'
 import Link from 'next/link'
+import { Toggle } from '@/components/ui/Toggle'
+import { toast } from 'sonner'
 import { 
   ArrowLeft, 
   Battery, 
@@ -32,6 +34,7 @@ export default function DevicePage({ params }: DevicePageProps) {
   // Use Convex reactive queries — no manual fetch needed
   const { devices, isLoading: loading, error, getDeviceById } = useConvexDevices()
   const { unregisterDevice, registerDevice } = useConvexDeviceMutations()
+  const { setPortState, setBuzzer, setAcConfig, isLoading: controlLoading } = useConvexDeviceControl()
   
   // Get device from store
   const device = getDeviceById(deviceId)
@@ -448,31 +451,112 @@ export default function DevicePage({ params }: DevicePageProps) {
             </div>
           </div>
 
-          {/* Quick Actions */}
+          {/* Quick Controls */}
           <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6">
             <h3 className="text-lg font-medium text-text-primary mb-4 flex items-center space-x-2">
               <Power className="w-5 h-5 text-brand-primary" />
-              <span>Quick Actions</span>
+              <span>Quick Controls</span>
             </h3>
-            <div className="space-y-3">
-              <button className="w-full bg-brand-primary hover:bg-brand-primary/80 text-bg-base px-4 py-3 rounded-pill font-medium transition-all duration-160 ease-dashboard flex items-center justify-center space-x-2">
-                <Zap className="w-4 h-4" />
-                <span>Start Charging</span>
-              </button>
-              <Link
-                href={`/device/${device.id}/settings`}
-                className="w-full bg-bg-base hover:bg-surface-2 text-text-secondary border border-stroke-subtle hover:border-stroke-strong px-4 py-3 rounded-pill font-medium transition-all duration-160 ease-dashboard flex items-center justify-center space-x-2"
-              >
-                <Settings className="w-4 h-4" />
-                <span>Device Settings</span>
-              </Link>
-              <button 
-                onClick={() => window.location.reload()}
-                className="w-full bg-brand-tertiary hover:bg-brand-tertiary/80 text-text-primary px-4 py-3 rounded-pill font-medium transition-all duration-160 ease-dashboard flex items-center justify-center space-x-2"
-              >
-                <Activity className="w-4 h-4" />
-                <span>Refresh Data</span>
-              </button>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-text-primary">AC Output</span>
+                  <p className="text-xs text-text-muted">Alternating current outlets</p>
+                </div>
+                <Toggle
+                  checked={reading?.acEnabled ?? false}
+                  disabled={controlLoading || !device.online}
+                  onToggle={async (checked) => {
+                    try {
+                      await setPortState({ deviceSn: device.deviceSn, port: "ac" as const, enabled: checked })
+                      toast.success(`AC output ${checked ? 'enabled' : 'disabled'}`)
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : 'Failed to toggle AC output')
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-text-primary">DC / USB Output</span>
+                  <p className="text-xs text-text-muted">12V car port & USB ports</p>
+                </div>
+                <Toggle
+                  checked={reading?.dcOutEnabled ?? false}
+                  disabled={controlLoading || !device.online}
+                  onToggle={async (checked) => {
+                    try {
+                      await setPortState({ deviceSn: device.deviceSn, port: "dcUsb" as const, enabled: checked })
+                      toast.success(`DC/USB output ${checked ? 'enabled' : 'disabled'}`)
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : 'Failed to toggle DC/USB output')
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-text-primary">Car Charger</span>
+                  <p className="text-xs text-text-muted">12V car charging port</p>
+                </div>
+                <Toggle
+                  checked={reading?.carChargerEnabled ?? false}
+                  disabled={controlLoading || !device.online}
+                  onToggle={async (checked) => {
+                    try {
+                      await setPortState({ deviceSn: device.deviceSn, port: "car" as const, enabled: checked })
+                      toast.success(`Car charger ${checked ? 'enabled' : 'disabled'}`)
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : 'Failed to toggle car charger')
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-text-primary">AC X-Boost</span>
+                  <p className="text-xs text-text-muted">Extend AC output capacity</p>
+                </div>
+                <Toggle
+                  checked={reading?.acXboost ?? false}
+                  disabled={controlLoading || !device.online}
+                  onToggle={async (checked) => {
+                    try {
+                      await setAcConfig({ deviceSn: device.deviceSn, xboost: checked })
+                      toast.success(`X-Boost ${checked ? 'enabled' : 'disabled'}`)
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : 'Failed to toggle X-Boost')
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-text-primary">Buzzer</span>
+                  <p className="text-xs text-text-muted">Device beep sounds</p>
+                </div>
+                <Toggle
+                  checked={reading?.buzzerSilent ?? false}
+                  disabled={controlLoading || !device.online}
+                  onToggle={async (checked) => {
+                    try {
+                      await setBuzzer({ deviceSn: device.deviceSn, enabled: checked })
+                      toast.success(`Buzzer ${checked ? 'enabled' : 'silenced'}`)
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : 'Failed to toggle buzzer')
+                    }
+                  }}
+                />
+              </div>
+              <div className="border-t border-stroke-subtle pt-3 mt-3">
+                <Link
+                  href={`/device/${device.id}/settings`}
+                  className="w-full bg-bg-base hover:bg-surface-2 text-text-secondary border border-stroke-subtle hover:border-stroke-strong px-4 py-3 rounded-pill font-medium transition-all duration-160 ease-dashboard flex items-center justify-center space-x-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>All Settings</span>
+                </Link>
+              </div>
             </div>
           </div>
         </div>
