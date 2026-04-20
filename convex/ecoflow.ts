@@ -706,11 +706,13 @@ export const setChargingConfig = action({
 
     const { device, accessKey, secretKey } = await validateDeviceAccess(ctx, userId, args.deviceSn);
 
-    // AC charging config
+    // AC charging config — acChgCfg requires both chgWatts and chgPauseFlag
     if (args.chgWatts !== undefined || args.chgPauseFlag !== undefined) {
-      const params: Record<string, unknown> = {};
-      if (args.chgWatts !== undefined) params.chgWatts = args.chgWatts;
-      if (args.chgPauseFlag !== undefined) params.chgPauseFlag = args.chgPauseFlag ? 1 : 0;
+      const currentConfig = await ctx.runQuery(internal.readings.getLatestAcConfig, { deviceId: device._id });
+      const params = {
+        chgWatts: args.chgWatts ?? currentConfig?.acChargingWatts ?? 600,
+        chgPauseFlag: args.chgPauseFlag !== undefined ? (args.chgPauseFlag ? 1 : 0) : 0,
+      };
 
       const result = await setDeviceQuotaRequest(accessKey, secretKey, {
         sn: args.deviceSn, moduleType: 5, operateType: "acChgCfg", params,
@@ -822,11 +824,15 @@ export const setEnergyManagement = action({
 
     const { device, accessKey, secretKey } = await validateDeviceAccess(ctx, userId, args.deviceSn);
 
-    // Energy management config (watthConfig)
+    // Energy management config — watthConfig requires all 4 params
     if (args.isConfig !== undefined || args.bpPowerSoc !== undefined) {
-      const params: Record<string, unknown> = {};
-      if (args.isConfig !== undefined) params.isConfig = args.isConfig ? 1 : 0;
-      if (args.bpPowerSoc !== undefined) params.bpPowerSoc = args.bpPowerSoc;
+      const currentConfig = await ctx.runQuery(internal.readings.getLatestEnergyConfig, { deviceId: device._id });
+      const params = {
+        isConfig: args.isConfig !== undefined ? (args.isConfig ? 1 : 0) : (currentConfig?.energyMgmtEnabled ? 1 : 0),
+        bpPowerSoc: args.bpPowerSoc ?? currentConfig?.backupReserveSoc ?? 50,
+        minDsgSoc: currentConfig?.minDischargeSoc ?? 255,
+        minChgSoc: currentConfig?.maxChargeSoc ?? 255,
+      };
 
       const result = await setDeviceQuotaRequest(accessKey, secretKey, {
         sn: args.deviceSn, moduleType: 1, operateType: "watthConfig", params,
@@ -843,10 +849,13 @@ export const setEnergyManagement = action({
       if (!result.success) throw new Error(`EcoFlow SET failed: ${result.message}`);
     }
 
-    // AC always on
-    if (args.acAutoOutConfig !== undefined) {
-      const params: Record<string, unknown> = { acAutoOutConfig: args.acAutoOutConfig ? 1 : 0 };
-      if (args.minAcOutSoc !== undefined) params.minAcOutSoc = args.minAcOutSoc;
+    // AC always on — acAutoOutConfig requires both params
+    if (args.acAutoOutConfig !== undefined || args.minAcOutSoc !== undefined) {
+      const currentConfig = await ctx.runQuery(internal.readings.getLatestEnergyConfig, { deviceId: device._id });
+      const params = {
+        acAutoOutConfig: args.acAutoOutConfig !== undefined ? (args.acAutoOutConfig ? 1 : 0) : (currentConfig?.acAutoOutEnabled ? 1 : 0),
+        minAcOutSoc: args.minAcOutSoc ?? currentConfig?.minAcOutSoc ?? 20,
+      };
 
       const result = await setDeviceQuotaRequest(accessKey, secretKey, {
         sn: args.deviceSn, moduleType: 1, operateType: "acAutoOutConfig", params,

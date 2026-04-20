@@ -309,7 +309,7 @@ export const count = query({
 
 /**
  * Get current AC config from the latest reading for a device.
- * Used by setAcConfig/setPortState to include all required acOutCfg params.
+ * Used by setAcConfig/setPortState/setChargingConfig to include all required params.
  */
 export const getLatestAcConfig = internalQuery({
   args: { deviceId: v.id("devices") },
@@ -325,6 +325,31 @@ export const getLatestAcConfig = internalQuery({
       acXboost: latest.acXboost ?? false,
       acOutVoltage: latest.acOutVoltage ?? undefined,
       acOutFrequency: latest.acOutFrequency ?? undefined,
+      acChargingWatts: latest.acChargingWatts ?? undefined,
+    };
+  },
+});
+
+/**
+ * Get current energy management config from the latest reading.
+ * Used by setEnergyManagement to include all required watthConfig/acAutoOutConfig params.
+ */
+export const getLatestEnergyConfig = internalQuery({
+  args: { deviceId: v.id("devices") },
+  handler: async (ctx, args) => {
+    const latest = await ctx.db
+      .query("deviceReadings")
+      .withIndex("by_deviceId_recordedAt", (q) => q.eq("deviceId", args.deviceId))
+      .order("desc")
+      .first();
+    if (!latest) return null;
+    return {
+      energyMgmtEnabled: latest.energyMgmtEnabled ?? false,
+      backupReserveSoc: latest.backupReserveSoc ?? undefined,
+      maxChargeSoc: latest.maxChargeSoc ?? undefined,
+      minDischargeSoc: latest.minDischargeSoc ?? undefined,
+      acAutoOutEnabled: latest.acAutoOutEnabled ?? false,
+      minAcOutSoc: latest.minAcOutSoc ?? undefined,
     };
   },
 });
