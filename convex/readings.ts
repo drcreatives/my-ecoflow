@@ -368,6 +368,9 @@ export const patchLatestReading = internalMutation({
       carChargerEnabled: v.optional(v.boolean()),
       acXboost: v.optional(v.boolean()),
       buzzerSilent: v.optional(v.boolean()),
+      acChargingWatts: v.optional(v.float64()),
+      dcChargingCurrent: v.optional(v.float64()),
+      maxChargeSoc: v.optional(v.float64()),
     }),
   },
   handler: async (ctx, args) => {
@@ -378,12 +381,15 @@ export const patchLatestReading = internalMutation({
       .first();
     if (!latest) return;
 
-    const patch: Record<string, boolean> = {};
+    const patch: Record<string, boolean | number> = {};
     if (args.fields.acEnabled !== undefined) patch.acEnabled = args.fields.acEnabled;
     if (args.fields.dcOutEnabled !== undefined) patch.dcOutEnabled = args.fields.dcOutEnabled;
     if (args.fields.carChargerEnabled !== undefined) patch.carChargerEnabled = args.fields.carChargerEnabled;
     if (args.fields.acXboost !== undefined) patch.acXboost = args.fields.acXboost;
     if (args.fields.buzzerSilent !== undefined) patch.buzzerSilent = args.fields.buzzerSilent;
+    if (args.fields.acChargingWatts !== undefined) patch.acChargingWatts = args.fields.acChargingWatts;
+    if (args.fields.dcChargingCurrent !== undefined) patch.dcChargingCurrent = args.fields.dcChargingCurrent;
+    if (args.fields.maxChargeSoc !== undefined) patch.maxChargeSoc = args.fields.maxChargeSoc;
 
     await ctx.db.patch(latest._id, patch);
   },

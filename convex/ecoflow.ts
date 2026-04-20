@@ -728,6 +728,16 @@ export const setChargingConfig = action({
       if (!result.success) throw new Error(`EcoFlow SET failed: ${result.message}`);
     }
 
+    // Optimistic UI patch
+    const patchFields: Record<string, number> = {};
+    if (args.chgWatts !== undefined) patchFields.acChargingWatts = args.chgWatts;
+    if (args.dcChgCurrent !== undefined) patchFields.dcChargingCurrent = args.dcChgCurrent;
+    if (Object.keys(patchFields).length > 0) {
+      await ctx.runMutation(internal.readings.patchLatestReading, {
+        deviceId: device._id, fields: patchFields,
+      });
+    }
+
     await ctx.scheduler.runAfter(5000, internal.ecoflow.refreshDeviceReading, {
       deviceSn: args.deviceSn, deviceId: device._id,
     });
