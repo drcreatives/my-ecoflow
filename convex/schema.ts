@@ -56,6 +56,7 @@ export default defineSchema({
     acOutVoltage: v.optional(v.float64()),
     acOutFrequency: v.optional(v.float64()),
     acChargingWatts: v.optional(v.float64()),
+    acChargingPaused: v.optional(v.boolean()),
     dcChargingCurrent: v.optional(v.float64()),
     acStandbyMins: v.optional(v.float64()),
     carStandbyMins: v.optional(v.float64()),

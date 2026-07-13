@@ -34,6 +34,9 @@ export interface DeviceReading {
   status?: string | null
   rawData?: Record<string, unknown>
   recordedAt: Date | number
+  acChargingWatts?: number | null
+  acChargingPaused?: boolean | null
+  dcChargingCurrent?: number | null
 }
 
 // ─── Formatting Utilities ─────────────────────────────────────────────────────

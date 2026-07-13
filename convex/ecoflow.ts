@@ -26,7 +26,7 @@ interface APIResponse<T = Record<string, unknown>> {
 
 // ─── EcoFlow API Helpers (ported from src/lib/ecoflow-api.ts) ────────────────
 
-function generateSignature(
+export function generateSignature(
   secretKey: string,
   accessKey: string,
   params: Record<string, string | number>,
@@ -118,7 +118,7 @@ async function getDeviceList(
  * Flatten a nested object into dot-separated key-value pairs for signature generation.
  * E.g. { sn: "X", params: { enabled: 1 } } → { "sn": "X", "params.enabled": "1" }
  */
-function flattenParams(
+export function flattenParams(
   obj: Record<string, unknown>,
   prefix = ""
 ): Record<string, string> {
@@ -236,7 +236,7 @@ function getQuotaValue(
   return isNaN(num) ? null : num;
 }
 
-function transformQuotaToReading(data: Record<string, number | string>) {
+export function transformQuotaToReading(data: Record<string, number | string>) {
   // === INPUT POWER ===
   const acInputWatts = getQuotaValue(data, "inv.inputWatts") || 0;
   const dcInputWatts = getQuotaValue(data, "mppt.inWatts") || 0;
@@ -327,6 +327,7 @@ function transformQuotaToReading(data: Record<string, number | string>) {
     acOutVoltage: getQuotaValue(data, "mppt.cfgAcOutVol") ?? undefined,
     acOutFrequency: getQuotaValue(data, "mppt.cfgAcOutFreq") ?? undefined,
     acChargingWatts: getQuotaValue(data, "mppt.cfgChgWatts") ?? undefined,
+    acChargingPaused: getQuotaValue(data, "mppt.chgPauseFlag") === 1 ? true : getQuotaValue(data, "mppt.chgPauseFlag") === 0 ? false : undefined,
     dcChargingCurrent: getQuotaValue(data, "mppt.dcChgCurrent") ?? undefined,
     acStandbyMins: getQuotaValue(data, "mppt.acStandbyMins") ?? undefined,
     carStandbyMins: getQuotaValue(data, "mppt.carStandbyMin") ?? undefined,
@@ -433,6 +434,7 @@ export const collectAllUserReadings = internalAction({
                 acOutVoltage: reading.acOutVoltage,
                 acOutFrequency: reading.acOutFrequency,
                 acChargingWatts: reading.acChargingWatts,
+                acChargingPaused: reading.acChargingPaused,
                 dcChargingCurrent: reading.dcChargingCurrent,
                 acStandbyMins: reading.acStandbyMins,
                 carStandbyMins: reading.carStandbyMins,
@@ -711,7 +713,7 @@ export const setChargingConfig = action({
       const currentConfig = await ctx.runQuery(internal.readings.getLatestAcConfig, { deviceId: device._id });
       const params = {
         chgWatts: args.chgWatts ?? currentConfig?.acChargingWatts ?? 600,
-        chgPauseFlag: args.chgPauseFlag !== undefined ? (args.chgPauseFlag ? 1 : 0) : 0,
+        chgPauseFlag: args.chgPauseFlag !== undefined ? (args.chgPauseFlag ? 1 : 0) : (currentConfig?.acChargingPaused ? 1 : 0),
       };
 
       const result = await setDeviceQuotaRequest(accessKey, secretKey, {
@@ -729,8 +731,9 @@ export const setChargingConfig = action({
     }
 
     // Optimistic UI patch
-    const patchFields: Record<string, number> = {};
+    const patchFields: Record<string, number | boolean> = {};
     if (args.chgWatts !== undefined) patchFields.acChargingWatts = args.chgWatts;
+    if (args.chgPauseFlag !== undefined) patchFields.acChargingPaused = args.chgPauseFlag;
     if (args.dcChgCurrent !== undefined) patchFields.dcChargingCurrent = args.dcChgCurrent;
     if (Object.keys(patchFields).length > 0) {
       await ctx.runMutation(internal.readings.patchLatestReading, {
@@ -834,9 +837,15 @@ export const setEnergyManagement = action({
 
     const { device, accessKey, secretKey } = await validateDeviceAccess(ctx, userId, args.deviceSn);
 
+    // Fetch energy config once for both watthConfig and acAutoOutConfig blocks
+    const needsEnergyConfig = args.isConfig !== undefined || args.bpPowerSoc !== undefined ||
+      args.acAutoOutConfig !== undefined || args.minAcOutSoc !== undefined;
+    const currentConfig = needsEnergyConfig
+      ? await ctx.runQuery(internal.readings.getLatestEnergyConfig, { deviceId: device._id })
+      : null;
+
     // Energy management config — watthConfig requires all 4 params
     if (args.isConfig !== undefined || args.bpPowerSoc !== undefined) {
-      const currentConfig = await ctx.runQuery(internal.readings.getLatestEnergyConfig, { deviceId: device._id });
       const params = {
         isConfig: args.isConfig !== undefined ? (args.isConfig ? 1 : 0) : (currentConfig?.energyMgmtEnabled ? 1 : 0),
         bpPowerSoc: args.bpPowerSoc ?? currentConfig?.backupReserveSoc ?? 50,
@@ -861,7 +870,6 @@ export const setEnergyManagement = action({
 
     // AC always on — acAutoOutConfig requires both params
     if (args.acAutoOutConfig !== undefined || args.minAcOutSoc !== undefined) {
-      const currentConfig = await ctx.runQuery(internal.readings.getLatestEnergyConfig, { deviceId: device._id });
       const params = {
         acAutoOutConfig: args.acAutoOutConfig !== undefined ? (args.acAutoOutConfig ? 1 : 0) : (currentConfig?.acAutoOutEnabled ? 1 : 0),
         minAcOutSoc: args.minAcOutSoc ?? currentConfig?.minAcOutSoc ?? 20,
@@ -1065,6 +1073,7 @@ export const refreshDeviceReading = internalAction({
         acOutVoltage: reading.acOutVoltage,
         acOutFrequency: reading.acOutFrequency,
         acChargingWatts: reading.acChargingWatts,
+        acChargingPaused: reading.acChargingPaused,
         dcChargingCurrent: reading.dcChargingCurrent,
         acStandbyMins: reading.acStandbyMins,
         carStandbyMins: reading.carStandbyMins,
@@ -1185,6 +1194,7 @@ export const refreshReadings = action({
             acOutVoltage: reading.acOutVoltage,
             acOutFrequency: reading.acOutFrequency,
             acChargingWatts: reading.acChargingWatts,
+            acChargingPaused: reading.acChargingPaused,
             dcChargingCurrent: reading.dcChargingCurrent,
             acStandbyMins: reading.acStandbyMins,
             carStandbyMins: reading.carStandbyMins,
