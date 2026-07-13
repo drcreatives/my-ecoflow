@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, use } from 'react';
+import { useState, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useConvexDevices, useConvexDeviceMutations, useConvexDeviceControl, useConvexSchedules } from '@/hooks/useConvexData';
 import Link from 'next/link';
@@ -56,6 +56,28 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
     action: 'acOn' as string,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
+  // DC charging current slider state
+  const [dcSliderValue, setDcSliderValue] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const dcCurrentDisplay = dcSliderValue ?? reading?.dcChargingCurrent ?? 8000;
+
+  const handleDcSliderCommit = useCallback(async (val: number) => {
+    if (!device) {
+      toast.error('Device is not available yet');
+      setDcSliderValue(null);
+      return;
+    }
+
+    try {
+      await deviceControl.setChargingConfig({ deviceSn: device.deviceSn, dcChgCurrent: val });
+      toast.success(`DC input current set to ${val / 1000}A`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed');
+    }
+    setDcSliderValue(null);
+  }, [deviceControl, device]);
+
   const [formData, setFormData] = useState({
     deviceName: '',
     notifications: true,
@@ -558,7 +580,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                   {/* Charging Configuration */}
                   <div>
                     <h3 className="text-sm font-medium text-text-muted mb-3">Charging</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div className="p-3 bg-surface-2/50 rounded-inner">
                         <label className="block text-sm font-medium text-text-primary mb-1">
                           AC Charging Watts
@@ -610,6 +632,55 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                               }
                             }}
                           />
+                        </div>
+                      </div>
+                      <div className="p-3 bg-surface-2/50 rounded-inner">
+                        <label className="block text-sm font-medium text-text-primary mb-1">
+                          Car / Solar Input
+                        </label>
+                        <p className="text-xs text-text-muted mb-2">Max DC input current (XT60)</p>
+                        <div className="relative flex items-center gap-3 px-3 py-2 bg-surface-2 border border-stroke-subtle rounded-inner">
+                          <span className="text-xs text-text-muted">4A</span>
+                          <div className="relative flex-1">
+                            {isDragging && (
+                              <div
+                                className="absolute -top-10 px-2 py-1 bg-brand-primary text-white text-xs font-bold rounded-md shadow-lg pointer-events-none whitespace-nowrap"
+                                style={{
+                                  left: `${((dcCurrentDisplay - 4000) / 6000) * 100}%`,
+                                  transform: 'translateX(-50%)',
+                                }}
+                              >
+                                {dcCurrentDisplay / 1000}A
+                                <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-brand-primary" />
+                              </div>
+                            )}
+                            <input
+                              type="range"
+                              min={4000}
+                              max={10000}
+                              step={1000}
+                              value={dcCurrentDisplay}
+                              disabled={deviceControl.isLoading || !device.online}
+                              onMouseDown={() => setIsDragging(true)}
+                              onTouchStart={() => setIsDragging(true)}
+                              onChange={(e) => {
+                                setDcSliderValue(parseInt(e.target.value));
+                              }}
+                              onMouseUp={(e) => {
+                                setIsDragging(false);
+                                handleDcSliderCommit(parseInt((e.target as HTMLInputElement).value));
+                              }}
+                              onTouchEnd={(e) => {
+                                setIsDragging(false);
+                                handleDcSliderCommit(parseInt((e.target as HTMLInputElement).value));
+                              }}
+                              className="w-full h-2 accent-brand-primary disabled:opacity-50 cursor-pointer"
+                            />
+                          </div>
+                          <span className="text-xs text-text-muted">10A</span>
+                          <span className="text-sm font-medium text-brand-primary min-w-[3ch] text-right">
+                            {(dcCurrentDisplay / 1000)}A
+                          </span>
                         </div>
                       </div>
                     </div>

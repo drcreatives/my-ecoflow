@@ -1,4 +1,4 @@
-import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
+import { query, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { auth } from "./auth";
 import { Id } from "./_generated/dataModel";
@@ -56,6 +56,7 @@ export const latest = query({
               acOutVoltage: reading.acOutVoltage ?? null,
               acOutFrequency: reading.acOutFrequency ?? null,
               acChargingWatts: reading.acChargingWatts ?? null,
+              acChargingPaused: reading.acChargingPaused ?? null,
               dcChargingCurrent: reading.dcChargingCurrent ?? null,
               acStandbyMins: reading.acStandbyMins ?? null,
               carStandbyMins: reading.carStandbyMins ?? null,
@@ -121,6 +122,7 @@ export const latestForDevice = query({
           acOutVoltage: reading.acOutVoltage ?? null,
           acOutFrequency: reading.acOutFrequency ?? null,
           acChargingWatts: reading.acChargingWatts ?? null,
+          acChargingPaused: reading.acChargingPaused ?? null,
           dcChargingCurrent: reading.dcChargingCurrent ?? null,
           acStandbyMins: reading.acStandbyMins ?? null,
           carStandbyMins: reading.carStandbyMins ?? null,
@@ -309,7 +311,7 @@ export const count = query({
 
 /**
  * Get current AC config from the latest reading for a device.
- * Used by setAcConfig/setPortState to include all required acOutCfg params.
+ * Used by setAcConfig/setPortState/setChargingConfig to include all required params.
  */
 export const getLatestAcConfig = internalQuery({
   args: { deviceId: v.id("devices") },
@@ -325,6 +327,32 @@ export const getLatestAcConfig = internalQuery({
       acXboost: latest.acXboost ?? false,
       acOutVoltage: latest.acOutVoltage ?? undefined,
       acOutFrequency: latest.acOutFrequency ?? undefined,
+      acChargingWatts: latest.acChargingWatts ?? undefined,
+      acChargingPaused: latest.acChargingPaused ?? false,
+    };
+  },
+});
+
+/**
+ * Get current energy management config from the latest reading.
+ * Used by setEnergyManagement to include all required watthConfig/acAutoOutConfig params.
+ */
+export const getLatestEnergyConfig = internalQuery({
+  args: { deviceId: v.id("devices") },
+  handler: async (ctx, args) => {
+    const latest = await ctx.db
+      .query("deviceReadings")
+      .withIndex("by_deviceId_recordedAt", (q) => q.eq("deviceId", args.deviceId))
+      .order("desc")
+      .first();
+    if (!latest) return null;
+    return {
+      energyMgmtEnabled: latest.energyMgmtEnabled ?? false,
+      backupReserveSoc: latest.backupReserveSoc ?? undefined,
+      maxChargeSoc: latest.maxChargeSoc ?? undefined,
+      minDischargeSoc: latest.minDischargeSoc ?? undefined,
+      acAutoOutEnabled: latest.acAutoOutEnabled ?? false,
+      minAcOutSoc: latest.minAcOutSoc ?? undefined,
     };
   },
 });
@@ -343,6 +371,10 @@ export const patchLatestReading = internalMutation({
       carChargerEnabled: v.optional(v.boolean()),
       acXboost: v.optional(v.boolean()),
       buzzerSilent: v.optional(v.boolean()),
+      acChargingWatts: v.optional(v.float64()),
+      acChargingPaused: v.optional(v.boolean()),
+      dcChargingCurrent: v.optional(v.float64()),
+      maxChargeSoc: v.optional(v.float64()),
     }),
   },
   handler: async (ctx, args) => {
@@ -353,12 +385,16 @@ export const patchLatestReading = internalMutation({
       .first();
     if (!latest) return;
 
-    const patch: Record<string, boolean> = {};
+    const patch: Record<string, boolean | number> = {};
     if (args.fields.acEnabled !== undefined) patch.acEnabled = args.fields.acEnabled;
     if (args.fields.dcOutEnabled !== undefined) patch.dcOutEnabled = args.fields.dcOutEnabled;
     if (args.fields.carChargerEnabled !== undefined) patch.carChargerEnabled = args.fields.carChargerEnabled;
     if (args.fields.acXboost !== undefined) patch.acXboost = args.fields.acXboost;
     if (args.fields.buzzerSilent !== undefined) patch.buzzerSilent = args.fields.buzzerSilent;
+    if (args.fields.acChargingWatts !== undefined) patch.acChargingWatts = args.fields.acChargingWatts;
+    if (args.fields.acChargingPaused !== undefined) patch.acChargingPaused = args.fields.acChargingPaused;
+    if (args.fields.dcChargingCurrent !== undefined) patch.dcChargingCurrent = args.fields.dcChargingCurrent;
+    if (args.fields.maxChargeSoc !== undefined) patch.maxChargeSoc = args.fields.maxChargeSoc;
 
     await ctx.db.patch(latest._id, patch);
   },
@@ -392,6 +428,7 @@ export const insertReading = internalMutation({
     acOutVoltage: v.optional(v.float64()),
     acOutFrequency: v.optional(v.float64()),
     acChargingWatts: v.optional(v.float64()),
+    acChargingPaused: v.optional(v.boolean()),
     dcChargingCurrent: v.optional(v.float64()),
     acStandbyMins: v.optional(v.float64()),
     carStandbyMins: v.optional(v.float64()),
@@ -433,6 +470,7 @@ export const insertReading = internalMutation({
       acOutVoltage: args.acOutVoltage,
       acOutFrequency: args.acOutFrequency,
       acChargingWatts: args.acChargingWatts,
+      acChargingPaused: args.acChargingPaused,
       dcChargingCurrent: args.dcChargingCurrent,
       acStandbyMins: args.acStandbyMins,
       carStandbyMins: args.carStandbyMins,
