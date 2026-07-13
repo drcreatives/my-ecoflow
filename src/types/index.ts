@@ -43,6 +43,7 @@ export interface DeviceReading {
   acOutVoltage?: number
   acOutFrequency?: number
   acChargingWatts?: number
+  acChargingPaused?: boolean
   dcChargingCurrent?: number
   acStandbyMins?: number
   carStandbyMins?: number
