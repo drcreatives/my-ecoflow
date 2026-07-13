@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import localFont from 'next/font/local'
 import { Toaster } from 'sonner'
 import { ConvexClientProvider } from '@/components/ConvexClientProvider'
@@ -25,15 +25,16 @@ export const metadata: Metadata = {
   description: 'Monitor and manage your EcoFlow Delta 2 power station',
   keywords: ['EcoFlow', 'Delta 2', 'Power Station', 'Battery Monitor', 'Energy Management'],
   authors: [{ name: 'EcoFlow Dashboard' }],
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-    viewportFit: 'cover'
-  },
-  themeColor: '#44af21',
   manifest: '/manifest.json',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+  themeColor: '#44af21',
 }
 
 export default function RootLayout({
