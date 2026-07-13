@@ -3,6 +3,11 @@ import { v } from "convex/values";
 import { auth } from "./auth";
 import { Id } from "./_generated/dataModel";
 
+// deviceReadings can contain a legacy raw EcoFlow payload, so reading thousands
+// of documents in one query can exceed Convex's transaction read limits before
+// the documents are mapped to the much smaller client-facing history shape.
+const MAX_HISTORY_DOCUMENTS = 500;
+
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 /**
@@ -162,6 +167,12 @@ export const history = query({
     // are inserted in the future. This is the #1 bandwidth optimization.
     const effectiveEndTime = Math.min(args.endTime, Date.now());
 
+    // An inverted custom range produces contradictory index bounds. Treat it
+    // as an empty range instead of allowing the database query to fail.
+    if (args.startTime >= effectiveEndTime) {
+      return { readings: [], summary: null };
+    }
+
     // Get user's devices to scope the query
     const userDevices = await ctx.db
       .query("devices")
@@ -178,21 +189,26 @@ export const history = query({
       if (!owned) return { readings: [], summary: null };
     }
 
-    // Adaptive row cap: derive from the requested time span and expected
-    // collection interval (~5 min) so long ranges (7d/30d) don't silently
-    // drop older readings, while still capping bandwidth.
+    const collectionSettings = await ctx.db
+      .query("dataRetentionSettings")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .first();
+    const collectionIntervalMinutes = Math.max(
+      1,
+      collectionSettings?.collectionIntervalMinutes ?? 5
+    );
+
     const agg = args.aggregation ?? "raw";
-    let rowCap: number;
-    if (agg === "raw") {
-      rowCap = 4000;
-    } else {
-      const durationMs = effectiveEndTime - args.startTime;
-      const approxIntervalMs = 5 * 60 * 1000; // 5 minutes
-      const estimatedRows =
-        durationMs > 0 ? Math.ceil(durationMs / approxIntervalMs) : 0;
-      // Clamp between 2000 (min for aggregates) and 4000 (previous global cap)
-      rowCap = Math.min(4000, Math.max(2000, estimatedRows));
-    }
+    const rowCap = getHistoryRowCap(
+      args.startTime,
+      effectiveEndTime,
+      collectionIntervalMinutes
+    );
+    const sampleWindows = getHistorySampleWindows(
+      args.startTime,
+      effectiveEndTime,
+      collectionIntervalMinutes
+    );
 
     const allReadings: Array<{
       deviceId: Id<"devices">;
@@ -220,22 +236,37 @@ export const history = query({
       const device = deviceMap.get(devId);
       if (!device) continue;
 
-      // Fetch DESC so we always keep the NEWEST readings for large ranges,
-      // then reverse to chronological order for aggregation/charts.
-      // Row cap is adaptive based on aggregation level.
-      const rawReadings = await ctx.db
-        .query("deviceReadings")
-        .withIndex("by_deviceId_recordedAt", (q) =>
-          q
-            .eq("deviceId", devId)
-            .gte("recordedAt", args.startTime)
-            .lte("recordedAt", effectiveEndTime)
-        )
-        .order("desc")
-        .take(rowCap);
-
-      // Reverse to chronological order (oldest → newest)
-      const readings = rawReadings.reverse();
+      const readings = sampleWindows
+        ? (
+            await Promise.all(
+              sampleWindows.map((window, index) =>
+                ctx.db
+                  .query("deviceReadings")
+                  .withIndex("by_deviceId_recordedAt", (q) => {
+                    const range = q
+                      .eq("deviceId", devId)
+                      .gte("recordedAt", window.startTime);
+                    return index === sampleWindows.length - 1
+                      ? range.lte("recordedAt", window.endTime)
+                      : range.lt("recordedAt", window.endTime);
+                  })
+                  .order("desc")
+                  .first()
+              )
+            )
+          ).filter((reading) => reading !== null)
+        : (
+            await ctx.db
+              .query("deviceReadings")
+              .withIndex("by_deviceId_recordedAt", (q) =>
+                q
+                  .eq("deviceId", devId)
+                  .gte("recordedAt", args.startTime)
+                  .lte("recordedAt", effectiveEndTime)
+              )
+              .order("desc")
+              .take(rowCap)
+          ).reverse();
 
       for (const r of readings) {
         allReadings.push({
@@ -460,7 +491,6 @@ export const insertReading = internalMutation({
       remainingTime: args.remainingTime,
       temperature: args.temperature,
       status: args.status,
-      rawData: args.rawData,
       recordedAt: args.recordedAt,
       // Config state
       acEnabled: args.acEnabled,
@@ -507,6 +537,42 @@ export const getLatestTimestamp = internalQuery({
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+export function getHistoryRowCap(
+  startTime: number,
+  endTime: number,
+  collectionIntervalMinutes: number
+): number {
+  const durationMs = endTime - startTime;
+  if (durationMs <= 0) return 0;
+
+  const expectedIntervalMs = Math.max(1, collectionIntervalMinutes) * 60 * 1000;
+  const estimatedRows = Math.ceil(durationMs / expectedIntervalMs);
+
+  return Math.min(MAX_HISTORY_DOCUMENTS, Math.max(1, estimatedRows));
+}
+
+export function getHistorySampleWindows(
+  startTime: number,
+  endTime: number,
+  collectionIntervalMinutes: number
+): Array<{ startTime: number; endTime: number }> | null {
+  const durationMs = endTime - startTime;
+  if (durationMs <= 0) return null;
+
+  const expectedIntervalMs = Math.max(1, collectionIntervalMinutes) * 60 * 1000;
+  const estimatedRows = Math.ceil(durationMs / expectedIntervalMs);
+  if (estimatedRows <= MAX_HISTORY_DOCUMENTS) return null;
+
+  const windowMs = durationMs / MAX_HISTORY_DOCUMENTS;
+  return Array.from({ length: MAX_HISTORY_DOCUMENTS }, (_, index) => ({
+    startTime: startTime + index * windowMs,
+    endTime:
+      index === MAX_HISTORY_DOCUMENTS - 1
+        ? endTime
+        : startTime + (index + 1) * windowMs,
+  }));
+}
 
 interface ReadingRow {
   batteryLevel: number | null;

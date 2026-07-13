@@ -104,7 +104,7 @@ The collection cron is only a tick: each user's `collectionIntervalMinutes` dete
 - New readings are pushed through Convex reactivity; there is no normal client polling loop.
 - `useOnDemandRefresh` refreshes on focus, visibility, and navigation, with a two-minute client cooldown. The server independently skips fresh devices using the same approximate staleness threshold.
 - Device detail/settings routes refresh only that device; other routes may refresh all owned devices.
-- `readings.history` caps future end times to now, uses the compound index, limits rows adaptively, reads newest records first, reverses to chronological order, then aggregates.
+- `readings.history` caps future end times to now, rejects empty/inverted ranges, and uses the compound index. Ranges within the 500-document safety bound read normally; larger ranges fetch one evenly distributed indexed sample per window before aggregation so the entire interval remains represented. The bound protects Convex query limits because retained legacy readings may include large raw EcoFlow payloads; new inserts omit that unused payload.
 
 ### EcoFlow integration
 
@@ -163,7 +163,7 @@ Recent committed work leading into this state added full device control/schedule
 12. `migrations.runMigration` remains public for the legacy script, although it is now guarded by `MIGRATION_SECRET`. Prefer internalizing or deleting the migration surface once it is no longer needed.
 13. `npm audit` reports two moderate PostCSS advisories nested under Next.js. The remaining automatic remedy proposes a breaking/invalid Next downgrade, so it was not forced; reassess during the next framework upgrade.
 
-Current quality baseline at this update: `npm run type-check` passes; all 16 tests pass; `npm run lint` has a ceiling of 48 existing warnings and zero errors. The warnings are chiefly legacy `any`, unused imports/variables, the anonymous auth-config export, and two generated JavaScript eslint directives. Reduce the ceiling whenever warnings are repaired; the target is zero.
+Current quality baseline at this update: `npm run type-check` passes; all 22 tests pass; `npm run lint` has a ceiling of 48 existing warnings and zero errors. The warnings are chiefly legacy `any`, unused imports/variables, the anonymous auth-config export, and two generated JavaScript eslint directives. Reduce the ceiling whenever warnings are repaired; the target is zero.
 
 Committed Husky hooks are installed through `npm install`/`prepare`: pre-commit runs lint-staged and pre-push runs lint, type-check, all Vitest projects, and a production build. Git's `--no-verify` escape hatch must be exceptional and disclosed.
 

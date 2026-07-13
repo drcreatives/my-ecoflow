@@ -46,6 +46,8 @@ export default defineSchema({
     remainingTime: v.optional(v.float64()),
     temperature: v.optional(v.float64()),
     status: v.optional(v.string()),
+    // Legacy imports/readings may contain the full EcoFlow quota payload.
+    // New inserts omit it because history queries only use extracted fields.
     rawData: v.optional(v.any()),
     recordedAt: v.float64(), // epoch ms
     // ─── Config state (extracted from quota) ─────────────────────────────────
