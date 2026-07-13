@@ -6,13 +6,26 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings 48",
+    "lint:staged": "lint-staged",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:backend": "vitest run --project backend",
     "test:frontend": "vitest run --project frontend",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "verify:commit": "lint-staged",
+    "verify:push": "npm run lint && npm run type-check && npm run test && npm run build",
+    "verify": "npm run verify:push",
+    "verify:full": "npm run verify:push && npm run test:e2e",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs}": "eslint",
+    "*.{json,md,css}": "git diff --check --"
+  },
+  "overrides": {
+    "picomatch@2.3.1": "2.3.2"
   },
   "dependencies": {
     "@auth/core": "^0.37.0",
@@ -27,7 +40,7 @@
     "framer-motion": "^12.23.16",
     "gsap": "^3.13.0",
     "lucide-react": "^0.544.0",
-    "next": "15.5.12",
+    "next": "^15.5.20",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "recharts": "^3.2.1",
@@ -50,8 +63,10 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9",
-    "eslint-config-next": "15.5.3",
+    "eslint-config-next": "^15.5.20",
+    "husky": "^9.1.7",
     "jsdom": "^29.0.2",
+    "lint-staged": "^17.0.8",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.4"
