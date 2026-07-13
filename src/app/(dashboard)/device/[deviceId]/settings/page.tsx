@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, use } from 'react';
+import { useState, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useConvexDevices, useConvexDeviceMutations, useConvexDeviceControl, useConvexSchedules } from '@/hooks/useConvexData';
 import Link from 'next/link';
@@ -59,19 +59,24 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
   // DC charging current slider state
   const [dcSliderValue, setDcSliderValue] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const sliderRef = useRef<HTMLInputElement>(null);
 
   const dcCurrentDisplay = dcSliderValue ?? reading?.dcChargingCurrent ?? 8000;
 
   const handleDcSliderCommit = useCallback(async (val: number) => {
+    if (!device) {
+      toast.error('Device is not available yet');
+      setDcSliderValue(null);
+      return;
+    }
+
     try {
-      await deviceControl.setChargingConfig({ deviceSn: device?.deviceSn ?? '', dcChgCurrent: val });
+      await deviceControl.setChargingConfig({ deviceSn: device.deviceSn, dcChgCurrent: val });
       toast.success(`DC input current set to ${val / 1000}A`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed');
     }
     setDcSliderValue(null);
-  }, [deviceControl, device?.deviceSn]);
+  }, [deviceControl, device]);
 
   const [formData, setFormData] = useState({
     deviceName: '',
@@ -650,7 +655,6 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                               </div>
                             )}
                             <input
-                              ref={sliderRef}
                               type="range"
                               min={4000}
                               max={10000}
