@@ -26,7 +26,7 @@ All data fetching, mutations, and background jobs run on Convex. No Next.js API 
 
 | File | Purpose |
 |---|---|
-| `schema.ts` | 11 tables + authTables (users, devices, deviceReadings, deviceSettings, dailySummaries, alerts, dataRetentionSettings, notificationSettings, notificationLogs, sessionSettings, passwordChangeLog) |
+| `schema.ts` | 12 application tables + authTables (including device schedules) |
 | `auth.ts` / `auth.config.ts` | `@convex-dev/auth` with Password provider |
 | `http.ts` | HTTP router for auth endpoints |
 | `users.ts` | Profile queries/mutations |
@@ -38,7 +38,7 @@ All data fetching, mutations, and background jobs run on Convex. No Next.js API 
 | `email.ts` | Resend email sending (internal actions) |
 | `email_log.ts` | Email log queries |
 | `admin.ts` | Data cleanup mutation |
-| `crons.ts` | 4 scheduled jobs: collect-readings (1min), device-monitor (15min), data-cleanup (24h), backup-check (1h) |
+| `crons.ts` | 5 scheduled jobs: collect-readings (1min), device-monitor (15min), data-cleanup (24h), backup-check (1h), process-schedules (1min) |
 | `migrations.ts` | One-time Supabase→Convex data migration |
 
 ### Frontend (`src/`)
@@ -163,9 +163,11 @@ const isNetDischarging = hasPdRemainSign ? pdRemain < 0 : netPower < -10;
 ## Development
 
 ```bash
-# Application should already be running — do NOT start another dev server
+# Reuse an existing development server when one is already running
 npm run lint              # ESLint
 npm run type-check        # TypeScript
+npm run test              # Backend + frontend Vitest projects
+npm run verify            # Pre-push gate: lint, types, tests, build
 npm run build             # Production build
 
 # Convex
@@ -177,8 +179,8 @@ npx convex deploy         # Deploy to production
 
 ```bash
 # Convex (auto-configured)
-CONVEX_DEPLOYMENT=dev:acrobatic-swordfish-996
-NEXT_PUBLIC_CONVEX_URL=https://acrobatic-swordfish-996.convex.cloud
+CONVEX_DEPLOYMENT=dev:<your-deployment>
+NEXT_PUBLIC_CONVEX_URL=https://<your-deployment>.convex.cloud
 
 # EcoFlow API
 ECOFLOW_ACCESS_KEY=...
@@ -186,6 +188,9 @@ ECOFLOW_SECRET_KEY=...
 
 # Email (Resend)
 RESEND_API_KEY=...
+CONVEX_SITE_URL=https://<your-deployment>.convex.site
+DISABLE_CRONS=true # optional for development
+MIGRATION_SECRET=... # temporary, legacy migration only
 
 # Set in Convex Dashboard (not .env.local):
 # ECOFLOW_ACCESS_KEY, ECOFLOW_SECRET_KEY, RESEND_API_KEY
