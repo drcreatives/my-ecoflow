@@ -338,6 +338,15 @@ export const createDefaultSettings = internalMutation({
 
 // ─── Orchestrating action ────────────────────────────────────────────────────
 
+export function assertMigrationAuthorized(
+  configuredSecret: string | undefined,
+  providedSecret: string
+) {
+  if (!configuredSecret || providedSecret !== configuredSecret) {
+    throw new Error("Migration is not authorized");
+  }
+}
+
 /**
  * Main migration action. Call from the Convex dashboard or CLI.
  *
@@ -351,6 +360,7 @@ export const createDefaultSettings = internalMutation({
  */
 export const runMigration = action({
   args: {
+    migrationSecret: v.string(),
     userId: v.id("users"),
     data: v.object({
       devices: v.array(supabaseDeviceValidator),
@@ -361,6 +371,8 @@ export const runMigration = action({
     }),
   },
   handler: async (ctx, args) => {
+    assertMigrationAuthorized(process.env.MIGRATION_SECRET, args.migrationSecret);
+
     const results: Record<string, unknown> = {};
 
     // Step 1: Import devices and get ID mapping

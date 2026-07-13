@@ -18,13 +18,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
-const CONVEX_URL = "https://acrobatic-swordfish-996.convex.cloud";
+const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
+const MIGRATION_SECRET = process.env.MIGRATION_SECRET;
 const EXPORT_FILE = path.join(__dirname, "supabase-export.json");
 const READING_BATCH_SIZE = 50; // Keep batches small to stay under Convex argument limits
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
+  if (!CONVEX_URL || !MIGRATION_SECRET) {
+    console.error(
+      "NEXT_PUBLIC_CONVEX_URL and MIGRATION_SECRET must be set before migration"
+    );
+    process.exit(1);
+  }
+
   const userId = process.argv[2];
   if (!userId) {
     console.error("Usage: node scripts/run-migration.mjs <convex-user-id>");
@@ -54,6 +62,7 @@ async function main() {
   // Step 1: Import devices (small payload — call runMigration with only devices)
   console.log(`📦 Step 1: Importing ${data.devices.length} devices...`);
   const devicesResult = await client.action("migrations:runMigration", {
+    migrationSecret: MIGRATION_SECRET,
     userId,
     data: {
       devices: data.devices,
@@ -89,6 +98,7 @@ async function main() {
 
       try {
         const result = await client.action("migrations:runMigration", {
+          migrationSecret: MIGRATION_SECRET,
           userId,
           data: {
             devices: data.devices, // Always include for ID mapping (idempotent)
@@ -105,6 +115,7 @@ async function main() {
           const smallBatch = batch.slice(j, j + smallBatchSize);
           try {
             await client.action("migrations:runMigration", {
+              migrationSecret: MIGRATION_SECRET,
               userId,
               data: {
                 devices: data.devices,
@@ -125,6 +136,7 @@ async function main() {
   if ((data.settings?.length > 0) || (data.dailySummaries?.length > 0) || (data.alerts?.length > 0)) {
     console.log(`\n📦 Step 3: Importing settings/summaries/alerts...`);
     const extraResult = await client.action("migrations:runMigration", {
+      migrationSecret: MIGRATION_SECRET,
       userId,
       data: {
         devices: data.devices,
