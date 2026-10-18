@@ -335,15 +335,22 @@ export function useConvexSettings() {
   const dataRetention = useQuery(api.settings.getDataRetention);
   const notifications = useQuery(api.settings.getNotifications);
   const session = useQuery(api.settings.getSession);
+  const googleDriveStatus = useQuery(api.googleDrive_queries.status);
 
   const updateDataRetention = useMutation(api.settings.updateDataRetention);
   const updateNotifications = useMutation(api.settings.updateNotifications);
   const updateSession = useMutation(api.settings.updateSession);
+  const sendMyTestEmail = useAction(api.email.sendMyTestEmail);
+  const startGoogleDriveConnection = useAction(api.googleDrive.startConnection);
+  const finishGoogleDriveConnection = useAction(api.googleDrive.finishConnection);
+  const disconnectGoogleDrive = useMutation(api.googleDrive_queries.disconnect);
 
   return {
     dataRetention: dataRetention ?? null,
     notifications: notifications ?? null,
     session: session ?? null,
+    googleDriveStatus: googleDriveStatus ?? null,
+    googleDriveLoading: googleDriveStatus === undefined,
     isLoading:
       dataRetention === undefined ||
       notifications === undefined ||
@@ -351,6 +358,10 @@ export function useConvexSettings() {
     updateDataRetention,
     updateNotifications,
     updateSession,
+    sendTestEmail: useCallback(() => sendMyTestEmail({}), [sendMyTestEmail]),
+    startGoogleDriveConnection,
+    finishGoogleDriveConnection,
+    disconnectGoogleDrive: useCallback(() => disconnectGoogleDrive({}), [disconnectGoogleDrive]),
   };
 }
 
