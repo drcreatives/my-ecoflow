@@ -15,12 +15,19 @@ const DATA_RETENTION_DEFAULTS = {
   retentionPeriodDays: 90,
   autoCleanupEnabled: true,
   backupEnabled: false,
+  backupDestination: "email" as const,
   backupIntervalHours: 24,
   collectionIntervalMinutes: 5,
 };
 
 export const getDataRetention = query({
   args: {},
+  returns: v.union(v.null(), v.object({
+    retentionPeriodDays: v.float64(), autoCleanupEnabled: v.boolean(), backupEnabled: v.boolean(),
+    backupDestination: v.union(v.literal("email"), v.literal("googleDrive")),
+    backupIntervalHours: v.float64(), collectionIntervalMinutes: v.float64(),
+    lastBackupAt: v.optional(v.union(v.float64(), v.null())), userId: v.optional(v.id("users")),
+  })),
   handler: async (ctx) => {
     const userId = await auth.getUserId(ctx);
     if (!userId) return null;
@@ -38,6 +45,7 @@ export const getDataRetention = query({
       retentionPeriodDays: settings.retentionPeriodDays,
       autoCleanupEnabled: settings.autoCleanupEnabled,
       backupEnabled: settings.backupEnabled,
+      backupDestination: settings.backupDestination ?? "email",
       backupIntervalHours: settings.backupIntervalHours ?? DATA_RETENTION_DEFAULTS.backupIntervalHours,
       collectionIntervalMinutes: settings.collectionIntervalMinutes,
       lastBackupAt: settings.lastBackupAt ?? null,
@@ -50,17 +58,43 @@ export const updateDataRetention = mutation({
     retentionPeriodDays: v.optional(v.float64()),
     autoCleanupEnabled: v.optional(v.boolean()),
     backupEnabled: v.optional(v.boolean()),
+    backupDestination: v.optional(v.union(v.literal("email"), v.literal("googleDrive"))),
     backupIntervalHours: v.optional(v.float64()),
     collectionIntervalMinutes: v.optional(v.float64()),
   },
+  returns: v.object({ success: v.literal(true) }),
   handler: async (ctx, args) => {
     const userId = await auth.getUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
+
+    if (
+      args.retentionPeriodDays !== undefined &&
+      (!Number.isInteger(args.retentionPeriodDays) ||
+        args.retentionPeriodDays < 1 ||
+        args.retentionPeriodDays > 730)
+    ) {
+      throw new Error("Retention period must be a whole number between 1 and 730 days");
+    }
+    if (args.collectionIntervalMinutes !== undefined &&
+        (!Number.isInteger(args.collectionIntervalMinutes) || args.collectionIntervalMinutes < 1 || args.collectionIntervalMinutes > 1440)) {
+      throw new Error("Collection interval must be a whole number between 1 and 1440 minutes");
+    }
+    if (args.backupIntervalHours !== undefined && ![24, 168, 336, 720].includes(args.backupIntervalHours)) {
+      throw new Error("Backup interval must be daily, weekly, every two weeks, or monthly");
+    }
 
     const existing = await ctx.db
       .query("dataRetentionSettings")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .first();
+
+    if (args.backupDestination === "googleDrive") {
+      const connection = await ctx.db.query("googleDriveConnections")
+        .withIndex("by_userId", (q) => q.eq("userId", userId)).first();
+      if (!connection?.encryptedRefreshToken || connection.reconnectRequired) {
+        throw new Error("Connect Google Drive before selecting it for automatic backups");
+      }
+    }
 
     const values = {
       retentionPeriodDays:
@@ -75,6 +109,7 @@ export const updateDataRetention = mutation({
         args.backupEnabled ??
         existing?.backupEnabled ??
         DATA_RETENTION_DEFAULTS.backupEnabled,
+      backupDestination: args.backupDestination ?? existing?.backupDestination ?? "email",
       backupIntervalHours:
         args.backupIntervalHours ??
         existing?.backupIntervalHours ??
@@ -86,12 +121,20 @@ export const updateDataRetention = mutation({
     };
 
     if (existing) {
-      await ctx.db.patch(existing._id, values);
+      const cancelBackup = args.backupEnabled === false || values.backupDestination !== (existing.backupDestination ?? "email");
+      if (cancelBackup) {
+        if (existing.backupRun?.preparedStorageId) await ctx.storage.delete(existing.backupRun.preparedStorageId);
+        if (existing.backupRun?.driveManifestStorageId) await ctx.storage.delete(existing.backupRun.driveManifestStorageId);
+      }
+      await ctx.db.patch(existing._id, {
+        ...values,
+        ...(cancelBackup ? { backupRun: undefined } : {}),
+      });
     } else {
       await ctx.db.insert("dataRetentionSettings", { userId, ...values });
     }
 
-    return { success: true };
+    return { success: true as const };
   },
 });
 
