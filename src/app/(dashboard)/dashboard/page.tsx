@@ -121,7 +121,7 @@ export default function DashboardPage() {
             {stats.map((stat, index) => (
               <StatCard key={index} stat={stat} />
             ))}
-            <CollectionStatusControl autoCollect={true} />
+            <CollectionStatusControl />
           </div>
         </div>
 

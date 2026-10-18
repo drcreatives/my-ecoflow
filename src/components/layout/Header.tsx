@@ -15,6 +15,7 @@ import { useIsMobile } from '@/hooks/useBreakpoint'
 import LogoutButton from '@/components/LogoutButton'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
+import { useConvexConnectionState } from 'convex/react'
 
 interface HeaderProps {
   title?: string
@@ -27,13 +28,15 @@ export const Header = ({ title, onRefresh, isRefreshing }: HeaderProps) => {
   const { notifications, toggleSidebar } = useUIStore()
   const { devices } = useConvexDevices()
   const isMobile = useIsMobile()
+  const connection = useConvexConnectionState()
 
   const unreadNotifications = notifications.filter(n => !n.isRead).length
   const activeDevices = devices.filter(d => d.isActive).length
   const totalDevices = devices.length
 
-  // Mock connection status for now
-  const isOnline = true
+  const isOnline = connection.isWebSocketConnected
+  const staleReadings = devices.filter(d => d.isActive && d.readingFreshness === 'stale').length
+  const connectionLabel = isOnline ? 'App connected' : connection.hasEverConnected ? 'App reconnecting' : 'App connecting'
 
   return (
     <header className="h-14 bg-surface-1 border-b border-stroke-subtle px-4 sm:px-6 flex items-center sticky top-0 z-50">
@@ -73,11 +76,16 @@ export const Header = ({ title, onRefresh, isRefreshing }: HeaderProps) => {
               <span className="text-sm text-text-secondary">
                 {activeDevices}/{totalDevices} devices active
               </span>
+              {staleReadings > 0 && (
+                <span className="text-xs text-warning">
+                  {staleReadings} {staleReadings === 1 ? 'reading stale' : 'readings stale'}
+                </span>
+              )}
             </div>
           )}
 
           {/* Connection Status - Simplified on mobile */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" aria-label={connectionLabel} title="App connection; device reading freshness is shown separately">
             {isOnline ? (
               <Wifi size={16} className="text-icon" />
             ) : (
@@ -88,7 +96,7 @@ export const Header = ({ title, onRefresh, isRefreshing }: HeaderProps) => {
                 "text-sm",
                 isOnline ? "text-brand-primary" : "text-danger"
               )}>
-                {isOnline ? 'Connected' : 'Offline'}
+                {connectionLabel}
               </span>
             )}
           </div>

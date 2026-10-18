@@ -18,6 +18,10 @@ import { cn } from '@/lib/utils'
 import { formatRemainingTime } from '@/lib/data-utils'
 import { useState } from 'react'
 import { useConvexDeviceMutations } from '@/hooks/useConvexData'
+import { getInputLabel, getInputSourceDescription, getReadingFreshness, type InputQuality, type InputSourceReading, type ReadingFreshness } from '@/lib/reading-status'
+import { resolveTemperatureMetric } from '@/lib/display-telemetry'
+import type { DisplayTelemetry } from '@/types'
+import { TemperatureStatus } from './TemperatureStatus'
 
 interface DeviceData {
   id: string
@@ -28,12 +32,18 @@ interface DeviceData {
   online: boolean
   status?: string
   userId: string
-  currentReading?: {
+  connectionStatus?: 'online' | 'offline' | 'error' | null
+  readingFreshness?: ReadingFreshness
+  displayTelemetry?: DisplayTelemetry | null
+  temperatureRefreshing?: boolean
+  currentReading?: InputSourceReading & {
     batteryLevel?: number | null
     inputWatts?: number | null
     acInputWatts?: number | null
     dcInputWatts?: number | null
     chargingType?: number | null
+    inputQuality?: InputQuality | null
+    recordedAt?: number | Date | string | null
     outputWatts?: number | null
     temperature?: number | null
     remainingTime?: number | null
@@ -47,29 +57,24 @@ interface DeviceStatusCardProps {
   isCompact?: boolean
 }
 
-const CHARGING_TYPE_LABELS: Record<number, string> = {
-  1: 'DC Input',
-  2: 'Solar Input',
-  3: 'AC Input',
-  4: 'Gas Input',
-  5: 'Wind Input',
-}
-
-function getInputLabel(chargingType?: number | null, inputWatts?: number): string {
-  if (!inputWatts || inputWatts <= 0 || chargingType == null) return 'Input'
-  return CHARGING_TYPE_LABELS[chargingType] ?? 'Input'
-}
-
 export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCardProps) => {
   const [isRegistering, setIsRegistering] = useState(false)
   const [isUnregistering, setIsUnregistering] = useState(false)
   const { registerDevice, unregisterDevice } = useConvexDeviceMutations()
   
-  const batteryLevel = device.currentReading?.batteryLevel ?? 0
+  const rawBatteryLevel = device.currentReading?.batteryLevel
+  const batteryLevel = typeof rawBatteryLevel === 'number' && Number.isFinite(rawBatteryLevel) ? rawBatteryLevel : null
   const inputWatts = device.currentReading?.inputWatts ?? 0
   const outputWatts = device.currentReading?.outputWatts ?? 0
-  const temperature = device.currentReading?.temperature ?? 20
+  const inputLabel = getInputLabel(device.currentReading)
+  const inputSourceDescription = getInputSourceDescription(device.currentReading)
+  const temperatureMetric = resolveTemperatureMetric(device.displayTelemetry?.temperature)
+  const temperature = temperatureMetric.value
+  const batteryColor = batteryLevel === null ? 'text-text-muted' : batteryLevel > 20 ? 'text-brand-primary' : 'text-danger'
   const remainingTime = device.currentReading?.remainingTime
+  const readingFreshness = device.readingFreshness ?? getReadingFreshness(device.currentReading?.recordedAt)
+  const confirmedOffline = device.connectionStatus === 'offline' ||
+    (!device.connectionStatus && !device.online && readingFreshness === 'recent')
 
   // Check if device is registered (has real UUID vs temp ID)
   const isRegistered = !device.id.startsWith('temp-')
@@ -78,8 +83,20 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
   // The device can have simultaneous input (e.g. solar) and output (e.g. loads),
   // so we compare them to determine the actual charging state.
   const getStatusInfo = () => {
-    if (!device.online) {
+    if (device.connectionStatus === 'error') {
+      return { color: 'text-warning', bg: 'bg-warning/10', text: 'Refresh failed' }
+    }
+    if (confirmedOffline) {
       return { color: 'text-text-muted', bg: 'bg-surface-2', text: 'Offline' }
+    }
+    if (readingFreshness === 'missing') {
+      return { color: 'text-text-muted', bg: 'bg-surface-2', text: 'No readings' }
+    }
+    if (readingFreshness === 'stale') {
+      return { color: 'text-warning', bg: 'bg-warning/10', text: 'Reading stale' }
+    }
+    if (device.currentReading?.inputWatts == null || device.currentReading.outputWatts == null) {
+      return { color: 'text-text-muted', bg: 'bg-surface-2', text: 'Power unavailable' }
     }
     const netPower = inputWatts - outputWatts
     if (netPower > 10) {
@@ -167,7 +184,7 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
         )}>
           {statusInfo.text}
         </div>
-        {device.isActive && (
+        {device.isActive && device.online && readingFreshness === 'recent' && (
           <div className="w-2 h-2 bg-brand-primary rounded-full animate-pulse" />
         )}
       </div>
@@ -190,7 +207,7 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
               </span>
               <span className="text-xs text-text-muted">
                 {isRegistered 
-                  ? "Device data is being collected for history and analytics" 
+                  ? "Device registered for history and analytics collection"
                   : "Register device to enable data collection and analytics"
                 }
               </span>
@@ -249,17 +266,15 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
         <div className="flex items-center gap-2">
           <Battery 
             size={isCompact ? 16 : 18} 
-            className={cn(
-              batteryLevel > 20 ? "text-brand-primary" : "text-danger"
-            )} 
+            className={batteryColor}
           />
           <div className="flex flex-col">
             <span className={cn(
               "font-semibold",
               isCompact ? "text-sm" : "text-base",
-              batteryLevel > 20 ? "text-brand-primary" : "text-danger"
-            )}>
-              {batteryLevel}%
+              batteryColor
+            )} aria-label={batteryLevel === null ? 'Battery level unavailable' : `Battery level ${batteryLevel}%`}>
+              {batteryLevel === null ? '—' : `${batteryLevel}%`}
             </span>
             {!isCompact && (
               <span className="text-xs text-text-muted">Battery</span>
@@ -279,13 +294,11 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
               isCompact ? "text-sm" : "text-base",
               inputWatts > 0 ? "text-brand-primary" : "text-text-muted"
             )}>
-              {inputWatts}W
+              {device.currentReading?.inputWatts == null ? '—' : `${inputWatts}W`}
             </span>
-            {!isCompact && (
-              <span className="text-xs text-text-muted">
-                {getInputLabel(device.currentReading?.chargingType, inputWatts)}
-              </span>
-            )}
+            <span className={cn('text-xs text-text-muted', inputLabel === 'Solar active' && 'whitespace-nowrap')} title={inputSourceDescription} aria-description={inputSourceDescription}>
+              {inputLabel}
+            </span>
           </div>
         </div>
 
@@ -301,7 +314,7 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
               isCompact ? "text-sm" : "text-base",
               outputWatts > 0 ? "text-brand-tertiary" : "text-text-muted"
             )}>
-              {outputWatts}W
+              {device.currentReading?.outputWatts == null ? '—' : `${outputWatts}W`}
             </span>
             {!isCompact && (
               <span className="text-xs text-text-muted">Output</span>
@@ -313,19 +326,17 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
         <div className="flex items-center gap-2">
           <Thermometer 
             size={isCompact ? 16 : 18} 
-            className={temperature > 40 ? "text-warning" : "text-text-muted"} 
+            className={temperatureMetric.status === 'reported' && temperature !== null && temperature > 40 ? "text-warning" : "text-text-muted"}
           />
           <div className="flex flex-col">
             <span className={cn(
               "font-semibold",
               isCompact ? "text-sm" : "text-base",
-              temperature > 40 ? "text-warning" : "text-text-primary"
-            )}>
-              {temperature}°C
+              temperatureMetric.status !== 'reported' ? 'text-text-muted' : temperature !== null && temperature > 40 ? "text-warning" : "text-text-primary"
+            )} aria-label={temperature === null ? 'Temperature unavailable' : `Temperature ${temperature}°C`} aria-description={temperatureMetric.label}>
+              {temperature === null ? '—' : `${temperature}°C`}
             </span>
-            {!isCompact && (
-              <span className="text-xs text-text-muted">Temp</span>
-            )}
+            <TemperatureStatus metric={temperatureMetric} refreshing={device.temperatureRefreshing} compact />
           </div>
         </div>
       </div>
@@ -341,7 +352,7 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
       )}
 
       {/* Offline Overlay */}
-      {!device.online && (
+      {confirmedOffline && (
         <div className="absolute inset-0 bg-bg-base/60 rounded-card flex items-center justify-center">
           <div className="text-center">
             <WifiOff size={24} className="text-text-muted mx-auto mb-2" />
