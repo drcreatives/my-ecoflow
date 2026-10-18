@@ -2,6 +2,9 @@ import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { auth } from "./auth";
 import { internal } from "./_generated/api";
+import { dcInputSourceValidator } from "./readingQuality";
+
+const TEMPERATURE_OBSERVATION_MAX_AGE_MS = 6 * 60_000;
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
@@ -25,6 +28,12 @@ export const list = query({
       deviceName: d.deviceName ?? "EcoFlow Device",
       deviceType: d.deviceType,
       isActive: d.isActive,
+      dcInputSource: d.dcInputSource ?? "auto",
+      displayTelemetry: d.displayTelemetry ?? null,
+      temperatureRefreshing: d.isActive && (d.mqttLeases?.temperature?.expiresAt ?? 0) > Date.now(),
+      connectionStatus: d.connectionStatus ?? null,
+      lastRefreshSucceededAt: d.lastRefreshSucceededAt ?? null,
+      lastStatusCheckAt: d.lastStatusCheckAt ?? null,
       createdAt: d.createdAt,
       updatedAt: d.updatedAt,
     }));
@@ -49,6 +58,12 @@ export const get = query({
       deviceName: device.deviceName ?? "EcoFlow Device",
       deviceType: device.deviceType,
       isActive: device.isActive,
+      dcInputSource: device.dcInputSource ?? "auto",
+      displayTelemetry: device.displayTelemetry ?? null,
+      temperatureRefreshing: device.isActive && (device.mqttLeases?.temperature?.expiresAt ?? 0) > Date.now(),
+      connectionStatus: device.connectionStatus ?? null,
+      lastRefreshSucceededAt: device.lastRefreshSucceededAt ?? null,
+      lastStatusCheckAt: device.lastStatusCheckAt ?? null,
       createdAt: device.createdAt,
       updatedAt: device.updatedAt,
     };
@@ -77,6 +92,12 @@ export const getBySn = query({
       deviceName: device.deviceName ?? "EcoFlow Device",
       deviceType: device.deviceType,
       isActive: device.isActive,
+      dcInputSource: device.dcInputSource ?? "auto",
+      displayTelemetry: device.displayTelemetry ?? null,
+      temperatureRefreshing: device.isActive && (device.mqttLeases?.temperature?.expiresAt ?? 0) > Date.now(),
+      connectionStatus: device.connectionStatus ?? null,
+      lastRefreshSucceededAt: device.lastRefreshSucceededAt ?? null,
+      lastStatusCheckAt: device.lastStatusCheckAt ?? null,
       createdAt: device.createdAt,
       updatedAt: device.updatedAt,
     };
@@ -124,13 +145,15 @@ export const create = mutation({
 });
 
 /**
- * Update a device's name or active status.
+ * Update owned app metadata, including the physical DC input wiring choice.
+ * This does not send any command to the EcoFlow device.
  */
 export const update = mutation({
   args: {
     deviceId: v.id("devices"),
     deviceName: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
+    dcInputSource: v.optional(dcInputSourceValidator),
   },
   handler: async (ctx, args) => {
     const userId = await auth.getUserId(ctx);
@@ -144,6 +167,7 @@ export const update = mutation({
     const updates: Record<string, unknown> = { updatedAt: Date.now() };
     if (args.deviceName !== undefined) updates.deviceName = args.deviceName;
     if (args.isActive !== undefined) updates.isActive = args.isActive;
+    if (args.dcInputSource !== undefined) updates.dcInputSource = args.dcInputSource;
 
     await ctx.db.patch(args.deviceId, updates);
     return { success: true };
@@ -224,6 +248,7 @@ export const remove = mutation({
  */
 export const checkDeviceAlerts = internalMutation({
   args: {},
+  returns: v.object({ alertsCreated: v.float64(), skipped: v.optional(v.boolean()) }),
   handler: async (ctx) => {
     // Skip in dev deployment to save database bandwidth
     if (process.env.DISABLE_CRONS === "true") {
@@ -236,14 +261,25 @@ export const checkDeviceAlerts = internalMutation({
     for (const device of allDevices) {
       if (!device.isActive) continue;
 
-      // Get the latest reading for this device
+      // Thermal observations must not replace power/battery/configuration state.
       const latestReading = await ctx.db
         .query("deviceReadings")
-        .withIndex("by_deviceId_recordedAt", (q) => q.eq("deviceId", device._id))
+        .withIndex("by_deviceId_readingKind_recordedAt", (q) =>
+          q.eq("deviceId", device._id).eq("readingKind", undefined)
+        )
         .order("desc")
         .first();
 
-      if (!latestReading) continue;
+      // BMS observations have their own clock and must not depend on a power
+      // sample being present. Select the newest observation before validation:
+      // a newer cool/invalid report cannot fall back to an older hot one.
+      const latestTemperature = await ctx.db
+        .query("deviceReadings")
+        .withIndex("by_deviceId_readingKind_recordedAt", (q) =>
+          q.eq("deviceId", device._id).eq("readingKind", "temperature")
+        )
+        .order("desc")
+        .first();
 
       // Get user's notification settings
       const notifSettings = await ctx.db
@@ -255,7 +291,7 @@ export const checkDeviceAlerts = internalMutation({
 
       // Check low battery
       if (
-        notifSettings?.lowBattery &&
+        latestReading && notifSettings?.lowBattery &&
         latestReading.batteryLevel !== undefined &&
         latestReading.batteryLevel !== null &&
         latestReading.batteryLevel < (notifSettings.lowBatteryThreshold ?? 20)
@@ -285,9 +321,14 @@ export const checkDeviceAlerts = internalMutation({
 
       // Check high temperature
       if (
-        latestReading.temperature !== undefined &&
-        latestReading.temperature !== null &&
-        latestReading.temperature > 45
+        latestTemperature?.temperatureMeasurement === "bms-generic-mqtt-v1" &&
+        typeof latestTemperature.temperature === "number" &&
+        Number.isFinite(latestTemperature.temperature) &&
+        Number.isFinite(latestTemperature.recordedAt) &&
+        latestTemperature.recordedAt >= 0 &&
+        latestTemperature.recordedAt <= now &&
+        now - latestTemperature.recordedAt <= TEMPERATURE_OBSERVATION_MAX_AGE_MS &&
+        latestTemperature.temperature > 45
       ) {
         const recentAlert = await ctx.db
           .query("alerts")
@@ -302,8 +343,8 @@ export const checkDeviceAlerts = internalMutation({
             deviceId: device._id,
             type: "TEMPERATURE_HIGH",
             title: "High Temperature",
-            message: `${device.deviceName ?? device.deviceSn} temperature is ${latestReading.temperature}°C`,
-            severity: latestReading.temperature > 55 ? "CRITICAL" : "HIGH",
+            message: `${device.deviceName ?? device.deviceSn} temperature is ${latestTemperature.temperature}°C`,
+            severity: latestTemperature.temperature > 55 ? "CRITICAL" : "HIGH",
             isRead: false,
             createdAt: now,
           });
@@ -312,7 +353,7 @@ export const checkDeviceAlerts = internalMutation({
       }
 
       // Check if device appears offline (no readings in last 30 minutes)
-      if (latestReading.recordedAt < now - 30 * 60 * 1000) {
+      if (latestReading && latestReading.recordedAt < now - 30 * 60 * 1000) {
         const recentAlert = await ctx.db
           .query("alerts")
           .withIndex("by_deviceId_createdAt", (q) =>

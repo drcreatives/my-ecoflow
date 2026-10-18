@@ -2,15 +2,17 @@
 
 ## Architecture
 
-Reading collection is handled entirely server-side by **Convex cron jobs**. No client-side timers, workers, or service workers are needed.
+Reading collection is handled server-side by **Convex cron jobs**. Browser focus, navigation, initial authenticated load, and manual refresh can request an on-demand collection; there is no browser collection polling. A UI-only expiry timer marks old readings stale without fetching data.
 
 ### Cron Jobs (`convex/crons.ts`)
 
 | Job | Interval | Function | Purpose |
 |---|---|---|---|
 | `collect-readings` | 1 minute | `ecoflow.collectAllUserReadings` | Polls EcoFlow API for each user's devices, inserts readings |
-| `device-monitor` | 15 minutes | `ecoflow.monitorDevices` | Checks device health, sends email alerts if thresholds breached |
-| `data-cleanup` | 24 hours | `admin.cleanupOldReadings` | Deletes readings older than user's retention period |
+| `device-monitor` | 15 minutes | `devices.checkDeviceAlerts` | Checks device alerts |
+| `data-cleanup` | 24 hours | `admin.cleanupOldReadings` | Starts bounded retention batches; preserves readings at or after each owner's cutoff |
+| `backup-check` | 1 hour | `backup.checkAndRunBackups` | Checks enabled backups at each owner's saved cadence |
+| `process-schedules` | 1 minute | `schedules_internal.processSchedules` | Executes due device schedules |
 
 ### Data Flow
 
@@ -18,19 +20,89 @@ Reading collection is handled entirely server-side by **Convex cron jobs**. No c
 Convex Cron (every 1 min)
   → ecoflow.collectAllUserReadings (action)
     → For each user with devices:
-      → EcoFlow API: GET /iot-open/sign/device/quota/all
-      → Transform quota data → deviceReadings table INSERT
+      → Enforce configured collection interval
+      → Check device online status (one shared device-list request)
+      → For online devices: open a bounded passive MQTT quota subscription
+      → Require two PD reports with both total powers and advancing module clocks
+      → GET quota/all for configuration; overlay live report measurements
+      → Validate source evidence → deviceReadings INSERT at report receipt time
+      → Record fetch health separately; offline/error responses do not insert cached readings
     → Convex reactivity pushes new data to connected clients instantly
 ```
 
 ### Configuration
 
-- **Collection interval**: Fixed at 1 minute via cron. Per-user `collectionIntervalMinutes` in `dataRetentionSettings` can be used to skip collections if the last one was too recent.
+- **Collection interval**: The cron checks every minute; per-user `collectionIntervalMinutes` controls collection (default: five minutes). Active device owners without saved settings receive this default. Failed collections remain due for retry.
+- **Manual refresh**: Can fetch after a recent cron reading. An atomic per-device two-minute limit bounds on-demand attempts, including manual requests. The UI reports rate limits, offline devices, and failures.
 - **Retention period**: Configurable per user in Settings → Data Retention. Default: 90 days.
 - **Alerts**: Configured in Settings → Notifications. Email sent via Resend when thresholds are breached.
+
+### Retention and complete backups
+
+The daily cleanup starts an internal continuation chain. Each transaction reads at most 100 deletion candidates with a 512-KiB page budget, then schedules the next batch. It deletes only timestamps strictly older than the owner's selected retention cutoff; readings exactly on the cutoff remain. Ownership, cleanup preferences, and `DISABLE_CRONS` are checked again for every continuation. A longer retention selection protects queued readings immediately; a shorter selection is fully applied by the next daily cycle.
+
+For owners with automatic backups enabled, cleanup also requires a trusted completed archive checkpoint and preserves readings inserted after that checkpoint, including backdated imports. Email uses `lastCompleteBackupAt`; Google Drive requires its own `lastDriveBackupAt` and a connected grant, so an earlier email archive cannot authorize deletion before the first Drive backup. An active backup pauses that owner's cleanup. Missing or failed backup coverage retains data until the backup succeeds or the owner disables automatic backups; a skipped cycle does not update `lastCleanup`.
+
+The hourly backup check honors daily, weekly, two-week, and 30-day intervals. The first complete backup for each destination includes every stored reading. Later backups include records stored since that destination's completed checkpoint, preserving their original measurement timestamps. Reads are paginated into numbered JSON parts of at most 4 MiB; settings and scalar telemetry/configuration fields are included. Raw vendor payloads are omitted. Private prepared files and provider idempotency keys let retries reuse the exact same bytes. A removed or transferred device cancels obsolete work so a later check restarts for the remaining owned devices.
+
+The Google Drive destination uploads these parts to a private folder for each run beneath `EcoFlow Backups`, verifies each provider file's size and checksum, then writes a small completion manifest. Preallocated file IDs are persisted before upload so an uncertain response can be reconciled without duplicating files. Resend sends one email with the folder link after the manifest is verified; no part attachments are emailed. The trusted checkpoint advances only after that email is accepted. Provider acceptance does not prove mailbox delivery. The legacy email destination remains available and sends numbered attachments.
+
+### Google Drive server setup
+
+The recurring Drive destination requires an app-owned OAuth client. The Google Drive connection in a chat cannot authorize unattended Convex jobs. In Google Cloud, create a Web application OAuth client for this app, enable Google Drive API, and register `https://<your-production-deployment>.convex.site/google-drive/callback` as its exact redirect URI. Use only the recommended `https://www.googleapis.com/auth/drive.file` scope. Publish the OAuth app for production use: an External app left in Testing normally has seven-day refresh tokens, shorter than the two-week/monthly schedules.
+
+Set `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET`, and `TOKEN_ENCRYPTION_KEY` in the Convex deployment. The encryption key must be 32 cryptographically random bytes encoded as 64 hexadecimal characters. Keep these values out of Git and the browser. The server encrypts refresh tokens with AES-256-GCM bound to the owning account and token purpose. OAuth uses PKCE and a time-limited, one-use state; activation also requires the initiating signed-in account and browser session nonce. The callback returns only to explicit app origins, including the canonical Vercel host and `myecoflow.devrunor.com`.
+
+In Settings → Data & Privacy, connect Google Drive. Connection selects Drive as the saved destination without changing backup enabled status, cadence, retention, or collection interval. The first Drive backup then covers all currently stored readings. Disconnect removes app-held credentials and pending work; it keeps existing Drive files and pauses Drive backups/cleanup instead of silently emailing attachments. Google Account permissions can be revoked separately. Never use a service-account My Drive workaround or make backup folders public.
+
+Production status (2026-10-18): recurring Drive support and the public `/privacy` policy are deployed in merged release `dpl_8ksqsRcMZStWpA6w8re7ZtNaUF2M`. Google Cloud project `my-ecoflow-backups-20261018` has Drive API enabled, its Web OAuth client is configured, and audience publishing status is In Production. The three server credential names above are installed in production Convex; real limited `drive.file` consent completed and the encrypted offline grant is connected. The saved destination is now Google Drive; enabled backups, 90-day retention, the 336-hour interval, and one-minute collection were preserved.
+
+Release verification passed 649 backend tests, 272 frontend tests, TypeScript, lint with 32 existing warnings and zero errors, and the 41-second remote production build. Four application routes and all 21 referenced JavaScript assets passed protected-stage and production verification; canonical asset hashes match the tested stage, target production Convex, and retain the Analytics and temperature fixes. The Vercel alias redirects to the custom production domain.
+
+The initial Drive archive completed and was verified: 89,551 stored readings at the 2026-10-18 11:47:58.258 Lagos cutoff (`1792320478258`), in 23 numbered JSON parts plus one manifest. Every part was present; the parts' 91,003,410 bytes matched independent Drive metadata. All 24 files reported unshared, with owner-only folder/manifest permissions. All three backup checkpoints advanced to the cutoff and the pending run cleared. Exactly one successful backup log and one Resend email were verified; the message was delivered at 11:50:36.953 Lagos, contained the correct private folder link/count, and had no attachments. The saved Drive destination, backup toggle, retention, cadence and collection interval were unchanged; the original raw pre-cleanup archive remains separate and preserved.
+
+Consent was completed in the Google browser flow, activation used the same authenticated owner and original browser-bound state/nonce through the CLI, and signed-in Settings showed Drive connected. Verification combined browser and CLI checks; it was not a fully automated browser-only OAuth E2E run.
+
+Settings JSON/CSV downloads use their own authenticated pagination endpoint rather than sampled chart history. They include every reading stored by the server-issued export cutoff, with scalar telemetry, configuration, and provenance. The local review correction also pins an owner-wide deletion revision across every page/device: cleanup advances it atomically with actual reading deletions, and a changed revision aborts the download with a retry message instead of producing a partial file. The full original raw-payload archive made before the initial cleanup remains a separate one-time Google Drive backup.
+
+The Settings Test Email button calls an authenticated backend action, sends only to the signed-in account's stored address, and reserves a per-account one-minute interval atomically. Notification logs record the attempt and provider result. Automatic backup and notification preferences are not changed by this diagnostic.
 
 ### Monitoring
 
 - **Convex Dashboard → Cron Jobs**: View execution history, success/failure status
 - **Convex Dashboard → Logs**: Real-time function execution logs
-- **Dashboard UI**: `ReadingCollector` component shows cron status and last collection time
+- **Dashboard UI**: `ReadingCollector` shows the configured interval and last fetched reading; the app connection is displayed separately from device reading health.
+
+### Source accuracy and history
+
+Quota responses have no documented per-field measurement timestamp. Fetch time is therefore not proof that every module value was just measured. A device-list online check prevents accepting known offline cached quotas; it cannot prove freshness of all values from an online device. Investigation observed frozen REST snapshots while live MQTT reports changed. Collection now requires `captureReading` to observe advancing live reports; retained, duplicate, reordered, timed-out, or missing power evidence cannot be substituted with cached REST power. A source omission does not invalidate otherwise proven live aggregate powers.
+
+New readings carry `inputQuality`: `consistent`, `inconsistent`, or `incomplete`, plus optional `inputMeasurement` provenance. For the validated DELTA 2 model 80 / PD firmware 16908850, AC input comes from `pd.inputWatts` in the same PD report as aggregate `pd.wattsInSum`; the residual identifies DC input. `delta2-pd-mqtt-v1` identifies collected live PD evidence; `delta2-pd-v1` describes the field mapping without that transport proof. This avoids combining asynchronously reported INV and MPPT power. The model-specific interpretation was checked against live MQTT packets, the user's known AC connection, and retained solar/DC telemetry; it is not an undocumented unit conversion applied to other devices.
+
+Single-source readings use the PD DC subtype (2 solar, 1 adapter) when available. Unknown DC remains DC without a solar claim. Mixed input, missing PD fields, and unsupported firmware remain uncertain. Small rounding differences retain the existing 10 W / 5% tolerance; contradictory reported AC watts are preserved. The pure transform retains the legacy module comparison path for compatibility; live collection can use stable REST model/firmware configuration when absent from delta-only reports, while live identity takes precedence. REST source flags remain excluded. Owner-selected DC wiring supplies a fallback subtype; contradictory live evidence stays flagged. New `solarInputWatts` preserves confirmed solar portions across hourly AC/solar buckets; missing evidence stays absent. Older readings are not reclassified or rewritten.
+
+The local review correction requires `delta2-pd-mqtt-v1` transport evidence as well as coherent channels before station AC/DC energy is trusted. Marker-less, `legacy-modules`, and REST-only `delta2-pd-v1` snapshots remain diagnostic raw values and contribute unclassified input. Solar additionally requires an explicit bounded `solarInputWatts`; a subtype flag alone is insufficient. Uniform all-live averages retain their source proof, while mixed-provenance buckets remain unverified. Independent panel energy keeps its separate proof and accounting. No stored historical value is rewritten by these view/calculation rules.
+
+`powerMeasurement: pd-totals-mqtt-v1` identifies two advancing live PD reports that each contain total input and output. An omitted AC field leaves station AC/DC/solar allocation incomplete; it does not discard fresh totals and never implies AC zero. For the validated DELTA 2 profile, two fresh progressing MPPT reports with explicit solar type 2 and watts can separately add `solarPanelInputWatts`, `solarPanelReceivedAt`, and `solarPanelMeasurement: delta2-mppt-mqtt-v1`. Their receipts must be within five seconds of the selected PD report. These panel-side watts can differ from station input; they never determine its AC/DC split or station solar energy. Raw History and exports retain the distinction. Averaged buckets clear the single-report panel receipt. Separate derived bucket fields may show the average of verified panel samples with explicit sample coverage; they never claim a single sensor report. No older reading gains these fields. Analytics integrates the already-fetched bounded raw samples per device before chart averaging, using actual panel receipt intervals and explicit cadence/sampling gap limits. Panel energy has its own duration coverage and never fills station AC/DC allocation. Its totals stay the same across raw, hourly, and daily chart views.
+
+Internal `ecoflow.inspectPowerTelemetry` performs bounded GET-only diagnostics without inserts or health patches. Internal `ecoflowMqttDiagnostics.capture` subscribes passively for at most 20 seconds, with message/byte limits and sanitized numeric output. Its production variant `captureReading` proves live aggregate power independently of the source split. A source-complete PD packet stops it early; with omitted AC it waits up to five additional seconds for independent panel evidence, within the original session deadline. A live PD clock reset or changed equal-clock power/source replay invalidates the entire capture. Stable identity metadata may come from configuration, because delta-only reports omit unchanged fields. Both close their connections and publish no device requests or commands. There is no permanent listener or browser polling loop. `recordedAt` is the accepted live PD packet's receipt time, never its device-relative uptime.
+
+Rolling history windows advance on new stored power or temperature observations and deliberate refresh events. Temperature uses an independently owned timestamp query and never makes an old power reading fresh. Fixed custom ranges stay fixed. Queries remain indexed and bounded; sampled results report their sampling interval for energy estimates. No historical data is automatically repaired or rewritten.
+
+DC wiring is configured per device as Automatic, Solar panels, or DC adapter. This is dashboard metadata, not an EcoFlow control command. It applies only to positive live DC input and is recorded as `chargingTypeSource: device-setting`; direct live subtype uses `live-pd`. Changing wiring does not alter earlier rows. Stable per-device MQTT client IDs use private 90-second token leases; diagnostic and collector sessions have separate IDs.
+
+Concurrent captures are skipped as already collecting, without writing an error device status or a cached measurement. A successful health observation is ordered by live receipt time. Missing live SOC, temperature, or output breakdowns display as unavailable; REST cached measurements are not silently presented as current.
+
+For output details, devices retain a small display-only cache with per-field source and receipt time. Missing current output fields can display a last report; REST output values explicitly state that measurement time is unknown. This cache is never merged into collected history or AC/solar accounting. Validated model-80 live PD output uses same-packet AC, car/DC and total values, with nonnegative USB residual only when all required fields are present.
+
+Temperature uses a separate bounded passive BMS capture so the power collector can still finish promptly. It waits up to 330 seconds, with 800-message and 512-KiB caps, using an independent private six-minute lease, and stops immediately on success. These thermal bounds cover the observed roughly five-minute generic-temperature cycle; power and diagnostic bounds remain unchanged. A successful cloud read cannot make a temperature current. Only an explicit temperature field in a progressing, nonretained, nonduplicate BMS report may update the device's display temperature, with that field's actual receipt time. Partial BMS packets never refresh an older temperature's timestamp. Temperature progress and freshness are independent of PD input classification and power health; a thermal timeout cannot change AC/solar history. Compact cards show a short age or updating status, with the exact report time in an accessible tooltip; detail shows the full report time. Temperature becomes stale after six minutes. Missing historical temperature displays as unavailable, never a fabricated zero. EcoFlow does not provide a verified guarantee that every bounded capture includes temperature.
+
+Accepted independent BMS reports now also append compact `deviceReadings` events with `readingKind: temperature`, `temperatureMeasurement: bms-generic-mqtt-v1`, and the original packet receipt as `recordedAt`. The current unexpired token lease, receipt bounds and monotonic checks reject stale or duplicate writes. The insert and display update are atomic. Events contain no copied power, battery, source or configuration fields; existing historical documents are never patched or backfilled.
+
+`by_deviceId_readingKind_recordedAt` separates these events from power rows whose kind is absent. Latest power, refresh freshness, configuration, optimistic controls and monitoring explicitly select power rows. History retains its original 500-power-document budget and adds an independently sampled budget of at most 500 compact thermal events per device. `temperatureReadings`, `temperatureSummary`, `temperatureSampledReadings` and `temperatureSamplingIntervalMs` describe that separate stream. The legacy power summary stays null without power rows. Raw thermal rows retain receipt/provenance; averaged buckets have counts and no single-report provenance. Display rows merge only exact device/time matches; temperature-only rows leave other metrics unavailable. Energy integration uses only the original power samples before this merge.
+
+Complete Settings exports and Drive/email archives keep all stored kinds through their existing insertion-time pagination/checkpoints. Scalar JSON/CSV includes kind and thermal provenance; sampled History CSV also includes the observation count. Retention and device deletion continue to cover both kinds. The added custom index has storage overhead: `deviceReadings` now has three custom indexes/four table copies under [Convex storage accounting](https://docs.convex.dev/production/state/limits); previous three-copy estimates are historical. The deployed History repair originally left alerts on the power row; the local review correction selects the latest native generic BMS observation with exact provenance and a finite, nonfuture receipt no more than six minutes old. It preserves existing thresholds/deduplication and keeps battery/offline checks on power rows. Power captures no longer copy an initial BMS temperature snapshot into new PD-timed history.
+
+The forward thermal History repair is deployed to Convex and Vercel. Actual 41 C reports were appended at 15:58:58.221 and 16:03:58.935 Lagos on 2026-10-18; old missing periods were not filled. Owned raw/hourly/daily production queries retain identical values across all 13 energy fields, and temperature-only ranges have no power summary. Full frontend tests passed 300 cases, final TypeScript and lint passed (32 existing warnings), and the remote build passed in 37 seconds. All five checked canonical routes and 22 referenced JavaScript assets returned 200. The final merged release/source is recorded in `MEMORY.md`; preserve it over older Drive or temperature snapshots. Signed-in pre-reload hourly History showed the new readings; post-promotion browser automation timed out, so verification combines component tests, authenticated queries and production assets rather than a full browser-only E2E.
+
+Bounded public MQTT temperature GET diagnostics did not verify immediate sensor refresh: get-reply subscriptions were rejected and quota-only requests produced no explicit current temperature. A further single 60-second probe using the documented decimal request-ID style also received get-reply SUBACK 128, no correlated reply, and no explicit temperature in its progressing BMS reports. It remains an internal read-only diagnostic, separate from normal refresh. Manual refresh must not relabel cached cloud temperature as a fresh measurement.

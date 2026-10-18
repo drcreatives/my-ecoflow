@@ -19,6 +19,7 @@ import {
   Settings,
   MoreVertical,
   AlertTriangle,
+  Activity,
   CheckCircle,
   XCircle,
   Loader2,
@@ -26,6 +27,28 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatRemainingTime, DeviceData } from "@/lib/data-utils";
+import { resolveTemperatureMetric, type TemperatureMetric } from "@/lib/display-telemetry";
+import { TemperatureStatus } from "@/components/controls/TemperatureStatus";
+import { getDeviceHealth } from "@/lib/device-health";
+
+interface DeviceTemperatureProps {
+  metric: TemperatureMetric;
+  refreshing?: boolean;
+}
+
+function DeviceTemperature({ metric, refreshing }: DeviceTemperatureProps) {
+  return (
+    <div className="flex items-center gap-2">
+      <Thermometer size={16} className="text-warning" />
+      <div>
+        <p className="text-sm font-medium text-text-primary" aria-label={metric.value === null ? 'Temperature unavailable' : `Temperature ${metric.value}°C`} aria-description={metric.label}>
+          {metric.value === null ? '—' : `${metric.value}°C`}
+        </p>
+        <TemperatureStatus metric={metric} refreshing={refreshing} compact />
+      </div>
+    </div>
+  );
+}
 
 const DevicesPage = () => {
   const router = useRouter();
@@ -49,40 +72,21 @@ const DevicesPage = () => {
     const matchesStatus =
       filterStatus === "all" ||
       (filterStatus === "online" && device.online) ||
-      (filterStatus === "offline" && !device.online);
+      (filterStatus === "offline" && getDeviceHealth(device).tone === 'offline');
 
     return matchesSearch && matchesStatus;
   });
-
-  const getStatusColor = (online: boolean, batteryLevel?: number) => {
-    if (!online) return "text-danger";
-    if (batteryLevel && batteryLevel < 20) return "text-warning";
-    return "text-brand-primary";
-  };
-
-  const getStatusIcon = (online: boolean, batteryLevel?: number) => {
-    if (!online) return <WifiOff size={16} className="text-danger" />;
-    if (batteryLevel && batteryLevel < 20)
-      return <AlertTriangle size={16} className="text-warning" />;
-    return <Wifi size={16} className="text-brand-primary" />;
-  };
-
-  const getStatusText = (
-    online: boolean,
-    batteryLevel?: number,
-    status?: string
-  ) => {
-    if (!online) return "Offline";
-    if (batteryLevel && batteryLevel < 20) return "Low Battery";
-    return status || "Online";
-  };
 
   const DeviceCard = ({ device }: { device: DeviceData }) => {
     const batteryLevel = device.currentReading?.batteryLevel ?? 0;
     const inputWatts = device.currentReading?.inputWatts ?? 0;
     const outputWatts = device.currentReading?.outputWatts ?? 0;
-    const temperature = device.currentReading?.temperature ?? 0;
+    const temperature = resolveTemperatureMetric(device.displayTelemetry?.temperature);
     const remainingTime = device.currentReading?.remainingTime;
+    const health = getDeviceHealth(device);
+    const healthColor = health.tone === 'online' ? 'text-brand-primary'
+      : health.tone === 'warning' ? 'text-warning'
+      : health.tone === 'offline' ? 'text-danger' : 'text-text-muted';
 
     return (
       <div className="bg-surface-1 rounded-card border border-stroke-subtle shadow-card hover:shadow-card-hover hover:border-stroke-strong transition-all duration-160 ease-dashboard group">
@@ -94,7 +98,10 @@ const DevicesPage = () => {
                 <h3 className="text-lg font-medium text-text-primary group-hover:text-white transition-colors">
                   {device.deviceName}
                 </h3>
-                {getStatusIcon(device.online, batteryLevel)}
+                {health.tone === 'online' ? <Wifi size={16} className={healthColor} />
+                  : health.tone === 'warning' ? <AlertTriangle size={16} className={healthColor} />
+                  : health.tone === 'offline' ? <WifiOff size={16} className={healthColor} />
+                  : <Activity size={16} className={healthColor} />}
               </div>
               <p className="text-sm text-text-secondary">
                 {device.deviceSn} • {device.deviceType || "DELTA 2"}
@@ -102,10 +109,10 @@ const DevicesPage = () => {
               <p
                 className={cn(
                   "text-xs font-medium mt-1",
-                  getStatusColor(device.online, batteryLevel)
+                  healthColor
                 )}
               >
-                {getStatusText(device.online, batteryLevel, device.status)}
+                {health.label}
               </p>
             </div>
             <button className="p-2 hover:bg-surface-2 rounded-inner transition-all duration-160 opacity-0 group-hover:opacity-100">
@@ -155,15 +162,13 @@ const DevicesPage = () => {
               </div>
 
               {/* Temperature */}
-              <div className="flex items-center gap-2">
-                <Thermometer size={16} className="text-warning" />
-                <div>
-                  <p className="text-xs text-text-muted">Temp</p>
-                  <p className="text-sm font-medium text-text-primary">
-                    {temperature}°C
-                  </p>
-                </div>
-              </div>
+              <DeviceTemperature metric={temperature} refreshing={device.temperatureRefreshing} />
+            </div>
+          )}
+
+          {(!device.online || !device.currentReading) && (
+            <div className="mb-4 p-3 bg-surface-2 rounded-inner">
+              <DeviceTemperature metric={temperature} refreshing={device.temperatureRefreshing} />
             </div>
           )}
 
@@ -182,13 +187,15 @@ const DevicesPage = () => {
             </div>
           )}
 
-          {/* Offline State */}
+          {/* Reading and connection health */}
           {!device.online && (
-            <div className="flex items-center gap-2 mb-4 p-3 bg-danger/5 border border-danger/15 rounded-inner">
-              <WifiOff size={16} className="text-danger" />
+            <div role="status" aria-label="Device health" className="flex items-center gap-2 mb-4 p-3 bg-surface-2 border border-stroke-subtle rounded-inner">
+              {health.tone === 'offline' ? <WifiOff size={16} className={healthColor} />
+                : health.tone === 'warning' ? <AlertTriangle size={16} className={healthColor} />
+                : <Activity size={16} className={healthColor} />}
               <div>
-                <p className="text-sm text-danger">Device is offline</p>
-                <p className="text-xs text-text-muted">Last seen: Unknown</p>
+                <p className={cn('text-sm', healthColor)}>{health.tone === 'offline' ? 'Device is offline' : health.label}</p>
+                <p className="text-xs text-text-muted">Last reading: {health.lastReadingAt === null ? 'Never' : new Date(health.lastReadingAt).toLocaleString()}</p>
               </div>
             </div>
           )}
@@ -370,13 +377,13 @@ const DevicesPage = () => {
             </div>
           </div>
 
-          <div className="bg-surface-1 rounded-card border border-stroke-subtle shadow-card p-4">
+          <div role="group" aria-label="Offline devices" className="bg-surface-1 rounded-card border border-stroke-subtle shadow-card p-4">
             <div className="flex items-center gap-3">
               <WifiOff size={20} className="text-danger" />
               <div>
                 <p className="text-xs text-text-muted">Offline</p>
                 <p className="text-lg font-medium text-text-primary">
-                  {devices.filter((d) => !d.online).length}
+                  {devices.filter((d) => getDeviceHealth(d).tone === 'offline').length}
                 </p>
               </div>
             </div>

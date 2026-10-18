@@ -2,30 +2,28 @@
 
 import { useState, useMemo } from 'react'
 import { Activity, Settings } from 'lucide-react'
-import { useConvexDevices } from '@/hooks/useConvexData'
+import { useConvexDevices, useConvexSettings } from '@/hooks/useConvexData'
+import { getReadingFreshness } from '@/lib/reading-status'
 
-interface CollectionStatusControlProps {
-  autoCollect?: boolean
-}
-
-export default function CollectionStatusControl({ 
-  autoCollect = true 
-}: CollectionStatusControlProps) {
+export default function CollectionStatusControl() {
   const [isVisible, setIsVisible] = useState(false)
   const { devices } = useConvexDevices()
+  const { dataRetention } = useConvexSettings()
+  const collectionInterval = dataRetention?.collectionIntervalMinutes ?? 5
 
   // Derive last collection time from latest device readings
   const lastCollectionTime = useMemo(() => {
     let latest: number | null = null
     for (const device of devices) {
-      const reading = (device as any).currentReading
-      if (reading?.recordedAt) {
+      const reading = device.currentReading
+      if (reading?.recordedAt != null) {
         const t = typeof reading.recordedAt === 'number' ? reading.recordedAt : new Date(reading.recordedAt).getTime()
         if (!latest || t > latest) latest = t
       }
     }
     return latest ? new Date(latest) : null
   }, [devices])
+  const freshness = getReadingFreshness(lastCollectionTime, collectionInterval)
 
   const formatTimeAgo = (date: Date | null) => {
     if (!date) return 'Never'
@@ -45,6 +43,7 @@ export default function CollectionStatusControl({
         onClick={() => setIsVisible(true)}
         className="fixed bottom-4 right-4 bg-brand-primary hover:bg-brand-secondary text-bg-base p-3 rounded-full shadow-card transition-colors z-50"
         title="Show Collection Status"
+        aria-label="Show Collection Status"
       >
         <Activity className="w-5 h-5" />
       </button>
@@ -70,20 +69,21 @@ export default function CollectionStatusControl({
         <div className="flex items-center justify-between text-xs">
           <span className="text-text-muted">Collection Mode:</span>
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 bg-brand-primary rounded-full animate-pulse" />
-            <span className="text-brand-primary">Server (Convex Cron)</span>
+            <div className={`w-2 h-2 rounded-full ${freshness === 'recent' ? 'bg-brand-primary animate-pulse' : 'bg-warning'}`} />
+            <span className="text-text-primary">Server (Convex Cron)</span>
           </div>
         </div>
 
         <div className="flex items-center justify-between text-xs">
           <span className="text-text-muted">Interval:</span>
-          <span className="text-text-primary">1 minute</span>
+          <span className="text-text-primary">{collectionInterval} {collectionInterval === 1 ? 'minute' : 'minutes'}</span>
         </div>
 
         <div className="flex items-center justify-between text-xs">
-          <span className="text-text-muted">Last Reading:</span>
-          <span className="text-text-primary">
+          <span className="text-text-muted">Last Reading Fetched:</span>
+          <span className={freshness === 'stale' ? 'text-warning' : 'text-text-primary'} title={lastCollectionTime?.toLocaleString()}>
             {formatTimeAgo(lastCollectionTime)}
+            {freshness === 'stale' ? ' (stale)' : ''}
           </span>
         </div>
 
@@ -103,7 +103,7 @@ export default function CollectionStatusControl({
       </button>
 
       <div className="mt-2 text-xs text-text-muted">
-        ℹ️ Data collected automatically by server every minute
+        Server checks the configured interval every minute. The device measurement time is unavailable.
       </div>
     </div>
   )

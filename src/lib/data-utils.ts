@@ -2,6 +2,8 @@
  * Data types and formatting utilities for EcoFlow dashboard
  * API fetch functions removed — data is now fetched via Convex reactive queries
  */
+import type { ChargingTypeSource, DcInputSource, DisplayTelemetry } from '@/types'
+import type { ReadingFreshness } from '@/lib/reading-status'
 
 export interface DeviceData {
   id: string
@@ -9,8 +11,13 @@ export interface DeviceData {
   deviceName: string
   deviceType?: string
   isActive: boolean
+  dcInputSource?: DcInputSource
+  displayTelemetry?: DisplayTelemetry | null
+  temperatureRefreshing?: boolean
   online: boolean
   status?: string
+  connectionStatus?: 'online' | 'offline' | 'error' | null
+  readingFreshness?: ReadingFreshness
   userId: string
   createdAt?: string | number
   updatedAt?: string | number
@@ -20,11 +27,26 @@ export interface DeviceData {
 export interface DeviceReading {
   id?: string
   deviceId?: string
+  readingKind?: 'temperature' | null
+  temperatureMeasurement?: 'bms-generic-mqtt-v1' | null
+  temperatureSampleCount?: number
   batteryLevel?: number | null
   inputWatts?: number | null
   acInputWatts?: number | null    // AC wall charging input
   dcInputWatts?: number | null    // DC/Solar/Car charging input (MPPT)
   chargingType?: number | null    // 0=null, 1=Adapter/DC, 2=Solar, 3=AC, 4=Gas, 5=Wind
+  chargingTypeSource?: ChargingTypeSource | null
+  inputQuality?: 'consistent' | 'inconsistent' | 'incomplete' | null
+  inputMeasurement?: 'delta2-pd-v1' | 'delta2-pd-mqtt-v1' | 'legacy-modules' | null
+  solarInputWatts?: number | null
+  powerMeasurement?: 'pd-totals-mqtt-v1' | null
+  solarPanelInputWatts?: number | null // Independent panel-side measurement, not station solarInputWatts
+  solarPanelReceivedAt?: number | null
+  solarPanelMeasurement?: 'delta2-mppt-mqtt-v1' | null
+  // Derived history-bucket statistics; never individual sensor receipts.
+  solarPanelAverageWatts?: number | null
+  solarPanelSampleCount?: number
+  sampleCount?: number
   outputWatts?: number | null
   acOutputWatts?: number | null
   dcOutputWatts?: number | null
@@ -39,7 +61,29 @@ export interface DeviceReading {
   dcChargingCurrent?: number | null
 }
 
+/** A sensor report, or an explicitly counted display average of reports. */
+export interface TemperatureHistoryReading {
+  deviceId: string
+  deviceName: string
+  deviceSn: string
+  temperature: number
+  recordedAt: number
+  temperatureSampleCount: number
+  temperatureMeasurement: 'bms-generic-mqtt-v1' | null
+}
+
 // ─── Formatting Utilities ─────────────────────────────────────────────────────
+
+/** Missing measurements are unavailable, not measured zero. */
+export function formatMeasurementValue(
+  value: number | null | undefined,
+  unit: string,
+  fractionDigits = 1,
+): string {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? `${value.toFixed(fractionDigits)}${unit}`
+    : '—'
+}
 
 /**
  * Utility function to format device status

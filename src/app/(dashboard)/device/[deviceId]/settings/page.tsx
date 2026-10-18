@@ -5,8 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useConvexDevices, useConvexDeviceMutations, useConvexDeviceControl, useConvexSchedules } from '@/hooks/useConvexData';
 import Link from 'next/link';
 import { Toggle } from '@/components/ui/Toggle';
+import { DcInputSourceSetting } from '@/components/controls/DcInputSourceSetting';
+import { getDeviceHealth } from '@/lib/device-health';
 import { toast } from 'sonner';
 import { 
+  Activity,
   ArrowLeft,
   Settings,
   Edit3,
@@ -216,6 +219,11 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
     return null // This should not happen due to previous checks, but keeps TypeScript happy
   }
 
+  const health = getDeviceHealth(device);
+  const healthColor = health.tone === 'online' ? 'text-brand-primary'
+    : health.tone === 'warning' ? 'text-warning'
+    : health.tone === 'offline' ? 'text-danger' : 'text-text-muted';
+
   return (
     
       
@@ -235,13 +243,12 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                   <div className="flex items-center space-x-3 mt-1">
                     <span className="text-text-secondary text-sm">{device.deviceName}</span>
                     <div className="flex items-center space-x-1">
-                      {device.online ? (
-                        <Wifi className="w-4 h-4 text-brand-primary" />
-                      ) : (
-                        <WifiOff className="w-4 h-4 text-danger" />
-                      )}
-                      <span className={`text-sm font-medium ${device.online ? 'text-brand-primary' : 'text-danger'}`}>
-                        {device.online ? 'Online' : 'Offline'}
+                      {health.tone === 'online' ? <Wifi className={`w-4 h-4 ${healthColor}`} />
+                        : health.tone === 'offline' ? <WifiOff className={`w-4 h-4 ${healthColor}`} />
+                        : health.tone === 'warning' ? <AlertTriangle className={`w-4 h-4 ${healthColor}`} />
+                        : <Activity className={`w-4 h-4 ${healthColor}`} />}
+                      <span className={`text-sm font-medium ${healthColor}`}>
+                        {health.label}
                       </span>
                     </div>
                   </div>
@@ -335,15 +342,15 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                       Status
                     </label>
                     <div className="flex items-center gap-2">
-                      {device.online ? (
-                        <CheckCircle className="w-4 h-4 text-brand-primary" />
-                      ) : (
-                        <AlertTriangle className="w-4 h-4 text-danger" />
-                      )}
-                      <span className={device.online ? 'text-brand-primary' : 'text-danger'}>
-                        {device.online ? 'Connected' : 'Disconnected'}
+                      {health.tone === 'online' ? <CheckCircle className={`w-4 h-4 ${healthColor}`} />
+                        : health.tone === 'warning' || health.tone === 'offline'
+                          ? <AlertTriangle className={`w-4 h-4 ${healthColor}`} />
+                          : <Activity className={`w-4 h-4 ${healthColor}`} />}
+                      <span className={healthColor}>
+                        {health.label}
                       </span>
                     </div>
+                    <p className="mt-1 text-xs text-text-muted">Last reading: {health.lastReadingAt === null ? 'Never' : new Date(health.lastReadingAt).toLocaleString()}</p>
                   </div>
                 </div>
               </div>
@@ -377,6 +384,11 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                       </span>
                     </div>
                   </div>
+
+                  <DcInputSourceSetting
+                    value={device.dcInputSource ?? 'auto'}
+                    onSave={dcInputSource => updateDevice(device.id, { dcInputSource })}
+                  />
 
                   {!formData.autoCollectData && (
                     <div className="p-4 bg-warning/5 border border-warning/15 rounded-inner">

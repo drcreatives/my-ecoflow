@@ -77,7 +77,7 @@ Current code and configuration win when documentation disagrees. Known stale fac
 
 ### Current data and job model
 
-`convex/schema.ts` currently defines 12 application tables in addition to `authTables`: `users`, `devices`, `deviceReadings`, `deviceSettings`, `dailySummaries`, `alerts`, `dataRetentionSettings`, `notificationSettings`, `notificationLogs`, `sessionSettings`, `passwordChangeLog`, and `deviceSchedules`.
+`convex/schema.ts` currently defines 13 application tables in addition to `authTables`: `users`, `devices`, `deviceReadings`, `deviceSettings`, `dailySummaries`, `alerts`, `dataRetentionSettings`, `googleDriveConnections`, `notificationSettings`, `notificationLogs`, `sessionSettings`, `passwordChangeLog`, and `deviceSchedules`.
 
 `convex/crons.ts` currently defines five jobs:
 
@@ -142,6 +142,16 @@ Treat device-control changes as high-risk integration work.
 
 Do not create commits, push, deploy Convex, change Vercel configuration, send email, or operate a real device unless the user explicitly asks. If commits are requested, keep backend and frontend commits separate where practical and use conventional messages such as `feat(backend): ...` or `fix(frontend): ...`. The hook in `.github/hooks/pre-commit-lint.json` requires lint and type-check before commit.
 
+### "Review cycle" workflow
+
+When the user says **review cycle**, apply these skills in order:
+
+1. `deep-code-review`: inspect the complete requested change set, including staged, unstaged and untracked work, and trace affected workflows and contracts end to end. Consolidate confirmed findings after the full pass, fix accepted issues without discarding existing work, and add regression coverage.
+2. `pre-commit-check`: run the final-state gates sequentially: `npm run lint`, `npm run test`, `npm run type-check`, then `npm run build`. Stop the pipeline on failure, fix issues within the user's authorized scope, and restart the pipeline. Report actual outcomes and existing warnings. Do not run live-device operations or E2E merely as part of this gate.
+3. `smart-commit`: classify every in-scope changed file and present a concrete numbered plan for granular conventional commits. Keep backend and frontend separate where practical, keep tests with their behavior, preserve existing staging, and follow the skill's plan-confirmation step unless the user has explicitly approved that plan. Use GitKraken tools when available and local Git otherwise. Keep hooks enabled and verify status after each commit.
+
+Save relevant review decisions and actual verification results in `MEMORY.md`. A review cycle authorizes review, in-scope fixes, checks and the commit workflow; it does not imply permission to push, deploy, rewrite history, send email, or control a device.
+
 ## Verification matrix
 
 Run the smallest relevant checks during iteration, then broaden in proportion to risk.
@@ -163,10 +173,10 @@ Husky installs committed hooks through the `prepare` script. Pre-commit runs lin
 
 ## Environment and operational safety
 
-Frontend/local configuration uses `NEXT_PUBLIC_CONVEX_URL` and `CONVEX_DEPLOYMENT`. Convex deployment variables include `CONVEX_SITE_URL`, `ECOFLOW_ACCESS_KEY`, `ECOFLOW_SECRET_KEY`, `RESEND_API_KEY`, optional `NEXT_PUBLIC_APP_URL`, optional `DISABLE_CRONS`, and temporary `MIGRATION_SECRET` for legacy imports.
+Frontend/local configuration uses `NEXT_PUBLIC_CONVEX_URL` and `CONVEX_DEPLOYMENT`. Convex deployment variables include `CONVEX_SITE_URL`, `ECOFLOW_ACCESS_KEY`, `ECOFLOW_SECRET_KEY`, `RESEND_API_KEY`, Google Drive's `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET` and `TOKEN_ENCRYPTION_KEY`, optional `NEXT_PUBLIC_APP_URL`, optional `DISABLE_CRONS`, and temporary `MIGRATION_SECRET` for legacy imports.
 
 - `.env.example` contains safe placeholders only. Keep it synchronized with runtime variable names and never insert real values.
-- Never commit `.env*`, access keys, secret keys, deployment credentials, exported personal data, or real device serial numbers.
+- Never commit real `.env*` configuration, access keys, secret keys, deployment credentials, exported personal data, or real device serial numbers. The placeholder-only `.env.example` template is allowed.
 - `scripts/supabase-export.json` may contain migrated user/device data. Treat it as sensitive even though it is checked in; do not print or edit it casually.
 - External actions can control physical power outputs, send email, or alter production data. Prefer static checks and mocks; require explicit authorization and a clearly identified environment for live operations.
 

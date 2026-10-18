@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { 
   Settings,
@@ -25,7 +25,10 @@ import { useConvexProfile, useConvexSettings, useConvexDevices } from '@/hooks/u
 import { useAuthActions } from '@convex-dev/auth/react'
 import { useConvex } from 'convex/react'
 import { api } from '../../../../convex/_generated/api'
+import type { Id } from '../../../../convex/_generated/dataModel'
 import { cn } from '@/lib/utils'
+import { PillButton } from '@/components/ui/PillButton'
+import { collectCompleteReadings, createCompleteExportReadings, createCompleteReadingsCsv } from '@/lib/complete-readings-export'
 
 interface UserProfile {
   email: string
@@ -50,6 +53,19 @@ interface DataSettings {
   backupInterval: number // hours
   exportFormat: 'json' | 'csv'
   collectInterval: number // minutes
+  backupDestination: 'email' | 'googleDrive'
+}
+
+const DRIVE_BROWSER_NONCE_KEY = 'ecoflow.googleDrive.browserNonce'
+
+function clearDriveCallback() {
+  try {
+    window.sessionStorage.removeItem(DRIVE_BROWSER_NONCE_KEY)
+  } catch { /* A blocked browser store must not leave the callback URL behind. */ }
+  const url = new URL(window.location.href)
+  url.searchParams.delete('drive')
+  url.searchParams.delete('state')
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
 }
 
 interface SecuritySettings {
@@ -67,10 +83,16 @@ function SettingsPage() {
     isLoading: settingsLoading,
     updateDataRetention: convexUpdateDataRetention,
     updateNotifications: convexUpdateNotifications,
+    sendTestEmail,
+    googleDriveStatus,
+    googleDriveLoading,
+    startGoogleDriveConnection,
+    finishGoogleDriveConnection,
+    disconnectGoogleDrive,
   } = useConvexSettings()
   const { signOut } = useAuthActions()
   const convex = useConvex()
-  const { devices } = useConvexDevices()
+  const { devices, isLoading: devicesLoading } = useConvexDevices()
   const { notifications, clearAllNotifications } = useUIStore()
   const userLoading = profileLoading || settingsLoading
   // Keep local UI state
@@ -100,7 +122,8 @@ function SettingsPage() {
     autoBackup: true,
     backupInterval: 24,
     exportFormat: 'json',
-    collectInterval: 5
+    collectInterval: 5,
+    backupDestination: 'email',
   })
   
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
@@ -124,6 +147,44 @@ function SettingsPage() {
 
   // Test email state
   const [testingEmail, setTestingEmail] = useState(false)
+  const [driveOperation, setDriveOperation] = useState<'connecting' | 'finishing' | 'disconnecting' | null>(null)
+  const handledDriveCallback = useRef(false)
+  const driveReady = Boolean(googleDriveStatus?.configured && googleDriveStatus.connected && !googleDriveStatus.reconnectRequired)
+
+  useEffect(() => {
+    // A resolved, non-null status proves authentication before consuming the
+    // browser-bound callback. The ref prevents a second finish in StrictMode.
+    if (googleDriveLoading || !googleDriveStatus || handledDriveCallback.current) return
+    const params = new URL(window.location.href).searchParams
+    const callback = params.get('drive')
+    if (callback !== 'finish' && callback !== 'error') return
+    handledDriveCallback.current = true
+    setActiveTab('data')
+    if (callback === 'error') {
+      clearDriveCallback()
+      toast.error('Google Drive connection was not completed. Please try again.')
+      return
+    }
+
+    setDriveOperation('finishing')
+    void (async () => {
+      try {
+        const state = params.get('state')
+        const browserNonce = window.sessionStorage.getItem(DRIVE_BROWSER_NONCE_KEY)
+        if (!state || !/^[A-Za-z0-9_-]{43}$/.test(state) || !browserNonce || !/^[a-f0-9]{64}$/.test(browserNonce)) {
+          throw new Error('This Google Drive connection session is missing or expired. Connect again from this browser.')
+        }
+        await finishGoogleDriveConnection({ state, browserNonce })
+        setDataSettings(previous => ({ ...previous, backupDestination: 'googleDrive' }))
+        toast.success('Google Drive connected for backups. Your saved backup schedule is unchanged.')
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to connect Google Drive. Please try again.')
+      } finally {
+        clearDriveCallback()
+        setDriveOperation(null)
+      }
+    })()
+  }, [googleDriveLoading, googleDriveStatus, finishGoogleDriveConnection])
 
   // Sync profile from Convex reactive query
   useEffect(() => {
@@ -163,6 +224,7 @@ function SettingsPage() {
         autoBackup: convexDataRetention.backupEnabled ?? false,
         backupInterval: convexDataRetention.backupIntervalHours ?? 24,
         collectInterval: convexDataRetention.collectionIntervalMinutes ?? 5,
+        backupDestination: convexDataRetention.backupDestination ?? 'email',
       }))
     }
   }, [convexDataRetention])
@@ -226,13 +288,19 @@ function SettingsPage() {
         toast.success('Notification settings updated successfully')
       } else if (settingsType === 'dataSettings') {
         // Validate data settings before saving
-        if (settings.retentionPeriod < 1 || settings.retentionPeriod > 365) {
-          toast.error('Retention period must be between 1 and 365 days')
+        if (settings.retentionPeriod < 1 || settings.retentionPeriod > 730) {
+          toast.error('Retention period must be between 1 and 730 days')
           return
         }
 
         if (settings.collectInterval < 1 || settings.collectInterval > 1440) {
           toast.error('Collection interval must be between 1 and 1440 minutes')
+          return
+        }
+
+        const destinationChanged = settings.backupDestination !== (convexDataRetention?.backupDestination ?? 'email')
+        if (destinationChanged && settings.backupDestination === 'googleDrive' && !driveReady) {
+          toast.error('Connect Google Drive before selecting it for automatic backups.')
           return
         }
 
@@ -243,6 +311,7 @@ function SettingsPage() {
           backupEnabled: settings.autoBackup,
           backupIntervalHours: settings.backupInterval,
           collectionIntervalMinutes: settings.collectInterval,
+          ...(destinationChanged ? { backupDestination: settings.backupDestination } : {}),
         })
         toast.success('Data settings updated successfully')
       } else {
@@ -316,16 +385,49 @@ function SettingsPage() {
   }
 
   const handleTestEmail = async () => {
+    if (testingEmail) return
     setTestingEmail(true)
     try {
-      // Test emails are sent via Convex internal actions (triggered by device alerts)
-      // A manual test can be triggered from the Convex Dashboard
-      toast.info('Test emails are sent automatically when device alerts trigger. Check the Convex Dashboard for email logs.')
+      const result = await sendTestEmail()
+      if (!result.success) {
+        toast.error(result.error || 'Failed to send test email')
+        return
+      }
+      toast.success('Test email accepted for delivery. Check your inbox.')
     } catch (error) {
       console.error('Test email error:', error)
-      toast.error('Failed to send test email')
+      toast.error(error instanceof Error ? error.message : 'Failed to send test email')
     } finally {
       setTestingEmail(false)
+    }
+  }
+
+  const handleConnectDrive = async () => {
+    if (driveOperation || !googleDriveStatus?.configured) return
+    setDriveOperation('connecting')
+    try {
+      const bytes = window.crypto.getRandomValues(new Uint8Array(32))
+      const browserNonce = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
+      window.sessionStorage.setItem(DRIVE_BROWSER_NONCE_KEY, browserNonce)
+      const { url } = await startGoogleDriveConnection({ browserNonce, returnOrigin: window.location.origin })
+      window.location.assign(url)
+    } catch (error) {
+      try { window.sessionStorage.removeItem(DRIVE_BROWSER_NONCE_KEY) } catch { /* Browser storage may be blocked. */ }
+      setDriveOperation(null)
+      toast.error(error instanceof Error ? error.message : 'Failed to start Google Drive connection.')
+    }
+  }
+
+  const handleDisconnectDrive = async () => {
+    if (driveOperation) return
+    setDriveOperation('disconnecting')
+    try {
+      await disconnectGoogleDrive()
+      toast.success('Google Drive disconnected. Your backup settings are unchanged.')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to disconnect Google Drive.')
+    } finally {
+      setDriveOperation(null)
     }
   }
 
@@ -334,19 +436,23 @@ function SettingsPage() {
       toast.error('Invalid export format. Only JSON and CSV are supported.')
       return
     }
+    if (devicesLoading) {
+      toast.error('Devices are still loading. Please try again.')
+      return
+    }
 
     setSaving(true)
     try {
-      // Fetch readings from Convex (last 90 days by default)
-      const now = Date.now()
-      const startTime = now - (dataSettings.retentionPeriod * 24 * 60 * 60 * 1000)
-      const historyResult = await convex.query(api.readings.history, {
-        startTime,
-        endTime: now + 24 * 60 * 60 * 1000,
-        aggregation: 'raw',
-      })
-
-      const readings = historyResult?.readings ?? []
+      // Export every stored reading; chart history intentionally samples large ranges.
+      const exportWindow = await convex.query(api.exports.exportWindow, {})
+      if (!exportWindow) throw new Error('Please sign in again before exporting readings.')
+      const now = exportWindow.endTime
+      const exportDevices = [...(devices ?? [])]
+      const readings = await collectCompleteReadings(
+        exportDevices.map(device => device.id as Id<'devices'>),
+        exportWindow,
+        args => convex.query(api.exports.readingPage, args),
+      )
 
       let content: string
       let mimeType: string
@@ -355,52 +461,32 @@ function SettingsPage() {
       if (format === 'json') {
         const exportPayload = {
           exportedAt: new Date().toISOString(),
+          readingsThrough: new Date(now).toISOString(),
+          rawPayloadsIncluded: false,
           profile: convexProfile ? {
             email: convexProfile.email,
             firstName: convexProfile.firstName,
             lastName: convexProfile.lastName,
           } : null,
-          devices: (devices ?? []).map(d => ({
+          devices: exportDevices.map(d => ({
             deviceSn: d.deviceSn,
             deviceName: d.deviceName,
             deviceType: d.deviceType,
             isActive: d.isActive,
+            dcInputSource: d.dcInputSource ?? 'auto',
           })),
           settings: {
             dataRetention: convexDataRetention,
             notifications: convexNotifications,
           },
-          readings: readings.map(r => ({
-            deviceSn: r.deviceSn,
-            deviceName: r.deviceName,
-            batteryLevel: r.batteryLevel,
-            inputWatts: r.inputWatts,
-            outputWatts: r.outputWatts,
-            acInputWatts: r.acInputWatts,
-            dcInputWatts: r.dcInputWatts,
-            acOutputWatts: r.acOutputWatts,
-            dcOutputWatts: r.dcOutputWatts,
-            usbOutputWatts: r.usbOutputWatts,
-            remainingTime: r.remainingTime,
-            temperature: r.temperature,
-            status: r.status,
-            recordedAt: new Date(r.recordedAt).toISOString(),
-          })),
+          readings: createCompleteExportReadings(readings),
           totalReadings: readings.length,
         }
         content = JSON.stringify(exportPayload, null, 2)
         mimeType = 'application/json'
       } else {
         // CSV — readings only
-        const headers = ['deviceSn','deviceName','recordedAt','batteryLevel','inputWatts','outputWatts','acInputWatts','dcInputWatts','acOutputWatts','dcOutputWatts','usbOutputWatts','remainingTime','temperature','status']
-        const rows = readings.map(r => [
-          r.deviceSn, r.deviceName, new Date(r.recordedAt).toISOString(),
-          r.batteryLevel ?? '', r.inputWatts ?? '', r.outputWatts ?? '',
-          r.acInputWatts ?? '', r.dcInputWatts ?? '', r.acOutputWatts ?? '',
-          r.dcOutputWatts ?? '', r.usbOutputWatts ?? '', r.remainingTime ?? '',
-          r.temperature ?? '', r.status,
-        ].map(v => `"${v}"`).join(','))
-        content = [headers.join(','), ...rows].join('\n')
+        content = createCompleteReadingsCsv(readings)
         mimeType = 'text/csv'
       }
 
@@ -416,7 +502,7 @@ function SettingsPage() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
-      toast.success(`Data exported successfully as ${format.toUpperCase()} (${(blob.size / 1024).toFixed(1)} KB)`)
+      toast.success(`Data exported successfully as ${format.toUpperCase()} (${readings.length} readings, ${(blob.size / 1024).toFixed(1)} KB)`)
     } catch (error) {
       console.error('Export error:', error)
       const errorMessage = error instanceof Error ? error.message : 'Failed to export data'
@@ -764,9 +850,12 @@ function SettingsPage() {
                         <div className="flex items-center justify-between p-4 bg-surface-2 rounded-inner">
                           <div>
                             <div className="font-medium text-text-primary">Automatic Backup</div>
-                            <div className="text-sm text-text-muted">Periodic email backup of device readings and settings</div>
+                            <div className="text-sm text-text-muted">Save readings and settings on your schedule. Failed backups keep older readings until they succeed.</div>
                           </div>
                           <button
+                            role="switch"
+                            aria-label="Automatic Backup"
+                            aria-checked={dataSettings.autoBackup}
                             onClick={() => setDataSettings(prev => ({ ...prev, autoBackup: !prev.autoBackup }))}
                             className={cn(
                               "w-12 h-6 rounded-full transition-colors",
@@ -780,13 +869,82 @@ function SettingsPage() {
                           </button>
                         </div>
 
+                        <div className="p-4 bg-surface-2 rounded-inner space-y-2">
+                          <label htmlFor="backup-destination" className="block font-medium text-text-primary">Backup Destination</label>
+                          <select
+                            id="backup-destination"
+                            value={dataSettings.backupDestination}
+                            onChange={event => setDataSettings(previous => ({ ...previous, backupDestination: event.target.value as DataSettings['backupDestination'] }))}
+                            disabled={driveOperation !== null}
+                            className="w-full bg-surface-1 text-text-primary border border-stroke-subtle rounded-inner px-3 py-2"
+                          >
+                            <option value="email">Email attachments (numbered parts)</option>
+                            <option value="googleDrive" disabled={!driveReady}>Google Drive + one email link</option>
+                          </select>
+                          <p className="text-sm text-text-muted">
+                            {dataSettings.backupDestination === 'googleDrive'
+                              ? 'Backups stay private in Google Drive. You receive one email with a link after each completed backup.'
+                              : 'Large email backups arrive in numbered parts. Connect Google Drive to receive one backup link instead.'}
+                          </p>
+                        </div>
+
+                        <div className="p-4 bg-surface-2 rounded-inner space-y-3">
+                          <div>
+                            <div className="font-medium text-text-primary">Google Drive</div>
+                            <p className="text-sm text-text-muted" aria-live="polite">
+                              {driveOperation === 'finishing'
+                                ? 'Completing your Google Drive connection…'
+                                : googleDriveLoading
+                                  ? 'Checking Google Drive connection…'
+                                  : !googleDriveStatus?.configured
+                                    ? 'Google Drive backups are not configured yet.'
+                                    : googleDriveStatus.reconnectRequired
+                                      ? 'Reconnect Google Drive to resume automatic Drive backups.'
+                                      : googleDriveStatus.connected
+                                        ? 'Google Drive is connected for private backups.'
+                                        : 'Connect Google Drive for backups and one email link per completed backup.'}
+                            </p>
+                          </div>
+                          <p className="text-sm text-text-muted">The first Drive backup includes all stored readings; later backups include new readings and settings. Connecting switches the saved destination to Google Drive and keeps your automatic backup setting and interval.</p>
+                          {dataSettings.backupDestination === 'googleDrive' && !googleDriveLoading && !driveReady && (
+                            <p className="text-sm text-warning">Automatic Drive backups are paused until you reconnect or select email attachments. Older readings stay protected while backups are enabled.</p>
+                          )}
+                          <div className="flex flex-wrap items-center gap-3">
+                            {!driveReady && (
+                              <PillButton
+                                onClick={handleConnectDrive}
+                                disabled={saving || driveOperation !== null || googleDriveLoading || !googleDriveStatus?.configured}
+                                className="min-h-11 flex items-center gap-2"
+                              >
+                                {driveOperation === 'connecting' && <Loader2 size={16} className="animate-spin" />}
+                                {googleDriveStatus?.reconnectRequired ? 'Reconnect Google Drive' : 'Connect Google Drive for backups'}
+                              </PillButton>
+                            )}
+                            {(googleDriveStatus?.connected || googleDriveStatus?.connectedAt !== null && googleDriveStatus?.connectedAt !== undefined) && (
+                              <PillButton
+                                variant="ghost"
+                                onClick={handleDisconnectDrive}
+                                disabled={saving || driveOperation !== null}
+                                className="min-h-11 flex items-center gap-2"
+                              >
+                                {driveOperation === 'disconnecting' && <Loader2 size={16} className="animate-spin" />}
+                                Disconnect Google Drive
+                              </PillButton>
+                            )}
+                            {googleDriveStatus?.folderUrl && (
+                              <a href={googleDriveStatus.folderUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm text-brand-primary hover:text-brand-secondary">Open backup folder</a>
+                            )}
+                          </div>
+                        </div>
+
                         {dataSettings.autoBackup && (
                           <div className="flex items-center justify-between p-4 bg-surface-2 rounded-inner">
                             <div>
-                              <div className="font-medium text-text-primary">Backup Interval</div>
-                              <div className="text-sm text-text-muted">How often to email a data backup</div>
+                              <label htmlFor="backup-interval" className="font-medium text-text-primary">Backup Interval</label>
+                              <div className="text-sm text-text-muted">How often to create a data backup</div>
                             </div>
                             <select
+                              id="backup-interval"
                               value={dataSettings.backupInterval}
                               onChange={(e) => setDataSettings(prev => ({ ...prev, backupInterval: parseInt(e.target.value) }))}
                               className="bg-surface-1 text-text-primary border border-stroke-subtle rounded-inner px-3 py-1.5 text-sm"
@@ -802,7 +960,7 @@ function SettingsPage() {
 
                       <button
                         onClick={() => saveSettings('dataSettings', dataSettings)}
-                        disabled={saving}
+                        disabled={saving || driveOperation !== null}
                         className="mt-4 flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 disabled:opacity-50 text-bg-base font-medium px-4 py-2 rounded-pill transition-all duration-160 ease-dashboard"
                       >
                         {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
@@ -831,7 +989,7 @@ function SettingsPage() {
                           Export Readings (CSV)
                         </button>
                         <div className="text-sm text-text-muted">
-                          Download a complete copy of your data including device readings, settings, and profile information.
+                          Exports include every stored reading with telemetry and configuration fields. Raw EcoFlow payloads are excluded. JSON also includes settings and profile information.
                         </div>
                       </div>
                     </div>

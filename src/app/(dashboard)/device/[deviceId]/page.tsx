@@ -2,6 +2,9 @@
 
 import { use } from 'react'
 import { formatRemainingTime } from '@/lib/data-utils'
+import { getInputLabel, getInputSourceDescription, getTrustedInputChannels, getVerifiedSolarPanelInput } from '@/lib/reading-status'
+import { resolveDisplayMetric, resolveTemperatureMetric } from '@/lib/display-telemetry'
+import { TemperatureStatus } from '@/components/controls/TemperatureStatus'
 import { useRouter } from 'next/navigation'
 import { useConvexDevices, useConvexDeviceMutations, useConvexDeviceControl } from '@/hooks/useConvexData'
 import Link from 'next/link'
@@ -66,7 +69,8 @@ export default function DevicePage({ params }: DevicePageProps) {
     }
   }
 
-  const getBatteryColor = (level: number): string => {
+  const getBatteryColor = (level: number | null): string => {
+    if (level === null) return 'text-text-muted'
     if (level > 60) return 'text-brand-primary'
     if (level > 30) return 'text-warning'
     return 'text-danger'
@@ -178,6 +182,21 @@ export default function DevicePage({ params }: DevicePageProps) {
   }
 
   const reading = device.currentReading
+  const solarPanels = getVerifiedSolarPanelInput(reading)
+  const inputSourceDescription = getInputSourceDescription(reading)
+  const batteryLevel = typeof reading?.batteryLevel === 'number' && Number.isFinite(reading.batteryLevel) ? reading.batteryLevel : null
+  const temperatureMetric = resolveTemperatureMetric(device.displayTelemetry?.temperature)
+  const temperature = temperatureMetric.value
+  const acOutputMetric = resolveDisplayMetric(reading?.acOutputWatts, device.displayTelemetry?.acOutputWatts)
+  const dcOutputMetric = resolveDisplayMetric(reading?.dcOutputWatts, device.displayTelemetry?.dcOutputWatts)
+  const usbOutputMetric = resolveDisplayMetric(reading?.usbOutputWatts, device.displayTelemetry?.usbOutputWatts)
+  const formatOutputPower = (watts: number | null | undefined) =>
+    typeof watts === 'number' && Number.isFinite(watts) ? `${watts.toFixed(0)}W` : '—'
+  const connectionLabel = device.connectionStatus === 'offline' ? 'Offline'
+    : device.connectionStatus === 'error' ? 'Refresh failed'
+    : device.readingFreshness === 'stale' ? 'Reading stale'
+    : device.readingFreshness === 'missing' ? 'No readings'
+    : device.online ? 'Online' : 'Offline'
 
   return (
     
@@ -204,7 +223,7 @@ export default function DevicePage({ params }: DevicePageProps) {
                     <WifiOff className="w-4 h-4 text-danger" />
                   )}
                   <span className={`text-sm font-medium ${device.online ? 'text-brand-primary' : 'text-danger'}`}>
-                    {device.online ? 'Online' : 'Offline'}
+                    {connectionLabel}
                   </span>
                 </div>
               </div>
@@ -278,21 +297,30 @@ export default function DevicePage({ params }: DevicePageProps) {
           <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-160 ease-dashboard">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
-                <Battery className={`w-5 h-5 ${getBatteryColor(reading?.batteryLevel || 0)}`} />
+                <Battery className={`w-5 h-5 ${getBatteryColor(batteryLevel)}`} />
                 <span className="text-text-secondary text-sm font-medium">Battery</span>
               </div>
             </div>
             <div className="space-y-2">
-              <div className={`text-2xl font-bold ${getBatteryColor(reading?.batteryLevel || 0)}`}>
-                {reading?.batteryLevel || 0}%
+              <div className={`text-2xl font-bold ${getBatteryColor(batteryLevel)}`} aria-label={batteryLevel === null ? 'Battery level unavailable' : `Battery level ${batteryLevel}%`}>
+                {batteryLevel === null ? '—' : `${batteryLevel}%`}
               </div>
-              <div className="w-full bg-stroke-strong rounded-full h-2">
+              <div
+                role="progressbar"
+                aria-label="Battery level"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={batteryLevel ?? undefined}
+                aria-valuetext={batteryLevel === null ? 'Unavailable' : `${batteryLevel}%`}
+                className="w-full bg-stroke-strong rounded-full h-2"
+              >
                 <div 
                   className={`h-2 rounded-full transition-all duration-[220ms] ${
-                    (reading?.batteryLevel || 0) > 60 ? 'bg-brand-primary' :
-                    (reading?.batteryLevel || 0) > 30 ? 'bg-warning' : 'bg-danger'
+                    batteryLevel === null ? 'bg-stroke-subtle' :
+                    batteryLevel > 60 ? 'bg-brand-primary' :
+                    batteryLevel > 30 ? 'bg-warning' : 'bg-danger'
                   }`}
-                  style={{ width: `${reading?.batteryLevel || 0}%` }}
+                  style={{ width: `${batteryLevel ?? 0}%` }}
                 ></div>
               </div>
             </div>
@@ -307,10 +335,10 @@ export default function DevicePage({ params }: DevicePageProps) {
               </div>
             </div>
             <div className="text-2xl font-bold text-brand-tertiary">
-              {reading?.inputWatts || 0}W
+              {reading?.inputWatts == null ? '—' : `${reading.inputWatts}W`}
             </div>
-            <div className="text-xs text-text-muted mt-1">
-              {(reading?.inputWatts || 0) > 0 ? 'Receiving power' : 'No input'}
+            <div className="text-xs text-text-muted mt-1" title={inputSourceDescription} aria-description={inputSourceDescription}>
+              {getInputLabel(reading)}
             </div>
           </div>
 
@@ -323,7 +351,7 @@ export default function DevicePage({ params }: DevicePageProps) {
               </div>
             </div>
             <div className="text-2xl font-bold text-warning">
-              {reading?.outputWatts || 0}W
+              {reading?.outputWatts == null ? '—' : `${reading.outputWatts}W`}
             </div>
             <div className="text-xs text-text-muted mt-1">
               {(reading?.outputWatts || 0) > 0 ? 'In use' : 'Standby'}
@@ -334,24 +362,30 @@ export default function DevicePage({ params }: DevicePageProps) {
           <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-160 ease-dashboard">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
-                <Thermometer className="w-5 h-5 text-brand-primary" />
+                <Thermometer className={`w-5 h-5 ${temperatureMetric.status === 'reported' ? 'text-brand-primary' : 'text-text-muted'}`} />
                 <span className="text-text-secondary text-sm font-medium">Temperature</span>
               </div>
             </div>
-            <div className="text-2xl font-bold text-brand-primary">
-              {reading?.temperature || 20}°C
+            <div className={`text-2xl font-bold ${temperatureMetric.status === 'reported' ? 'text-brand-primary' : 'text-text-muted'}`} aria-label={temperature === null ? 'Temperature unavailable' : `Temperature ${temperature}°C`} aria-description={temperatureMetric.label}>
+              {temperature === null ? '—' : `${temperature}°C`}
             </div>
-            <div className="text-xs text-text-muted mt-1">
-              {(reading?.temperature || 20) < 45 ? 'Normal' : 'High'}
-            </div>
+            <TemperatureStatus metric={temperatureMetric} refreshing={device.temperatureRefreshing} className="mt-1" />
           </div>
         </div>
 
+        {/* Independent panel input */}
+        {solarPanels && (
+          <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-inner border border-stroke-subtle bg-surface-2 px-4 py-3 text-xs text-text-muted">
+            <span className="font-medium text-text-primary" title={inputSourceDescription} aria-description={inputSourceDescription}>Panels: {solarPanels.watts.toFixed(0)}W</span>
+            {!getTrustedInputChannels(reading) && <span>AC/DC split unavailable</span>}
+            <span>Separate panel measurement</span>
+          </div>
+        )}
         {/* Power Output Breakdown */}
-        <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 mb-8">
+        <div role="region" aria-labelledby="power-output-breakdown" className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Zap className="w-5 h-5 text-warning" />
-            <h3 className="text-lg font-medium text-text-primary">Power Output Breakdown</h3>
+            <h3 id="power-output-breakdown" className="text-lg font-medium text-text-primary">Power Output Breakdown</h3>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -364,9 +398,14 @@ export default function DevicePage({ params }: DevicePageProps) {
                 </div>
               </div>
               <div className="text-2xl font-bold text-brand-tertiary">
-                {reading?.acOutputWatts?.toFixed(0) || '0'}W
+                {formatOutputPower(acOutputMetric.value)}
               </div>
               <div className="text-xs text-text-muted">Alternating Current</div>
+              {acOutputMetric.cacheLabel !== null && (
+                <div className="text-xs text-text-muted mt-1" title={acOutputMetric.cacheTooltip} aria-description={acOutputMetric.cacheTooltip}>
+                  {acOutputMetric.cacheLabel}
+                </div>
+              )}
             </div>
 
             {/* DC Output */}
@@ -378,9 +417,14 @@ export default function DevicePage({ params }: DevicePageProps) {
                 </div>
               </div>
               <div className="text-2xl font-bold text-warning">
-                {reading?.dcOutputWatts?.toFixed(0) || '0'}W
+                {formatOutputPower(dcOutputMetric.value)}
               </div>
               <div className="text-xs text-text-muted">Direct Current</div>
+              {dcOutputMetric.cacheLabel !== null && (
+                <div className="text-xs text-text-muted mt-1" title={dcOutputMetric.cacheTooltip} aria-description={dcOutputMetric.cacheTooltip}>
+                  {dcOutputMetric.cacheLabel}
+                </div>
+              )}
             </div>
 
             {/* USB Output */}
@@ -392,9 +436,14 @@ export default function DevicePage({ params }: DevicePageProps) {
                 </div>
               </div>
               <div className="text-2xl font-bold text-success">
-                {reading?.usbOutputWatts?.toFixed(0) || '0'}W
+                {formatOutputPower(usbOutputMetric.value)}
               </div>
               <div className="text-xs text-text-muted">USB Ports</div>
+              {usbOutputMetric.cacheLabel !== null && (
+                <div className="text-xs text-text-muted mt-1" title={usbOutputMetric.cacheTooltip} aria-description={usbOutputMetric.cacheTooltip}>
+                  {usbOutputMetric.cacheLabel}
+                </div>
+              )}
             </div>
           </div>
 
@@ -403,11 +452,13 @@ export default function DevicePage({ params }: DevicePageProps) {
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-text-secondary">Total Output</span>
               <div className="text-xl font-bold text-text-primary">
-                {reading?.outputWatts?.toFixed(0) || '0'}W
+                {formatOutputPower(reading?.outputWatts)}
               </div>
             </div>
             <div className="text-xs text-text-muted mt-1">
-              Combined AC + DC + USB power output
+              {[acOutputMetric, dcOutputMetric, usbOutputMetric].some(metric => metric.cacheLabel !== null)
+                ? 'Latest total output; cached channel values may be older.'
+                : 'Combined AC + DC + USB power output'}
             </div>
           </div>
         </div>
@@ -586,16 +637,14 @@ export default function DevicePage({ params }: DevicePageProps) {
                   <span className="text-text-primary">{new Date(device.createdAt).toLocaleDateString()}</span>
                 </div>
               )}
-              {device.updatedAt && (
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Last Updated:</span>
-                  <span className="text-text-primary">{new Date(device.updatedAt).toLocaleDateString()}</span>
-                </div>
-              )}
+              <div className="flex justify-between">
+                <span className="text-text-secondary">Last Reading Fetched:</span>
+                <span className="text-text-primary">{reading?.recordedAt != null ? new Date(reading.recordedAt).toLocaleString() : 'Never'}</span>
+              </div>
               <div className="flex justify-between">
                 <span className="text-text-secondary">Connection:</span>
                 <span className={`font-medium ${device.online ? 'text-brand-primary' : 'text-danger'}`}>
-                  {device.online ? 'Connected' : 'Disconnected'}
+                  {connectionLabel}
                 </span>
               </div>
             </div>

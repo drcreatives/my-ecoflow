@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getHistoryRowCap, getHistorySampleWindows } from "../readings";
+import {
+  getHistoryRowCap,
+  getHistorySampleWindows,
+  getHistorySamplingIntervalMs,
+} from "../readings";
 
 describe("reading history query limits", () => {
   it("caps long filtered ranges before legacy raw payloads exceed query limits", () => {
@@ -38,6 +42,17 @@ describe("reading history query limits", () => {
     const oneHourLater = startTime + 60 * 60 * 1000;
 
     expect(getHistorySampleWindows(startTime, oneHourLater, 1)).toBeNull();
+  });
+
+  it("reports an explicit interval only for uniformly sampled ranges", () => {
+    const startTime = 1_700_000_000_000;
+    const thirtyDaysLater = startTime + 30 * 24 * 60 * 60 * 1000;
+    const windows = getHistorySampleWindows(startTime, thirtyDaysLater, 5);
+
+    expect(getHistorySamplingIntervalMs(windows)).toBe(
+      (30 * 24 * 60 * 60 * 1000) / 500
+    );
+    expect(getHistorySamplingIntervalMs(null)).toBeNull();
   });
 
   it("samples according to the user's configured collection interval", () => {

@@ -20,6 +20,10 @@ import {
 import { useConvexDevices, useConvexHistoryReadings } from '@/hooks/useConvexData'
 import { cn } from '@/lib/utils'
 import { DateTimePicker } from '@/components/ui/DateTimePicker'
+import { createHistoryCsv } from '@/lib/history-export'
+import { formatMeasurementValue as formatValue } from '@/lib/data-utils'
+import { getInputSourceDescription, getVerifiedSolarPanelInput } from '@/lib/reading-status'
+import { mergeTemperatureHistoryReadings } from '@/lib/temperature-history'
 
 // Types for history data
 interface HistoryFilters {
@@ -44,10 +48,11 @@ interface HistorySummary {
   totalReadings: number
   avgBatteryLevel: number
   avgPowerOutput: number
-  avgTemperature: number
+  avgTemperature: number | null
+  temperatureReadings: number
   peakPowerOutput: number
   lowestBatteryLevel: number
-  highestTemperature: number
+  highestTemperature: number | null
   startTime: number
   endTime: number
 }
@@ -62,9 +67,6 @@ interface DeviceOption {
 function HistoryPage() {
   // Use Convex reactive queries — no manual fetch needed
   const { devices, isLoading: devicesLoading } = useConvexDevices()
-
-  // Keep local UI state  
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   // Filter state
   const [filters, setFilters] = useState<HistoryFilters>({
@@ -116,6 +118,11 @@ function HistoryPage() {
   const {
     readings,
     summary,
+    samplingIntervalMs,
+    temperatureReadings,
+    temperatureSamplingIntervalMs,
+    temperatureSampledReadings,
+    temperatureSummary,
     isLoading,
     error,
   } = useConvexHistoryReadings(
@@ -128,8 +135,13 @@ function HistoryPage() {
     }
   )
 
-  // Reverse readings so the table shows newest first (query returns asc for charts)
-  const tableReadings = useMemo(() => [...readings].reverse(), [readings])
+  const mergedReadings = useMemo(() => mergeTemperatureHistoryReadings(readings, temperatureReadings), [readings, temperatureReadings])
+  // Reverse the combined display rows; power calculations continue to use the original stream.
+  const tableReadings = useMemo(() => [...mergedReadings].reverse(), [mergedReadings])
+  const lastRecordedAt = mergedReadings.reduce((latest, reading) => Math.max(latest, new Date(reading.recordedAt).getTime()), 0)
+  const temperatureStats = temperatureSummary ?? (summary ? {
+    avgTemperature: summary.avgTemperature, maxTemperature: summary.highestTemperature,
+  } : null)
 
   // Pagination calculations
   const totalPages = Math.max(1, Math.ceil(tableReadings.length / itemsPerPage))
@@ -146,20 +158,8 @@ function HistoryPage() {
     try {
       setIsExporting(true)
       // Client-side CSV export from current readings
-      if (readings.length === 0) throw new Error('No data to export')
-      const headers = ['Timestamp', 'Battery %', 'Input W', 'Output W', 'AC Out', 'DC Out', 'USB Out', 'Temp °C', 'Status']
-      const rows = readings.map((r: any) => [
-        new Date(r.recordedAt).toISOString(),
-        r.batteryLevel ?? '',
-        r.inputWatts ?? '',
-        r.outputWatts ?? '',
-        r.acOutputWatts ?? '',
-        r.dcOutputWatts ?? '',
-        r.usbOutputWatts ?? '',
-        r.temperature ?? '',
-        r.status ?? '',
-      ].join(','))
-      const csv = [headers.join(','), ...rows].join('\n')
+      if (mergedReadings.length === 0) throw new Error('No data to export')
+      const csv = createHistoryCsv(mergedReadings)
       const blob = new Blob([csv], { type: 'text/csv' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -190,7 +190,7 @@ function HistoryPage() {
   const getAggregationLabel = (aggregation: HistoryFilters['aggregation']) => {
     switch (aggregation) {
       case 'raw':
-        return 'Raw Data'
+        return samplingIntervalMs || temperatureSamplingIntervalMs ? 'Raw Data (sampled)' : 'Raw Data'
       case '5m':
         return '5 Minute Avg'
       case '1h':
@@ -200,11 +200,6 @@ function HistoryPage() {
       default:
         return 'Raw Data'
     }
-  }
-
-  const formatValue = (value: number | null | undefined, unit: string) => {
-    if (value === null || value === undefined || isNaN(value)) return '0' + unit
-    return value.toFixed(1) + unit
   }
 
   if (devicesLoading) {
@@ -238,9 +233,9 @@ function HistoryPage() {
               <p className="text-text-secondary">
                 Detailed device readings and power consumption data
               </p>
-              {lastUpdated && (
+              {lastRecordedAt > 0 && (
                 <p className="text-xs text-text-muted">
-                  Last updated: {lastUpdated.toLocaleString()}
+                  Latest history point: {new Date(lastRecordedAt).toLocaleString()}
                 </p>
               )}
             </div>
@@ -261,7 +256,7 @@ function HistoryPage() {
               
               <button
                 onClick={handleExportData}
-                disabled={isExporting || readings.length === 0}
+                disabled={isExporting || mergedReadings.length === 0}
                 className="flex items-center gap-2 px-4 py-2 bg-brand-tertiary hover:bg-brand-tertiary/90 disabled:bg-surface-2 disabled:opacity-50 text-bg-base rounded-pill transition-all duration-160 text-sm"
               >
                 {isExporting ? (
@@ -309,7 +304,7 @@ function HistoryPage() {
                   <div className="relative">
                     <select
                       value={filters.timeRange}
-                      onChange={(e) => setFilters(prev => ({ ...prev, timeRange: e.target.value as any }))}
+                      onChange={(e) => setFilters(prev => ({ ...prev, timeRange: e.target.value as HistoryFilters['timeRange'] }))}
                       className="w-full bg-surface-2 border border-stroke-subtle rounded-inner px-3 py-2 text-text-primary focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 appearance-none pr-10"
                     >
                       <option value="1h">Last Hour</option>
@@ -397,16 +392,23 @@ function HistoryPage() {
             </div>
           )}
 
+          {samplingIntervalMs !== null && samplingIntervalMs > 0 && (
+            <p className="text-xs text-text-muted" role="note">
+              Sampled history: approximately one reading per {(samplingIntervalMs / 60_000).toFixed(1)} minutes before averaging.
+              {' '}Summaries and this CSV cover the displayed sample, not every stored reading.
+            </p>
+          )}
+
           {/* Summary Cards */}
-          {summary && (
+          {(summary || temperatureSummary) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[18px]">
               <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
                 <div className="flex items-center justify-between mb-2">
                   <Activity className="w-5 h-5 text-brand-tertiary" />
-                  <span className="text-xs text-text-muted">{formatTimeSpan(summary.startTime, summary.endTime)}</span>
+                  <span className="text-xs text-text-muted">{summary ? formatTimeSpan(summary.startTime, summary.endTime) : 'Temperature observations'}</span>
                 </div>
                 <div className="text-2xl font-medium text-text-primary mb-1">
-                  {(summary.totalReadings || 0).toLocaleString()}
+                  {mergedReadings.length.toLocaleString()}
                 </div>
                 <div className="text-sm text-text-secondary">Data Points</div>
               </div>
@@ -417,7 +419,7 @@ function HistoryPage() {
                   <span className="text-xs text-text-muted">Average</span>
                 </div>
                 <div className="text-2xl font-medium text-text-primary mb-1">
-                  {formatValue(summary.avgBatteryLevel, '%')}
+                  {formatValue(readings.length ? summary?.avgBatteryLevel : null, '%')}
                 </div>
                 <div className="text-sm text-text-secondary">Battery Level</div>
               </div>
@@ -425,10 +427,10 @@ function HistoryPage() {
               <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
                 <div className="flex items-center justify-between mb-2">
                   <Zap className="w-5 h-5 text-warning" />
-                  <span className="text-xs text-text-muted">Peak: {formatValue(summary.peakPowerOutput, 'W')}</span>
+                  <span className="text-xs text-text-muted">Peak: {formatValue(readings.length ? summary?.peakPowerOutput : null, 'W')}</span>
                 </div>
                 <div className="text-2xl font-medium text-text-primary mb-1">
-                  {formatValue(summary.avgPowerOutput, 'W')}
+                  {formatValue(readings.length ? summary?.avgPowerOutput : null, 'W')}
                 </div>
                 <div className="text-sm text-text-secondary">Avg Power Output</div>
               </div>
@@ -436,12 +438,15 @@ function HistoryPage() {
               <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
                 <div className="flex items-center justify-between mb-2">
                   <Thermometer className="w-5 h-5 text-danger" />
-                  <span className="text-xs text-text-muted">Max: {formatValue(summary.highestTemperature, '°C')}</span>
+                  <span className="text-xs text-text-muted">Max: {formatValue(temperatureStats?.maxTemperature, '°C')}</span>
                 </div>
                 <div className="text-2xl font-medium text-text-primary mb-1">
-                  {formatValue(summary.avgTemperature, '°C')}
+                  {formatValue(temperatureStats?.avgTemperature, '°C')}
                 </div>
                 <div className="text-sm text-text-secondary">Avg Temperature</div>
+                <div className="text-xs text-text-muted mt-1">
+                  {(temperatureSampledReadings ?? 0).toLocaleString()} temperature readings{temperatureSamplingIntervalMs ? ' (sampled)' : ''}
+                </div>
               </div>
             </div>
           )}
@@ -479,7 +484,7 @@ function HistoryPage() {
                   Retry
                 </button>
               </div>
-            ) : readings.length === 0 ? (
+            ) : tableReadings.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-center p-6">
                 <BarChart3 className="w-16 h-16 text-text-muted mb-4" />
                 <h3 className="text-lg font-medium text-text-secondary mb-2">No Historical Data</h3>
@@ -512,8 +517,9 @@ function HistoryPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stroke-subtle">
-                    {paginatedReadings.map((reading: any, index: number) => {
+                    {paginatedReadings.map((reading, index) => {
                       const device = devices.find(d => d.id === reading.deviceId)
+                      const panels = filters.aggregation === 'raw' ? getVerifiedSolarPanelInput(reading) : null
                       return (
                         <tr key={index} className="hover:bg-surface-2/50 transition-colors">
                           <td className="p-4 text-sm text-text-secondary">
@@ -527,32 +533,40 @@ function HistoryPage() {
                           </td>
                           <td className="p-4 text-sm">
                             <div className="flex items-center gap-2">
-                              <div className={`w-2 h-2 rounded-full ${
+                              {typeof reading.batteryLevel === 'number' && Number.isFinite(reading.batteryLevel) && <div className={`w-2 h-2 rounded-full ${
                                 (reading.batteryLevel && typeof reading.batteryLevel === 'number' && reading.batteryLevel > 50) ? 'bg-brand-primary' :
                                 (reading.batteryLevel && typeof reading.batteryLevel === 'number' && reading.batteryLevel > 20) ? 'bg-warning' : 'bg-danger'
-                              }`} />
+                              }`} />}
                               <span className="text-text-primary font-medium">
-                                {reading.batteryLevel && typeof reading.batteryLevel === 'number' ? reading.batteryLevel.toFixed(1) : '0'}%
+                                {formatValue(reading.batteryLevel, '%')}
                               </span>
                             </div>
                           </td>
                           <td className="p-4 text-sm text-brand-tertiary font-medium">
-                            {reading.inputWatts && typeof reading.inputWatts === 'number' ? reading.inputWatts.toFixed(0) : '0'}W
+                            <div>{formatValue(reading.inputWatts, 'W', 0)}</div>
+                            {panels && (
+                              <div className="text-xs text-text-muted mt-1" title={getInputSourceDescription(reading)} aria-description={getInputSourceDescription(reading)}>
+                                Panels: {panels.watts.toFixed(0)}W
+                              </div>
+                            )}
                           </td>
                           <td className="p-4 text-sm text-warning font-medium">
-                            {reading.outputWatts && typeof reading.outputWatts === 'number' ? reading.outputWatts.toFixed(0) : '0'}W
+                            {formatValue(reading.outputWatts, 'W', 0)}
                           </td>
                           <td className="p-4 text-sm text-brand-secondary font-medium">
-                            {reading.acOutputWatts && typeof reading.acOutputWatts === 'number' ? reading.acOutputWatts.toFixed(0) : '0'}W
+                            {formatValue(reading.acOutputWatts, 'W', 0)}
                           </td>
                           <td className="p-4 text-sm text-warning font-medium">
-                            {reading.dcOutputWatts && typeof reading.dcOutputWatts === 'number' ? reading.dcOutputWatts.toFixed(0) : '0'}W
+                            {formatValue(reading.dcOutputWatts, 'W', 0)}
                           </td>
                           <td className="p-4 text-sm text-success font-medium">
-                            {reading.usbOutputWatts && typeof reading.usbOutputWatts === 'number' ? reading.usbOutputWatts.toFixed(0) : '0'}W
+                            {formatValue(reading.usbOutputWatts, 'W', 0)}
                           </td>
                           <td className="p-4 text-sm text-danger font-medium">
-                            {reading.temperature && typeof reading.temperature === 'number' ? reading.temperature.toFixed(1) : '0'}°C
+                            {formatValue(reading.temperature, '°C')}
+                            {filters.aggregation !== 'raw' && (reading.temperatureSampleCount ?? 0) > 0 && (
+                              <div className="mt-1 text-xs text-text-muted">{reading.temperatureSampleCount} temperature readings</div>
+                            )}
                           </td>
                           <td className="p-4 text-sm">
                             <span className={`px-2 py-1 rounded-pill text-xs font-medium ${
@@ -575,10 +589,10 @@ function HistoryPage() {
             )}
 
             {/* Pagination */}
-            {readings.length > 0 && (
+            {tableReadings.length > 0 && (
               <div className="p-4 border-t border-stroke-subtle flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-sm text-text-muted">
-                  Showing {Math.min(startIndex + 1, readings.length)}-{Math.min(endIndex, readings.length)} of {readings.length} readings
+                  Showing {Math.min(startIndex + 1, tableReadings.length)}-{Math.min(endIndex, tableReadings.length)} of {tableReadings.length} rows
                 </div>
                 <div className="flex items-center gap-2">
                   <button 

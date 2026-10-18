@@ -1,10 +1,11 @@
 "use node";
 
-import { internalAction } from "./_generated/server";
+import { action, internalAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { Resend } from "resend";
-import { Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
+import { auth } from "./auth";
 
 // ─── Email Templates ─────────────────────────────────────────────────────────
 
@@ -179,62 +180,113 @@ export const sendDeviceAlertEmail = internalAction({
   },
 });
 
-/**
- * Send a test email to verify email configuration.
- */
-export const sendTestEmail = internalAction({
-  args: {
-    to: v.string(),
-    userId: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-      return { success: false, error: "RESEND_API_KEY not set" };
-    }
+interface TestEmailResult { success: boolean; messageId?: string; error?: string }
+const TEST_EMAIL_SUBJECT = "EcoFlow Dashboard email test";
 
-    const resend = new Resend(apiKey);
-    const dashboardUrl =
-      process.env.NEXT_PUBLIC_APP_URL ?? "https://my-ecoflow.vercel.app";
-
-    const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:20px;background:#f4f4f4;">
-<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.1);">
-  <div style="background:linear-gradient(135deg,#44af21,#00c356);color:#fff;padding:30px;text-align:center;">
-    <h1 style="margin:0;font-size:24px;">✅ Email Test Successful!</h1>
-  </div>
-  <div style="padding:30px;">
-    <h2 style="color:#44af21;margin-top:0;">Email Notifications are Working!</h2>
-    <p>This is a test email to confirm that your EcoFlow Dashboard email notifications are properly configured.</p>
-    <p><a href="${dashboardUrl}/settings" style="color:#44af21;">Manage your notification preferences →</a></p>
-  </div>
-</div>
-</body></html>`;
-
-    try {
-      const { data, error } = await resend.emails.send({
-        from: "EcoFlow Dashboard <test@devrunor.com>",
-        to: args.to,
-        subject: "✅ EcoFlow Dashboard Email Test",
-        html,
-      });
-
-      await ctx.runMutation(internal.email_log.logNotification, {
-        userId: args.userId,
-        type: "test_email",
-        email: args.to,
-        subject: "✅ EcoFlow Dashboard Email Test",
-        messageId: data?.id,
-        status: error ? "failed" : "sent",
-        errorMessage: error?.message,
-      });
-
-      if (error) return { success: false, error: error.message };
-      return { success: true, messageId: data?.id };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      return { success: false, error: msg };
-    }
+/** Explicitly requested diagnostics go only to the signed-in account. */
+export const sendMyTestEmail = action({
+  args: {},
+  handler: async (ctx): Promise<TestEmailResult> => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) throw new Error("Unauthorized");
+    const attempt = await ctx.runMutation(internal.email_log.claimTestEmailAttempt, { userId });
+    if (!attempt.allowed) return { success: false, error: attempt.error };
+    return deliverTestEmail(ctx, {
+      to: attempt.email, userId, logId: attempt.logId, firstName: attempt.firstName,
+    });
   },
 });
+
+/** Retain the trusted backend entrypoint without exposing recipient arguments. */
+export const sendTestEmail = internalAction({
+  args: { to: v.string(), userId: v.id("users") },
+  handler: async (ctx, args): Promise<TestEmailResult> => {
+    const logId = await ctx.runMutation(internal.email_log.logNotification, {
+      userId: args.userId, type: "test_email", email: args.to,
+      subject: TEST_EMAIL_SUBJECT, status: "pending",
+    });
+    return deliverTestEmail(ctx, { ...args, logId });
+  },
+});
+
+// ─── Test email delivery ─────────────────────────────────────────────────────
+
+async function deliverTestEmail(ctx: ActionCtx, args: {
+  to: string; userId: Id<"users">; logId: Id<"notificationLogs">; firstName?: string;
+}): Promise<TestEmailResult> {
+  const name = args.firstName?.trim().slice(0, 120) || "there";
+  const settingsUrl = `${(process.env.NEXT_PUBLIC_APP_URL ?? "https://my-ecoflow.vercel.app").replace(/\/$/, "")}/settings`;
+  const html = `<!DOCTYPE html>
+<html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${TEST_EMAIL_SUBJECT}</title></head>
+<body style="margin:0;padding:24px;background:#f4f4f4;color:#222;font-family:Arial,sans-serif;font-size:16px;line-height:1.6;">
+<div lang="en" dir="ltr" style="max-width:600px;margin:0 auto;padding:24px;background:#fff;border-radius:8px;">
+<h1 style="font-size:24px;margin-top:0;">EcoFlow Dashboard email test</h1>
+<p>Hello ${escapeHtml(name)},</p>
+<p>This is the test email you requested from your EcoFlow Dashboard settings.</p>
+<p>Receiving this message confirms it reached your mailbox.</p>
+<p><a href="${escapeHtml(settingsUrl)}" style="color:#226311;">Manage your notification preferences</a></p>
+</div></body></html>`;
+  const text = `Hello ${name},\n\nThis is the test email you requested from your EcoFlow Dashboard settings.\nReceiving this message confirms it reached your mailbox.\n\nManage your notification preferences: ${settingsUrl}`;
+  const apiKey = process.env.RESEND_API_KEY;
+  let result: TestEmailResult;
+  if (!apiKey) {
+    result = { success: false, error: "Email service is not configured." };
+  } else {
+    try {
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json",
+          "Idempotency-Key": `ecoflow-test-email-${args.logId}`,
+        },
+        body: JSON.stringify({
+          from: "EcoFlow Dashboard <alerts@devrunor.com>", to: args.to,
+          subject: TEST_EMAIL_SUBJECT, html, text,
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!response.ok) {
+        result = { success: false, error: testEmailProviderError(response.status) };
+      } else {
+        const body: unknown = await response.json();
+        const messageId = body !== null && typeof body === "object" && "id" in body ? body.id : undefined;
+        result = typeof messageId === "string" && messageId.length > 0
+          ? { success: true, messageId }
+          : { success: false, error: "The email provider returned an incomplete response. Check your inbox before trying again." };
+      }
+    } catch {
+      // A timeout can happen after acceptance. Do not retry a diagnostic send
+      // automatically or expose provider responses and credentials to the UI.
+      result = { success: false, error: "The test email could not be confirmed. Check your inbox before trying again." };
+    }
+  }
+  try {
+    await ctx.runMutation(internal.email_log.finishTestEmailAttempt, {
+      logId: args.logId, userId: args.userId, status: result.success ? "sent" : "failed",
+      messageId: result.messageId, errorMessage: result.error,
+    });
+  } catch {
+    return {
+      success: false, messageId: result.messageId,
+      error: "The test email status could not be saved. Check your inbox before trying again.",
+    };
+  }
+  return result;
+}
+
+function testEmailProviderError(status: number): string {
+  if (status === 401 || status === 403) {
+    return "The email provider rejected the sender configuration. Check the verified sending domain and API key.";
+  }
+  if (status === 400 || status === 422) {
+    return "The email provider rejected the test message. Check the account email and sender configuration.";
+  }
+  if (status === 429) return "The email provider is busy. Please try again in a minute.";
+  return "The email provider could not accept the test email. Please try again later.";
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[character]!);
+}

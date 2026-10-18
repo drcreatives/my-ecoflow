@@ -1,5 +1,19 @@
 // Core application types for EcoFlow Dashboard
 
+export type DcInputSource = 'auto' | 'solar' | 'adapter'
+export type ChargingTypeSource = 'live-pd' | 'device-setting'
+
+export interface DisplayTelemetryValue {
+  value: number
+  source: 'mqtt' | 'rest-cache'
+  receivedAt: number
+}
+
+export type DisplayTelemetry = Partial<Record<
+  'temperature' | 'acOutputWatts' | 'dcOutputWatts' | 'usbOutputWatts',
+  DisplayTelemetryValue
+>>
+
 export interface User {
   id: string
   email: string
@@ -14,6 +28,9 @@ export interface Device {
   deviceName?: string
   deviceType: string
   isActive: boolean
+  dcInputSource?: DcInputSource
+  displayTelemetry?: DisplayTelemetry
+  temperatureRefreshing?: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -26,6 +43,14 @@ export interface DeviceReading {
   acInputWatts?: number    // AC wall charging input
   dcInputWatts?: number    // DC/Solar/Car charging input (MPPT)
   chargingType?: number    // 0=null, 1=Adapter/DC, 2=Solar, 3=AC, 4=Gas, 5=Wind
+  chargingTypeSource?: ChargingTypeSource
+  inputQuality?: 'consistent' | 'inconsistent' | 'incomplete'
+  inputMeasurement?: 'delta2-pd-v1' | 'delta2-pd-mqtt-v1' | 'legacy-modules'
+  solarInputWatts?: number
+  powerMeasurement?: 'pd-totals-mqtt-v1'
+  solarPanelInputWatts?: number // PV-panel watts, separate from station solarInputWatts
+  solarPanelReceivedAt?: number // epoch ms for the independent MPPT receipt
+  solarPanelMeasurement?: 'delta2-mppt-mqtt-v1'
   outputWatts?: number // Total output power (AC + DC) from pd.wattsOutSum
   acOutputWatts?: number
   dcOutputWatts?: number
