@@ -2,6 +2,8 @@
 
 A real-time dashboard for monitoring EcoFlow Delta 2 power stations. Built with Next.js 15, Convex, and the EcoFlow Developer API.
 
+Production app: [myecoflow.devrunor.com](https://myecoflow.devrunor.com).
+
 ## Features
 
 - **Real-time monitoring** — battery, power I/O, temperature, device status
