@@ -3,10 +3,14 @@
 import { internalAction, action } from "./_generated/server";
 import { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import crypto from "crypto";
 import { auth } from "./auth";
+import type { ChargingTypeSource, DcInputSource, InputMeasurement, InputQuality } from "./readingQuality";
+import type { DiagnosticFrame, MqttDiagnosticResult } from "./ecoflowMqttDiagnostics";
+import type { DisplayTelemetry } from "./displayTelemetry";
+import { selectSolarPanelTelemetry } from "./solarPanelTelemetry";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,6 +29,34 @@ interface APIResponse<T = Record<string, unknown>> {
 }
 
 // ─── EcoFlow API Helpers (ported from src/lib/ecoflow-api.ts) ────────────────
+
+const GET_TIMEOUT_MS = 15_000;
+
+async function fetchEcoFlowJson<T>(
+  url: string,
+  options: RequestInit
+): Promise<APIResponse<T>> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GET_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`EcoFlow API HTTP ${response.status}`);
+    }
+    const data: APIResponse<T> = await response.json();
+    if (!data || data.code !== "0") {
+      // Upstream messages may contain the serial or echoed request details.
+      throw new Error("EcoFlow API returned an unsuccessful response");
+    }
+    return data;
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("EcoFlow API request timed out");
+    if (error instanceof Error && error.message.startsWith("EcoFlow API ")) throw error;
+    throw new Error("EcoFlow API request failed");
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export function generateSignature(
   secretKey: string,
@@ -83,21 +115,10 @@ async function makeEcoFlowRequest<T = Record<string, unknown>>(
     ? `${baseURL}${endpoint}?${searchParams.toString()}`
     : `${baseURL}${endpoint}`;
 
-  const response = await fetch(url, {
+  return fetchEcoFlowJson<T>(url, {
     method,
     headers,
   });
-
-  if (!response.ok) {
-    throw new Error(`EcoFlow API HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  const data: APIResponse<T> = await response.json();
-  if (data.code !== "0") {
-    throw new Error(`EcoFlow API error: ${data.message} (code: ${data.code})`);
-  }
-
-  return data;
 }
 
 async function getDeviceList(
@@ -109,7 +130,10 @@ async function getDeviceList(
     secretKey,
     "/iot-open/sign/device/list"
   );
-  return response.data || [];
+  if (!Array.isArray(response.data)) {
+    throw new Error("EcoFlow API returned an invalid device list");
+  }
+  return response.data;
 }
 
 // ─── SET Command Helpers ─────────────────────────────────────────────────────
@@ -201,9 +225,9 @@ async function getDeviceQuota(
   // Quota API signature excludes sn parameter
   const signature = generateSignature(secretKey, accessKey, {}, timestamp, nonce);
 
-  const url = `${baseURL}/iot-open/sign/device/quota/all?sn=${deviceSN}`;
+  const url = `${baseURL}/iot-open/sign/device/quota/all?sn=${encodeURIComponent(deviceSN)}`;
 
-  const response = await fetch(url, {
+  const response = await fetchEcoFlowJson<Record<string, number | string>>(url, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -214,16 +238,9 @@ async function getDeviceQuota(
     },
   });
 
-  if (!response.ok) {
-    throw new Error(`EcoFlow Quota API HTTP ${response.status}`);
-  }
-
-  const data: APIResponse<Record<string, number | string>> = await response.json();
-  if (data.code !== "0") {
-    throw new Error(`EcoFlow Quota API error: ${data.message}`);
-  }
-
-  return data.data || null;
+  const data = response.data;
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  return data;
 }
 
 function getQuotaValue(
@@ -232,38 +249,132 @@ function getQuotaValue(
 ): number | null {
   const value = data[key];
   if (value === undefined || value === null) return null;
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  return isNaN(num) ? null : num;
+  if (typeof value === "string" && value.trim() === "") return null;
+  const num = typeof value === "string" ? Number(value) : value;
+  return Number.isFinite(num) ? num : null;
 }
 
-export function transformQuotaToReading(data: Record<string, number | string>) {
+function getQuotaPower(data: Record<string, number | string>, key: string) {
+  const value = getQuotaValue(data, key);
+  return value !== null && value >= 0 ? value : null;
+}
+
+function sumQuotaPowers(powers: Array<number | null>): number | null {
+  if (powers.some((power) => power === null)) return null;
+  const sum = powers.reduce<number>((total, power) => total + (power ?? 0), 0);
+  return Number.isFinite(sum) ? sum : null;
+}
+
+export function transformQuotaToReading(
+  data: Record<string, number | string>,
+  options: { dcInputSource?: DcInputSource } = {},
+) {
   // === INPUT POWER ===
-  const acInputWatts = getQuotaValue(data, "inv.inputWatts") || 0;
-  const dcInputWatts = getQuotaValue(data, "mppt.inWatts") || 0;
-  const totalInput =
-    getQuotaValue(data, "pd.wattsInSum") || acInputWatts + dcInputWatts;
-  const chgType = getQuotaValue(data, "mppt.chgType");
+  const reportedAcInput = getQuotaPower(data, "inv.inputWatts");
+  const reportedDcInput = getQuotaPower(data, "mppt.inWatts");
+  const aggregateInput = getQuotaPower(data, "pd.wattsInSum");
+  let totalInput = aggregateInput ?? sumQuotaPowers([reportedAcInput, reportedDcInput]);
+  // Quota fields come from separate modules. A coherent snapshot is evidence of
+  // agreement only, not a documented device measurement timestamp. Allow small
+  // rounding/asynchronous update differences; never rescale contradictory watts.
+  let inputQuality: InputQuality = "incomplete";
+  if (aggregateInput !== null && reportedAcInput !== null && reportedDcInput !== null) {
+    const difference = Math.abs(reportedAcInput + reportedDcInput - aggregateInput);
+    const tolerance = Math.max(10, aggregateInput * 0.05);
+    inputQuality = aggregateInput === 0
+      ? (reportedAcInput === 0 && reportedDcInput === 0 ? "consistent" : "inconsistent")
+      : (difference <= tolerance ? "consistent" : "inconsistent");
+  }
+  let acInputWatts = aggregateInput === 0 ? 0 : reportedAcInput ?? undefined;
+  let dcInputWatts = aggregateInput === 0 ? 0 : reportedDcInput ?? undefined;
+  let chgType = getQuotaValue(data, "mppt.chgType");
+  let solarInputWatts: number | undefined;
+  let chargingTypeSource: ChargingTypeSource | undefined;
+  let inputMeasurement: InputMeasurement | undefined = "legacy-modules";
+
+  // Observed DELTA 2 model 80 PD frames (sysVer 16908850) report AC input and
+  // aggregate input together, in watts. pd.inputWatts/pd.chargerType are not
+  // specified in the checked-in HTTP field reference: live MQTT frames and
+  // retained source-transition evidence establish this model's mapping.
+  // INV charging/output values are separate asynchronous measurements and
+  // cannot serve as this PD frame's AC contribution. No guessed scale factor
+  // or source mapping is applied to other models. Provenance is forward-only.
+  const pdAcInput = getQuotaPower(data, "pd.inputWatts");
+  if (getQuotaValue(data, "pd.model") === 80) {
+    const supportedFirmware = getQuotaValue(data, "pd.sysVer") === 16908850;
+    inputMeasurement = supportedFirmware ? "delta2-pd-v1" : undefined;
+    totalInput = aggregateInput;
+    acInputWatts = pdAcInput ?? undefined;
+    dcInputWatts = undefined;
+    chgType = null;
+    inputQuality = "incomplete";
+    // An identified model must not silently return to the faulty INV mapping
+    // when PD fields are missing or malformed.
+    if (supportedFirmware && aggregateInput !== null && pdAcInput !== null) {
+      dcInputWatts = Math.max(0, aggregateInput - pdAcInput);
+      const pdChargerType = getQuotaValue(data, "pd.chargerType");
+      const liveDcType = pdChargerType === 1 || pdChargerType === 2 ? pdChargerType : null;
+      const configuredDcType = options.dcInputSource === "solar" ? 2 : options.dcInputSource === "adapter" ? 1 : null;
+      const sourceMismatch = dcInputWatts > 0 && liveDcType !== null && configuredDcType !== null &&
+        liveDcType !== configuredDcType;
+      // PD's observed DC-source enum is separate from INV's charger enum.
+      chgType = dcInputWatts > 0 && !sourceMismatch
+        ? liveDcType ?? configuredDcType
+        : dcInputWatts === 0 ? (pdAcInput > 0 ? 3 : 0) : null;
+      if (dcInputWatts > 0 && chgType !== null) {
+        chargingTypeSource = liveDcType !== null ? "live-pd" : "device-setting";
+      }
+      const tolerance = Math.max(10, aggregateInput * 0.05);
+      if ((aggregateInput === 0 && pdAcInput > 0) || pdAcInput > aggregateInput + tolerance) {
+        // Retain the reported AC channel as evidence; do not replace it with
+        // zero or fall back to a stale INV channel to conceal a PD conflict.
+        inputQuality = "inconsistent";
+      } else if (sourceMismatch) {
+        inputQuality = "inconsistent";
+      } else if (dcInputWatts === 0) {
+        inputQuality = "consistent";
+        solarInputWatts = 0;
+      } else if (pdAcInput === 0) {
+        // PD still identifies the input as DC when the subtype is unknown;
+        // leave chargingType/solar absent so it cannot be called solar or zero.
+        inputQuality = "consistent";
+        solarInputWatts = chgType === 2 ? dcInputWatts : chgType === 1 ? 0 : undefined;
+      } else {
+        // Mixed-input splits are not validated by the exclusive-source
+        // observations; keep their allocation uncertain.
+        inputQuality = "incomplete";
+      }
+    }
+  }
 
   // === OUTPUT POWER ===
-  const acOutputWatts = getQuotaValue(data, "inv.outputWatts") || 0;
-  const carWatts = getQuotaValue(data, "pd.carWatts") || 0;
-  const dcOutputWatts = carWatts;
-
-  const usb1 = getQuotaValue(data, "pd.usb1Watts") || 0;
-  const usb2 = getQuotaValue(data, "pd.usb2Watts") || 0;
-  const typec1 = getQuotaValue(data, "pd.typec1Watts") || 0;
-  const typec2 = getQuotaValue(data, "pd.typec2Watts") || 0;
-  const qcUsb1 = getQuotaValue(data, "pd.qcUsb1Watts") || 0;
-  const qcUsb2 = getQuotaValue(data, "pd.qcUsb2Watts") || 0;
-  const usbOutputWatts = usb1 + usb2 + typec1 + typec2 + qcUsb1 + qcUsb2;
-
-  const totalOutput =
-    getQuotaValue(data, "pd.wattsOutSum") ||
-    getQuotaValue(data, "pd.outputWatts") ||
-    acOutputWatts + dcOutputWatts + usbOutputWatts;
+  let acOutputWatts = getQuotaPower(data, "inv.outputWatts");
+  const dcOutputWatts = getQuotaPower(data, "pd.carWatts");
+  const usbPowers = ["pd.usb1Watts", "pd.usb2Watts", "pd.typec1Watts",
+    "pd.typec2Watts", "pd.qcUsb1Watts", "pd.qcUsb2Watts"]
+    .map((key) => getQuotaPower(data, key));
+  let usbOutputWatts = sumQuotaPowers(usbPowers);
+  const supportedPdOutput = getQuotaValue(data, "pd.model") === 80 &&
+    getQuotaValue(data, "pd.sysVer") === 16908850;
+  const aggregateOutput =
+    getQuotaPower(data, "pd.wattsOutSum") ??
+    (supportedPdOutput ? null : getQuotaPower(data, "pd.outputWatts"));
+  if (supportedPdOutput) {
+    // On this validated firmware, PD reports AC output, car/DC output and total
+    // together. The residual includes USB ports omitted from delta-only updates.
+    // INV output is independently updated and cannot complete this PD snapshot.
+    acOutputWatts = getQuotaPower(data, "pd.outputWatts");
+    usbOutputWatts = aggregateOutput !== null && acOutputWatts !== null && dcOutputWatts !== null &&
+      acOutputWatts + dcOutputWatts <= aggregateOutput
+      ? aggregateOutput - acOutputWatts - dcOutputWatts
+      : null;
+  }
+  const totalOutput = aggregateOutput ?? sumQuotaPowers([acOutputWatts, dcOutputWatts, usbOutputWatts]);
 
   // === BATTERY & STATUS ===
-  const batteryLevel = getQuotaValue(data, "bms_bmsStatus.soc");
+  const reportedBattery = getQuotaValue(data, "bms_bmsStatus.soc");
+  const batteryLevel = reportedBattery !== null && reportedBattery >= 0 && reportedBattery <= 100
+    ? reportedBattery : null;
   const temperature = getQuotaValue(data, "bms_bmsStatus.temp");
 
   // remainingTime: prefer bms_emsStatus (precise minutes) over pd.remainTime (rounded by firmware).
@@ -278,7 +389,7 @@ export function transformQuotaToReading(data: Record<string, number | string>) {
   // The device can simultaneously have input (e.g. solar) and output (e.g. loads),
   // so we must compare them. pd.remainTime sign is the authoritative signal from
   // the firmware since it already accounts for net power.
-  const netPower = totalInput - totalOutput;
+  const netPower = totalInput !== null && totalOutput !== null ? totalInput - totalOutput : 0;
   const hasPdRemainSign = pdRemain !== null && pdRemain !== 0;
   const isNetCharging = hasPdRemainSign
     ? pdRemain > 0             // firmware says charging (positive)
@@ -306,18 +417,21 @@ export function transformQuotaToReading(data: Record<string, number | string>) {
 
   return {
     batteryLevel: batteryLevel ?? undefined,
-    inputWatts: totalInput,
+    inputWatts: totalInput ?? undefined,
     acInputWatts,
     dcInputWatts,
+    inputQuality,
+    inputMeasurement,
+    chargingTypeSource,
+    solarInputWatts,
     chargingType: chgType ?? undefined,
-    outputWatts: totalOutput,
-    acOutputWatts,
-    dcOutputWatts,
-    usbOutputWatts,
+    outputWatts: totalOutput ?? undefined,
+    acOutputWatts: aggregateOutput === 0 ? 0 : acOutputWatts ?? undefined,
+    dcOutputWatts: aggregateOutput === 0 ? 0 : dcOutputWatts ?? undefined,
+    usbOutputWatts: aggregateOutput === 0 ? 0 : usbOutputWatts ?? undefined,
     remainingTime: remainingTime ?? undefined,
     temperature: temperature ?? undefined,
     status,
-    rawData: data,
     recordedAt: Date.now(),
     // === CONFIG STATE ===
     acEnabled: getQuotaValue(data, "mppt.cfgAcEnabled") === 1 ? true : getQuotaValue(data, "mppt.cfgAcEnabled") === 0 ? false : undefined,
@@ -346,7 +460,281 @@ export function transformQuotaToReading(data: Record<string, number | string>) {
   };
 }
 
+interface OnlineSnapshot {
+  onlineSerials: Set<string>;
+  checkedAt: number;
+}
+
+async function getOnlineSnapshot(accessKey: string, secretKey: string): Promise<OnlineSnapshot> {
+  const checkedAt = Date.now();
+  const devices = await getDeviceList(accessKey, secretKey);
+  return {
+    onlineSerials: new Set(devices.filter((device) => device?.online === 1).map((device) => device.sn)),
+    checkedAt,
+  };
+}
+
+// PD delta reports can omit the AC branch even while both aggregate powers
+// advance. Liveness does not establish availability of the source allocation.
+const PD_TOTAL_POWERS = ["wattsInSum", "wattsOutSum"] as const;
+// A later source/power delta invalidates an earlier selected power packet if it
+// omits either total. Pure metadata updates do not make measured totals vanish.
+const PD_POWER_OR_SOURCE_FIELDS = new Set(["wattsInSum", "wattsOutSum", "inputWatts", "outputWatts",
+  "inWatts", "outWatts", "carWatts", "usb1Watts", "usb2Watts", "qcUsb1Watts", "qcUsb2Watts",
+  "typec1Watts", "typec2Watts", "chargerType", "acChargeFlag", "redunChargeFlag", "chgDsgState"]);
+
+export function hasPdPowerOrSourceFields(values: Record<string, number>) {
+  return Object.keys(values).some(key => PD_POWER_OR_SOURCE_FIELDS.has(key));
+}
+const PD_SESSION_METADATA = ["model", "sysVer", "wifiVer", "chargerType", "soc", "remainTime",
+  "chgDsgState", "acChargeFlag", "redunChargeFlag"] as const;
+const PD_CONFIG_FIELDS = new Set(["dcOutState", "standbyMin", "pvChgPrioSet", "watchIsConfig",
+  "bpPowerSoc", "acAutoOutConfig", "minAcoutSoc", "lcdOffSec", "model", "sysVer"]);
+
+function hasLiveTotalPowers(frame: DiagnosticFrame) {
+  return PD_TOTAL_POWERS.every((key) => Number.isFinite(frame.values[key]) && frame.values[key] >= 0);
+}
+
+/** A cached REST response must never be presented as a new physical capture. */
+function selectLivePdMeasurement(result: MqttDiagnosticResult) {
+  if (result.reason !== "measurement_ready" || !result.connected || !result.subscribed) {
+    throw new Error("Fresh EcoFlow telemetry was not received");
+  }
+  let moduleTime = -Infinity;
+  let receivedAt = -Infinity;
+  let totalPowerFrames = 0;
+  let pdContinuityPoisoned = false;
+  let latest: DiagnosticFrame | undefined;
+  const metadata: Record<string, number> = {};
+  const modules = { bms: {} as Record<string, number>, ems: {} as Record<string, number> };
+  const moduleClocks = { bms: -Infinity, ems: -Infinity };
+  const moduleReceipts = { bms: -Infinity, ems: -Infinity };
+  const fieldReceipts = { bms: {} as Record<string, number>, ems: {} as Record<string, number> };
+  for (const frame of result.frames) {
+    if (frame.retained || frame.duplicate || frame.moduleTime === null || !Number.isFinite(frame.moduleTime) || frame.moduleTime < 0 ||
+      !Number.isFinite(frame.receivedAt) || frame.receivedAt < result.startedAt ||
+      frame.receivedAt > result.finishedAt) continue;
+    if (frame.module === "bms" || frame.module === "ems") {
+      if (frame.moduleTime <= moduleClocks[frame.module] || frame.receivedAt < moduleReceipts[frame.module]) continue;
+      moduleClocks[frame.module] = frame.moduleTime;
+      moduleReceipts[frame.module] = frame.receivedAt;
+      for (const [key, value] of Object.entries(frame.values)) {
+        if (Number.isFinite(value)) {
+          modules[frame.module][key] = value;
+          fieldReceipts[frame.module][key] = frame.receivedAt;
+        }
+      }
+    }
+    if (frame.module !== "pd") continue;
+    if (pdContinuityPoisoned) continue;
+    if (frame.moduleTime <= moduleTime || frame.receivedAt < receivedAt) {
+      // A reset/replay breaks this session's continuity. A later full packet
+      // cannot reuse power proof or metadata from before that break.
+      if (frame.moduleTime < moduleTime || hasPdPowerOrSourceFields(frame.values)) {
+        pdContinuityPoisoned = true;
+        latest = undefined;
+      }
+      continue;
+    }
+    moduleTime = frame.moduleTime;
+    receivedAt = frame.receivedAt;
+    for (const key of PD_SESSION_METADATA) {
+      if (Number.isFinite(frame.values[key])) metadata[key] = frame.values[key];
+    }
+    if (hasLiveTotalPowers(frame)) {
+      totalPowerFrames++;
+      latest = frame;
+    } else if (hasPdPowerOrSourceFields(frame.values)) {
+      latest = undefined;
+    }
+  }
+  if (pdContinuityPoisoned || totalPowerFrames < 2 || !latest || !hasLiveTotalPowers(latest)) {
+    throw new Error("Fresh EcoFlow telemetry was not received");
+  }
+  return { latest, metadata, modules, fieldReceipts };
+}
+
+function overlayLivePdMeasurement(
+  quota: Record<string, number | string>,
+  live: ReturnType<typeof selectLivePdMeasurement>,
+) {
+  const merged = { ...quota };
+  for (const key of Object.keys(merged)) {
+    if (key.startsWith("pd.") && !PD_CONFIG_FIELDS.has(key.slice(3))) delete merged[key];
+    if (key.startsWith("bms_bmsStatus.")) delete merged[key];
+    if (key.startsWith("bms_emsStatus.") && !["maxChargeSoc", "minDsgSoc", "minOpenOilEb", "maxCloseOilEb"].includes(key.slice(14))) {
+      delete merged[key];
+    }
+  }
+  // REST is useful for configuration, but its independent cached modules are
+  // not evidence of current power, SOC, or a precise remaining-time estimate.
+  for (const key of ["inv.inputWatts", "inv.outputWatts", "mppt.inWatts", "mppt.chgType",
+    "bms_bmsStatus.soc", "bms_bmsStatus.remainTime", "bms_emsStatus.chgRemainTime",
+    "bms_emsStatus.dsgRemainTime"]) delete merged[key];
+  for (const [key, value] of Object.entries({ ...live.metadata, ...live.latest.values })) {
+    if (Number.isFinite(value)) merged[`pd.${key}`] = value;
+  }
+  // The power session can receive an initial BMS snapshot without proving that
+  // its temperature advanced. Only the independent BMS observer records a new
+  // generic temperature, at that report's own receipt rather than the PD time.
+  for (const [key, value] of Object.entries(live.modules.bms)) {
+    if (key !== "temp") merged[`bms_bmsStatus.${key}`] = value;
+  }
+  for (const [key, value] of Object.entries(live.modules.ems)) merged[`bms_emsStatus.${key}`] = value;
+  if (live.metadata.soc !== undefined) merged["bms_bmsStatus.soc"] = live.metadata.soc;
+  return merged;
+}
+
+/** Display-only fallback values never become newly measured historical samples. */
+function buildDisplayTelemetry(
+  quota: Record<string, number | string>,
+  live: ReturnType<typeof selectLivePdMeasurement>,
+  reading: ReturnType<typeof transformQuotaToReading>,
+  fetchedAt: number,
+): DisplayTelemetry {
+  const cached = transformQuotaToReading(quota);
+  const cachedUsb = sumQuotaPowers(["pd.usb1Watts", "pd.usb2Watts", "pd.typec1Watts",
+    "pd.typec2Watts", "pd.qcUsb1Watts", "pd.qcUsb2Watts"].map((key) => getQuotaPower(quota, key)));
+  cached.usbOutputWatts = cachedUsb ?? undefined;
+  const telemetry: DisplayTelemetry = {};
+  for (const field of ["acOutputWatts", "dcOutputWatts", "usbOutputWatts"] as const) {
+    const value = cached[field];
+    if (value !== undefined && Number.isFinite(value) && value >= 0) {
+      telemetry[field] = { value, source: "rest-cache", receivedAt: fetchedAt };
+    }
+  }
+  for (const field of ["acOutputWatts", "dcOutputWatts", "usbOutputWatts"] as const) {
+    const value = reading[field];
+    if (value !== undefined && Number.isFinite(value) && value >= 0) {
+      telemetry[field] = { value, source: "mqtt", receivedAt: live.latest.receivedAt };
+    }
+  }
+  return telemetry;
+}
+
+/** All reading paths must pass this liveness/quality gate, including post-SET. */
+async function captureDeviceReading(
+  ctx: ActionCtx,
+  accessKey: string,
+  secretKey: string,
+  device: { _id: Id<"devices">; deviceSn: string; dcInputSource?: DcInputSource },
+  snapshot: OnlineSnapshot
+): Promise<"refreshed" | "offline" | "busy"> {
+  if (!snapshot.onlineSerials.has(device.deviceSn)) {
+    await ctx.runMutation(internal.readings.recordCollectionStatus, {
+      deviceId: device._id, status: "offline", checkedAt: snapshot.checkedAt,
+    });
+    return "offline";
+  }
+
+  try {
+    // Temperature arrives less often than power and has an independent lease.
+    // Scheduling it must neither delay the power capture nor change its health.
+    await ctx.scheduler.runAfter(0, internal.ecoflowMqttDiagnostics.captureTemperature, { deviceId: device._id });
+  } catch {
+    console.warn("EcoFlow temperature capture could not be scheduled");
+  }
+
+  try {
+    const capture = await ctx.runAction(internal.ecoflowMqttDiagnostics.captureReading, {
+      deviceId: device._id,
+    });
+    if (capture.reason === "capture_busy") return "busy";
+    const live = selectLivePdMeasurement(capture);
+    const quota = await getDeviceQuota(accessKey, secretKey, device.deviceSn);
+    const fetchedAt = Date.now();
+    if (!quota) throw new Error("EcoFlow API returned no usable telemetry");
+    const liveQuota = overlayLivePdMeasurement(quota, live);
+    const reading = transformQuotaToReading(liveQuota, { dcInputSource: device.dcInputSource });
+    const recordedAt = live.latest.receivedAt;
+    // The full profile asserts availability of the validated PD AC/total pair.
+    // Live aggregate liveness alone must not acquire that source provenance.
+    const sourceComplete = Number.isFinite(live.latest.values.inputWatts) && live.latest.values.inputWatts >= 0;
+    const inputMeasurement: InputMeasurement | undefined = sourceComplete && reading.inputMeasurement === "delta2-pd-v1"
+      ? "delta2-pd-mqtt-v1"
+      : undefined;
+    const supportedPanelProfile = getQuotaValue(liveQuota, "pd.model") === 80 &&
+      getQuotaValue(liveQuota, "pd.sysVer") === 16908850;
+    const solarPanel = supportedPanelProfile ? selectSolarPanelTelemetry(capture, recordedAt) : null;
+    if (reading.batteryLevel === undefined && reading.inputWatts === undefined && reading.outputWatts === undefined) {
+      throw new Error("EcoFlow API returned no usable telemetry");
+    }
+    // The extracted values and quality flag suffice; full telemetry can contain
+    // private identifiers and unnecessarily inflates retained history.
+    await ctx.runMutation(internal.readings.insertReading, {
+      deviceId: device._id, ...reading, inputMeasurement, powerMeasurement: "pd-totals-mqtt-v1", recordedAt,
+      ...(solarPanel ?? {}),
+    });
+    const telemetry = buildDisplayTelemetry(quota, live, reading, fetchedAt);
+    if (Object.keys(telemetry).length > 0) {
+      try {
+        await ctx.runMutation(internal.devices_internal.recordDisplayTelemetry, { deviceId: device._id, telemetry });
+      } catch {
+        // Supplemental display availability must not invalidate a stored live capture.
+        console.warn("EcoFlow display telemetry cache could not be updated");
+      }
+    }
+    await ctx.runMutation(internal.readings.recordCollectionStatus, {
+      deviceId: device._id, status: "online", checkedAt: recordedAt,
+    });
+    return "refreshed";
+  } catch {
+    await ctx.runMutation(internal.readings.recordCollectionStatus, {
+      deviceId: device._id, status: "error", checkedAt: snapshot.checkedAt,
+    });
+    throw new Error("EcoFlow telemetry could not be collected");
+  }
+}
+
 // ─── Convex Actions ──────────────────────────────────────────────────────────
+
+// Keep diagnostics bounded and deliberately omit serials, credentials, and raw
+// payloads. These fields help compare measurement points and source counters.
+const POWER_TELEMETRY_FIELDS = [
+  "pd.wattsInSum", "pd.inputWatts", "pd.inWatts", "pd.wattsOutSum", "pd.outputWatts",
+  "pd.soc", "pd.remainTime", "pd.chargerType", "pd.chgDsgState",
+  "pd.acChargeFlag", "pd.redunChargeFlag", "pd.pvChgPrioSet",
+  "pd.chgPowerAC", "pd.chgSunPower", "pd.chgPowerDC",
+  "pd.dsgPowerAC", "pd.dsgPowerDC", "pd.invUsedTime", "pd.dcInUsedTime", "pd.mpptUsedTime",
+  "pd.sysVer", "pd.wifiVer", "pd.model",
+  "inv.inputWatts", "inv.outputWatts", "inv.acInVol", "inv.acInAmp", "inv.dcInVol",
+  "inv.dcInAmp", "inv.chargerType", "inv.chargerState", "inv.sysVer", "inv.swVer",
+  "mppt.inWatts", "mppt.inVol", "mppt.inAmp", "mppt.outVol", "mppt.outAmp", "mppt.outWatts",
+  "mppt.chgType", "mppt.x60ChgType", "mppt.cfgChgType", "mppt.chgState", "mppt.swVer",
+  "bms_bmsStatus.inputWatts", "bms_bmsStatus.outputWatts", "bms_bmsStatus.vol",
+  "bms_bmsStatus.amp", "bms_bmsStatus.soc",
+  "bms_emsStatus.chgState", "bms_emsStatus.chgVol", "bms_emsStatus.chgAmp",
+] as const;
+
+/** Read-only internal diagnostic: GET telemetry without collecting a reading. */
+export const inspectPowerTelemetry = internalAction({
+  args: { deviceId: v.id("devices") },
+  handler: async (ctx, args) => {
+    const device = await ctx.runQuery(internal.devices_internal.getById, {
+      deviceId: args.deviceId,
+    });
+    if (!device || !device.isActive) throw new Error("Device unavailable");
+
+    const accessKey = process.env.ECOFLOW_ACCESS_KEY;
+    const secretKey = process.env.ECOFLOW_SECRET_KEY;
+    if (!accessKey || !secretKey) throw new Error("EcoFlow API credentials not configured");
+
+    const requestedAt = Date.now();
+    const snapshot = await getOnlineSnapshot(accessKey, secretKey);
+    if (!snapshot.onlineSerials.has(device.deviceSn)) {
+      return { online: false, requestedAt, receivedAt: Date.now(), fields: {} };
+    }
+
+    const quota = await getDeviceQuota(accessKey, secretKey, device.deviceSn);
+    if (!quota) throw new Error("EcoFlow API returned no usable telemetry");
+    const fields: Record<string, number> = {};
+    for (const key of POWER_TELEMETRY_FIELDS) {
+      const value = getQuotaValue(quota, key);
+      if (value !== null) fields[key] = value;
+    }
+    return { online: true, requestedAt, receivedAt: Date.now(), fields };
+  },
+});
 
 /**
  * Collect readings for ALL users.
@@ -369,22 +757,29 @@ export const collectAllUserReadings = internalAction({
       return { success: false, error: "Missing API credentials" };
     }
 
-    // Get all data retention settings (one per user) to check intervals
+    // Include device owners who have never opened/saved retention settings.
     const allSettings = await ctx.runQuery(
-      internal.settings.getAllDataRetentionSettings
+      internal.settings.getCollectionSettingsForDevices
     );
 
     const now = Date.now();
     let totalReadings = 0;
     let usersCollected = 0;
+    let devicesOffline = 0;
+    let devicesFailed = 0;
+    let devicesBusy = 0;
     const errors: string[] = [];
+    // One device-list request per run, shared by every user's active devices.
+    let snapshotPromise: Promise<OnlineSnapshot> | undefined;
 
     for (const settings of allSettings) {
-      const intervalMs = (settings.collectionIntervalMinutes ?? 5) * 60 * 1000;
+      const configuredInterval = settings.collectionIntervalMinutes ?? 5;
+      const intervalMs = (Number.isFinite(configuredInterval) ? Math.max(1, configuredInterval) : 5) * 60 * 1000;
       const lastCollection = settings.lastCollectionAt ?? 0;
 
-      // Skip if not enough time has passed since last collection
-      if (now - lastCollection < intervalMs) {
+      // Stable slots avoid missing every other minute when cron execution
+      // duration/jitter makes successive start times slightly less than 60s apart.
+      if (Math.floor(now / intervalMs) <= Math.floor(lastCollection / intervalMs)) {
         continue;
       }
 
@@ -395,87 +790,47 @@ export const collectAllUserReadings = internalAction({
           { userId: settings.userId }
         );
 
+        let userReadings = 0;
         for (const device of devices) {
           if (!device.isActive) continue;
 
           try {
-            // Fetch quota from EcoFlow API
-            const quotaData = await getDeviceQuota(
-              accessKey,
-              secretKey,
-              device.deviceSn
-            );
-
-            if (quotaData) {
-              const reading = transformQuotaToReading(quotaData);
-
-              // Insert the reading via mutation
-              await ctx.runMutation(internal.readings.insertReading, {
-                deviceId: device._id,
-                batteryLevel: reading.batteryLevel,
-                inputWatts: reading.inputWatts,
-                acInputWatts: reading.acInputWatts,
-                dcInputWatts: reading.dcInputWatts,
-                chargingType: reading.chargingType,
-                outputWatts: reading.outputWatts,
-                acOutputWatts: reading.acOutputWatts,
-                dcOutputWatts: reading.dcOutputWatts,
-                usbOutputWatts: reading.usbOutputWatts,
-                remainingTime: reading.remainingTime,
-                temperature: reading.temperature,
-                status: reading.status,
-                rawData: reading.rawData,
-                recordedAt: reading.recordedAt,
-                // Config state
-                acEnabled: reading.acEnabled,
-                dcOutEnabled: reading.dcOutEnabled,
-                carChargerEnabled: reading.carChargerEnabled,
-                acXboost: reading.acXboost,
-                acOutVoltage: reading.acOutVoltage,
-                acOutFrequency: reading.acOutFrequency,
-                acChargingWatts: reading.acChargingWatts,
-                acChargingPaused: reading.acChargingPaused,
-                dcChargingCurrent: reading.dcChargingCurrent,
-                acStandbyMins: reading.acStandbyMins,
-                carStandbyMins: reading.carStandbyMins,
-                unitStandbyMins: reading.unitStandbyMins,
-                maxChargeSoc: reading.maxChargeSoc,
-                minDischargeSoc: reading.minDischargeSoc,
-                solarPriority: reading.solarPriority,
-                energyMgmtEnabled: reading.energyMgmtEnabled,
-                backupReserveSoc: reading.backupReserveSoc,
-                acAutoOutEnabled: reading.acAutoOutEnabled,
-                minAcOutSoc: reading.minAcOutSoc,
-                smartGenOnSoc: reading.smartGenOnSoc,
-                smartGenOffSoc: reading.smartGenOffSoc,
-                lcdOffSeconds: reading.lcdOffSeconds,
-                buzzerSilent: reading.buzzerSilent,
-              });
-
+            snapshotPromise ??= getOnlineSnapshot(accessKey, secretKey);
+            const result = await captureDeviceReading(ctx, accessKey, secretKey, device, await snapshotPromise);
+            if (result === "refreshed") {
               totalReadings++;
+              userReadings++;
+            } else if (result === "busy") {
+              devicesBusy++;
+            } else {
+              devicesOffline++;
             }
-          } catch (deviceError) {
-            const msg = `Device ${device.deviceSn}: ${deviceError instanceof Error ? deviceError.message : "Unknown error"}`;
-            console.error(msg);
-            errors.push(msg);
+          } catch {
+            devicesFailed++;
+            await ctx.runMutation(internal.readings.recordCollectionStatus, {
+              deviceId: device._id, status: "error", checkedAt: now,
+            });
+            errors.push("A device reading could not be collected");
           }
         }
 
-        // Update last collection time for this user
-        await ctx.runMutation(internal.settings.updateLastCollection, {
-          userId: settings.userId,
-          timestamp: now,
-        });
-
-        usersCollected++;
-      } catch (userError) {
-        const msg = `User ${settings.userId}: ${userError instanceof Error ? userError.message : "Unknown error"}`;
-        console.error(msg);
-        errors.push(msg);
+        // Keep partial/failed users due so one online device cannot postpone a
+        // failed sibling's next retry for the user's full collection interval.
+        if (userReadings > 0) {
+          usersCollected++;
+          if (userReadings === devices.filter((device) => device.isActive).length) {
+            await ctx.runMutation(internal.settings.updateLastCollection, {
+              userId: settings.userId,
+              timestamp: now,
+            });
+          }
+        }
+      } catch {
+        errors.push("A user's readings could not be collected");
       }
     }
 
-    return { success: true, usersCollected, totalReadings, errors };
+    return { success: errors.length === 0 && devicesOffline === 0, usersCollected, totalReadings, devicesOffline, devicesFailed, devicesBusy, errors };
   },
 });
 
@@ -1031,7 +1386,7 @@ export const setDeviceQuotaInternal = internalAction({
 
 /**
  * Refresh a single device's reading by fetching latest quota from EcoFlow API.
- * Scheduled after SET commands so the UI reflects changes within ~1 second.
+ * Scheduled after successful SET commands; subject to the same liveness checks.
  */
 export const refreshDeviceReading = internalAction({
   args: {
@@ -1039,78 +1394,43 @@ export const refreshDeviceReading = internalAction({
     deviceId: v.id("devices"),
   },
   handler: async (ctx, args) => {
+    const startedAt = Date.now();
     const accessKey = process.env.ECOFLOW_ACCESS_KEY;
     const secretKey = process.env.ECOFLOW_SECRET_KEY;
-    if (!accessKey || !secretKey) return;
+    if (!accessKey || !secretKey) return { success: false };
 
     try {
-      const quotaData = await getDeviceQuota(accessKey, secretKey, args.deviceSn);
-      if (!quotaData) {
-        console.warn("[refreshDeviceReading] No quota data returned");
-        return;
-      }
-      const reading = transformQuotaToReading(quotaData);
-      await ctx.runMutation(internal.readings.insertReading, {
+      const device = await ctx.runQuery(internal.devices_internal.getById, {
         deviceId: args.deviceId,
-        batteryLevel: reading.batteryLevel,
-        inputWatts: reading.inputWatts,
-        acInputWatts: reading.acInputWatts,
-        dcInputWatts: reading.dcInputWatts,
-        chargingType: reading.chargingType,
-        outputWatts: reading.outputWatts,
-        acOutputWatts: reading.acOutputWatts,
-        dcOutputWatts: reading.dcOutputWatts,
-        usbOutputWatts: reading.usbOutputWatts,
-        remainingTime: reading.remainingTime,
-        temperature: reading.temperature,
-        status: reading.status,
-        rawData: reading.rawData,
-        recordedAt: reading.recordedAt,
-        acEnabled: reading.acEnabled,
-        dcOutEnabled: reading.dcOutEnabled,
-        carChargerEnabled: reading.carChargerEnabled,
-        acXboost: reading.acXboost,
-        acOutVoltage: reading.acOutVoltage,
-        acOutFrequency: reading.acOutFrequency,
-        acChargingWatts: reading.acChargingWatts,
-        acChargingPaused: reading.acChargingPaused,
-        dcChargingCurrent: reading.dcChargingCurrent,
-        acStandbyMins: reading.acStandbyMins,
-        carStandbyMins: reading.carStandbyMins,
-        unitStandbyMins: reading.unitStandbyMins,
-        maxChargeSoc: reading.maxChargeSoc,
-        minDischargeSoc: reading.minDischargeSoc,
-        solarPriority: reading.solarPriority,
-        energyMgmtEnabled: reading.energyMgmtEnabled,
-        backupReserveSoc: reading.backupReserveSoc,
-        acAutoOutEnabled: reading.acAutoOutEnabled,
-        minAcOutSoc: reading.minAcOutSoc,
-        smartGenOnSoc: reading.smartGenOnSoc,
-        smartGenOffSoc: reading.smartGenOffSoc,
-        lcdOffSeconds: reading.lcdOffSeconds,
-        buzzerSilent: reading.buzzerSilent,
       });
-    } catch (e) {
-      console.warn("Failed to refresh reading after SET:", e);
+      if (!device || !device.isActive || device.deviceSn !== args.deviceSn) return { success: false };
+      const snapshot = await getOnlineSnapshot(accessKey, secretKey);
+      const result = await captureDeviceReading(ctx, accessKey, secretKey, device, snapshot);
+      return { success: result === "refreshed" || result === "busy", status: result };
+    } catch {
+      await ctx.runMutation(internal.readings.recordCollectionStatus, {
+        deviceId: args.deviceId, status: "error", checkedAt: startedAt,
+      });
+      return { success: false, status: "failed" as const };
     }
   },
 });
 
 // ─── On-Demand Refresh ───────────────────────────────────────────────────────
 
-const STALENESS_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
-
 /**
  * Public action: fetch fresh readings from EcoFlow API on demand.
  * Called by the frontend when the user returns to the tab, navigates pages,
- * or clicks the manual refresh button. Skips devices whose latest reading
- * is less than 2 minutes old to avoid excessive API calls.
+ * or clicks refresh. Explicit manual requests bypass snapshot freshness, but
+ * all on-demand attempts share an atomic per-device two-minute request limit.
  */
 export const refreshReadings = action({
   args: {
     deviceId: v.optional(v.id("devices")),
+    force: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const startedAt = Date.now();
     const userId = await auth.getUserId(ctx);
     if (!userId) throw new Error("Unauthorized");
 
@@ -1120,12 +1440,18 @@ export const refreshReadings = action({
       throw new Error("EcoFlow API credentials not configured");
     }
 
-    const now = Date.now();
     let devicesRefreshed = 0;
     let devicesSkipped = 0;
+    let devicesFresh = 0;
+    let devicesRateLimited = 0;
+    let devicesOffline = 0;
+    let devicesFailed = 0;
+    let devicesBusy = 0;
+    let retryAfterMs = 0;
+    let snapshotPromise: Promise<OnlineSnapshot> | undefined;
 
     // Determine which devices to refresh
-    let devices: Array<{ _id: typeof args.deviceId extends undefined ? never : NonNullable<typeof args.deviceId>; deviceSn: string; isActive: boolean; userId: typeof userId }>;
+    let devices: Array<Doc<"devices">>;
 
     if (args.deviceId) {
       // Single device — validate ownership
@@ -1135,14 +1461,14 @@ export const refreshReadings = action({
       if (!device || device.userId !== userId) {
         throw new Error("Device not found or not owned by user");
       }
-      devices = [device] as typeof devices;
+      devices = [device];
     } else {
       // All user devices
       const allDevices = await ctx.runQuery(
         internal.devices_internal.listByUserId,
         { userId }
       );
-      devices = allDevices as typeof devices;
+      devices = allDevices;
     }
 
     for (const device of devices) {
@@ -1152,78 +1478,39 @@ export const refreshReadings = action({
       }
 
       try {
-        // Check staleness — skip if latest reading is recent enough
-        const latestTimestamp = await ctx.runQuery(
-          internal.readings.getLatestTimestamp,
-          { deviceId: device._id }
-        );
-        if (latestTimestamp && now - latestTimestamp < STALENESS_THRESHOLD_MS) {
+        const claim = await ctx.runMutation(internal.readings.claimRefreshAttempt, {
+          deviceId: device._id, force: args.force,
+        });
+        if (!claim.allowed) {
           devicesSkipped++;
+          if (claim.reason === "fresh") devicesFresh++;
+          else devicesRateLimited++;
+          retryAfterMs = Math.max(retryAfterMs, claim.retryAfterMs);
           continue;
         }
 
-        // Fetch fresh data from EcoFlow API
-        const quotaData = await getDeviceQuota(
-          accessKey,
-          secretKey,
-          device.deviceSn
-        );
-
-        if (quotaData) {
-          const reading = transformQuotaToReading(quotaData);
-          await ctx.runMutation(internal.readings.insertReading, {
-            deviceId: device._id,
-            batteryLevel: reading.batteryLevel,
-            inputWatts: reading.inputWatts,
-            acInputWatts: reading.acInputWatts,
-            dcInputWatts: reading.dcInputWatts,
-            chargingType: reading.chargingType,
-            outputWatts: reading.outputWatts,
-            acOutputWatts: reading.acOutputWatts,
-            dcOutputWatts: reading.dcOutputWatts,
-            usbOutputWatts: reading.usbOutputWatts,
-            remainingTime: reading.remainingTime,
-            temperature: reading.temperature,
-            status: reading.status,
-            rawData: reading.rawData,
-            recordedAt: reading.recordedAt,
-            acEnabled: reading.acEnabled,
-            dcOutEnabled: reading.dcOutEnabled,
-            carChargerEnabled: reading.carChargerEnabled,
-            acXboost: reading.acXboost,
-            acOutVoltage: reading.acOutVoltage,
-            acOutFrequency: reading.acOutFrequency,
-            acChargingWatts: reading.acChargingWatts,
-            acChargingPaused: reading.acChargingPaused,
-            dcChargingCurrent: reading.dcChargingCurrent,
-            acStandbyMins: reading.acStandbyMins,
-            carStandbyMins: reading.carStandbyMins,
-            unitStandbyMins: reading.unitStandbyMins,
-            maxChargeSoc: reading.maxChargeSoc,
-            minDischargeSoc: reading.minDischargeSoc,
-            solarPriority: reading.solarPriority,
-            energyMgmtEnabled: reading.energyMgmtEnabled,
-            backupReserveSoc: reading.backupReserveSoc,
-            acAutoOutEnabled: reading.acAutoOutEnabled,
-            minAcOutSoc: reading.minAcOutSoc,
-            smartGenOnSoc: reading.smartGenOnSoc,
-            smartGenOffSoc: reading.smartGenOffSoc,
-            lcdOffSeconds: reading.lcdOffSeconds,
-            buzzerSilent: reading.buzzerSilent,
-          });
+        snapshotPromise ??= getOnlineSnapshot(accessKey, secretKey);
+        const result = await captureDeviceReading(ctx, accessKey, secretKey, device, await snapshotPromise);
+        if (result === "refreshed") {
           devicesRefreshed++;
-        } else {
+        } else if (result === "busy") {
           devicesSkipped++;
+          devicesBusy++;
+        } else {
+          devicesOffline++;
         }
-      } catch (e) {
-        console.warn(
-          `[refreshReadings] Failed for device ${device.deviceSn}:`,
-          e
-        );
-        devicesSkipped++;
+      } catch {
+        devicesFailed++;
+        await ctx.runMutation(internal.readings.recordCollectionStatus, {
+          deviceId: device._id, status: "error", checkedAt: startedAt,
+        });
       }
     }
 
-    return { success: true, devicesRefreshed, devicesSkipped };
+    return {
+      success: devicesFailed === 0 && devicesOffline === 0,
+      devicesRefreshed, devicesSkipped, devicesFresh, devicesRateLimited,
+      devicesOffline, devicesFailed, devicesBusy, retryAfterMs,
+    };
   },
 });

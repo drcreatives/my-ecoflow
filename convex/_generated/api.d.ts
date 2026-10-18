@@ -18,8 +18,12 @@ import type * as devices from "../devices.js";
 import type * as devices_internal from "../devices_internal.js";
 import type * as displayTelemetry from "../displayTelemetry.js";
 import type * as ecoflow from "../ecoflow.js";
+import type * as ecoflowMqttDiagnostics from "../ecoflowMqttDiagnostics.js";
+import type * as ecoflowTemperature from "../ecoflowTemperature.js";
+import type * as ecoflowTemperatureMqttGet from "../ecoflowTemperatureMqttGet.js";
 import type * as email from "../email.js";
 import type * as email_log from "../email_log.js";
+import type * as historyAnalytics from "../historyAnalytics.js";
 import type * as http from "../http.js";
 import type * as migrations from "../migrations.js";
 import type * as readingExport from "../readingExport.js";
@@ -28,6 +32,8 @@ import type * as readings from "../readings.js";
 import type * as schedules from "../schedules.js";
 import type * as schedules_internal from "../schedules_internal.js";
 import type * as settings from "../settings.js";
+import type * as solarPanelTelemetry from "../solarPanelTelemetry.js";
+import type * as temperatureHistory from "../temperatureHistory.js";
 import type * as users from "../users.js";
 
 import type {
@@ -47,8 +53,12 @@ declare const fullApi: ApiFromModules<{
   devices_internal: typeof devices_internal;
   displayTelemetry: typeof displayTelemetry;
   ecoflow: typeof ecoflow;
+  ecoflowMqttDiagnostics: typeof ecoflowMqttDiagnostics;
+  ecoflowTemperature: typeof ecoflowTemperature;
+  ecoflowTemperatureMqttGet: typeof ecoflowTemperatureMqttGet;
   email: typeof email;
   email_log: typeof email_log;
+  historyAnalytics: typeof historyAnalytics;
   http: typeof http;
   migrations: typeof migrations;
   readingExport: typeof readingExport;
@@ -57,6 +67,8 @@ declare const fullApi: ApiFromModules<{
   schedules: typeof schedules;
   schedules_internal: typeof schedules_internal;
   settings: typeof settings;
+  solarPanelTelemetry: typeof solarPanelTelemetry;
+  temperatureHistory: typeof temperatureHistory;
   users: typeof users;
 }>;
 

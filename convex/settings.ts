@@ -105,6 +105,25 @@ export const getAllDataRetentionSettings = internalQuery({
   },
 });
 
+/** Include device owners who have never saved the settings form. */
+export const getCollectionSettingsForDevices = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const devices = await ctx.db.query("devices")
+      .withIndex("by_isActive", (q) => q.eq("isActive", true)).collect();
+    const userIds = [...new Set(devices.map((device) => device.userId))];
+    return await Promise.all(userIds.map(async (userId) => {
+      const settings = await ctx.db.query("dataRetentionSettings")
+        .withIndex("by_userId", (q) => q.eq("userId", userId)).first();
+      return {
+        userId,
+        collectionIntervalMinutes: settings?.collectionIntervalMinutes ?? DATA_RETENTION_DEFAULTS.collectionIntervalMinutes,
+        lastCollectionAt: settings?.lastCollectionAt ?? null,
+      };
+    }));
+  },
+});
+
 /**
  * Internal: update lastCollectionAt after cron collection.
  */
