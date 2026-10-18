@@ -6,7 +6,11 @@ import { Id } from "../../convex/_generated/dataModel";
 import type { DcInputSource } from "@/types";
 import { getReadingFreshness, getReadingStaleAt } from "@/lib/reading-status";
 import { getTemperatureAge, resolveTemperatureMetric } from "@/lib/display-telemetry";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  READING_WINDOW_REFRESH_EVENT,
+  type ReadingWindowRefreshDetail,
+} from "@/lib/reading-refresh-events";
 
 /**
  * Bridge hook replacing useDeviceStore for page components.
@@ -141,20 +145,19 @@ export function useConvexReadingHistory(
     aggregation?: "raw" | "5m" | "15m" | "1h" | "1d";
   }
 ) {
-  // Memoize default time window so unrelated re-renders don't produce new
-  // Date.now() values that trigger fresh Convex queries (extra bandwidth).
-  const defaultTimesRef = useRef({
-    startTime: Date.now() - 24 * 60 * 60 * 1000,
-    endTime: Date.now(),
-  });
+  const windowEnd = useReadingHistoryWindow(
+    deviceId,
+    options?.endTime === undefined,
+    String(options?.startTime ?? "24h")
+  );
 
   const result = useQuery(
     api.readings.history,
     deviceId
       ? {
           deviceId: deviceId as Id<"devices">,
-          startTime: options?.startTime ?? defaultTimesRef.current.startTime,
-          endTime: options?.endTime ?? defaultTimesRef.current.endTime,
+          startTime: options?.startTime ?? windowEnd - 24 * 60 * 60 * 1000,
+          endTime: options?.endTime ?? windowEnd,
           aggregation: options?.aggregation,
         }
       : "skip"
@@ -217,8 +220,7 @@ export function useConvexDiscover() {
 
 // ─── Helper: convert timeRange string to epoch timestamps ──────────────────
 
-function timeRangeToEpoch(timeRange: string): { startDate: number; endDate: number } {
-  const now = Date.now();
+function timeRangeToEpoch(timeRange: string, now: number): { startDate: number; endDate: number } {
   const rangeMs: Record<string, number> = {
     "1h": 60 * 60 * 1000,
     "6h": 6 * 60 * 60 * 1000,
@@ -228,11 +230,43 @@ function timeRangeToEpoch(timeRange: string): { startDate: number; endDate: numb
   };
   return {
     startDate: now - (rangeMs[timeRange] ?? rangeMs["24h"]),
-    // Cap to current time — the server-side query also caps to Date.now().
-    // This prevents reactive re-execution when new readings are inserted,
-    // which was the #1 source of DB bandwidth consumption.
     endDate: now,
   };
+}
+
+/**
+ * Keep bounded history arguments stable until the selected device/filter changes,
+ * a refresh event occurs, or Convex publishes a newer collected row. The cached
+ * latest query is shared with the dashboard; fixed date ranges skip it entirely.
+ */
+function useReadingHistoryWindow(deviceId: string | null, enabled: boolean, windowKey: string) {
+  const [refreshTimestamp, setRefreshTimestamp] = useState(() => Date.now());
+  const scopeTimestamp = useMemo(
+    () => enabled && deviceId && windowKey ? Date.now() : 0,
+    [deviceId, enabled, windowKey]
+  );
+  const latestReadings = useQuery(api.readings.latest, enabled && deviceId ? {} : "skip");
+  const latestTemperatureAt = useQuery(api.readings.latestTemperatureTimestamp,
+    enabled && deviceId ? { deviceId: deviceId as Id<"devices"> } : "skip");
+  const latestRecordedAt = latestReadings?.find(reading => reading.deviceId === deviceId)?.reading?.recordedAt;
+  const latestTimestamp = useMemo(
+    () => enabled ? Math.min(Math.max(latestRecordedAt ?? 0, latestTemperatureAt ?? 0), Date.now()) : 0,
+    [enabled, latestRecordedAt, latestTemperatureAt]
+  );
+
+  useEffect(() => {
+    if (!enabled || !deviceId) return;
+    const handleRefresh = (event: Event) => {
+      const { detail } = event as CustomEvent<ReadingWindowRefreshDetail>;
+      if (!detail.deviceId || detail.deviceId === deviceId) {
+        setRefreshTimestamp(previous => Math.max(previous, Date.now()));
+      }
+    };
+    window.addEventListener(READING_WINDOW_REFRESH_EVENT, handleRefresh);
+    return () => window.removeEventListener(READING_WINDOW_REFRESH_EVENT, handleRefresh);
+  }, [deviceId, enabled]);
+
+  return Math.max(scopeTimestamp, refreshTimestamp, latestTimestamp);
 }
 
 /**
@@ -248,17 +282,22 @@ export function useConvexHistoryReadings(
     aggregation?: "raw" | "5m" | "15m" | "1h" | "1d";
   }
 ) {
+  const collectionSettings = useQuery(api.settings.getDataRetention, deviceId ? {} : "skip");
+  const usesCustomDates =
+    (!filters?.timeRange || filters.timeRange === "custom") &&
+    !!filters?.customStartDate && !!filters?.customEndDate;
+  const windowEnd = useReadingHistoryWindow(deviceId, !usesCustomDates, filters?.timeRange ?? "24h");
   // Compute start/end dates from filter state
   const { startTime, endTime } = useMemo(() => {
-    if (filters?.customStartDate && filters?.customEndDate) {
+    if (usesCustomDates && filters?.customStartDate && filters.customEndDate) {
       return {
         startTime: new Date(filters.customStartDate).getTime(),
         endTime: new Date(filters.customEndDate).getTime(),
       };
     }
-    const range = timeRangeToEpoch(filters?.timeRange ?? "24h");
+    const range = timeRangeToEpoch(filters?.timeRange ?? "24h", windowEnd);
     return { startTime: range.startDate, endTime: range.endDate };
-  }, [filters?.timeRange, filters?.customStartDate, filters?.customEndDate]);
+  }, [filters?.timeRange, filters?.customStartDate, filters?.customEndDate, usesCustomDates, windowEnd]);
 
   const result = useQuery(
     api.readings.history,
@@ -275,6 +314,15 @@ export function useConvexHistoryReadings(
   return {
     readings: result?.readings ?? [],
     summary: result?.summary ?? null,
+    samplingIntervalMs: result?.samplingIntervalMs ?? null,
+    energyTotals: result?.energyTotals ?? null,
+    sampledReadings: result?.sampledReadings ?? 0,
+    temperatureReadings: result?.temperatureReadings ?? [],
+    temperatureSummary: result?.temperatureSummary ?? null,
+    temperatureSamplingIntervalMs: result?.temperatureSamplingIntervalMs ?? null,
+    temperatureSampledReadings: result?.temperatureSampledReadings ?? 0,
+    collectionIntervalMinutes: collectionSettings === undefined
+      ? null : Math.max(1, collectionSettings?.collectionIntervalMinutes ?? 5),
     isLoading: result === undefined && deviceId !== null,
     error: null as string | null,
   };

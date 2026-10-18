@@ -2,10 +2,13 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useConvexDevices, useConvexHistoryReadings } from "@/hooks/useConvexData";
-import { CombinedChart, BatteryLevelChart, TemperatureChart, transformReadingsToChartData } from "@/components/charts/HistoryCharts";
+import { CombinedChart, BatteryLevelChart, TemperatureChart, ChartZoomControls, transformReadingsToChartData, transformTemperatureReadingsToChartData, type ChartRange } from "@/components/charts/HistoryCharts";
 import { Loader2, Battery, Thermometer, BarChart3, ExternalLink, Filter, ChevronDown, Search, Zap, Plug, Sun } from "lucide-react";
 import Link from "next/link";
 import { DateTimePicker } from '@/components/ui/DateTimePicker';
+import type { InputQuality } from "@/lib/reading-status";
+import { formatMeasurementValue as formatValue, type DeviceReading } from "@/lib/data-utils";
+import { selectTemperatureHistoryWindow } from '@/lib/temperature-history';
 
 // Types for analytics data
 interface HistoryFilters {
@@ -26,6 +29,17 @@ function formatTimeSpan(startTime: number, endTime: number): string {
   return `${mins} minutes`;
 }
 
+function formatDuration(milliseconds: number): string {
+  if (milliseconds < 60_000) return `${Math.round(milliseconds / 1000)} sec`;
+  const hours = milliseconds / 3_600_000;
+  const value = hours >= 1 ? hours : milliseconds / 60_000;
+  return `${value.toFixed(1).replace(/\.0$/, '')} ${hours >= 1 ? 'hr' : 'min'}`;
+}
+
+function formatCoverage(coveredMs: number, selectedMs: number): string {
+  return `${coveredMs < selectedMs ? 'Partial coverage' : 'Coverage'}: ${formatDuration(coveredMs)} of ${formatDuration(selectedMs)} selected`;
+}
+
 // interface HistorySummary {
 // 	totalReadings: number;
 // 	avgBatteryLevel: number;
@@ -38,10 +52,8 @@ function formatTimeSpan(startTime: number, endTime: number): string {
 // 	endTime: number;
 // }
 
-const MS_PER_HOUR = 3_600_000;
-
 /** Shape of a single reading returned by the Convex history query. */
-interface HistoryReading {
+interface HistoryReading extends DeviceReading {
   deviceId: string;
   deviceName: string;
   deviceSn: string;
@@ -50,6 +62,7 @@ interface HistoryReading {
   acInputWatts: number | null;
   dcInputWatts: number | null;
   chargingType: number | null;
+  inputQuality?: InputQuality | null;
   outputWatts: number | null;
   acOutputWatts: number | null;
   dcOutputWatts: number | null;
@@ -109,6 +122,14 @@ function AnalyticsPage() {
 	const {
 		readings,
 		summary,
+		samplingIntervalMs,
+		temperatureReadings,
+		temperatureSamplingIntervalMs,
+		temperatureSampledReadings,
+		temperatureSummary,
+		energyTotals,
+		sampledReadings,
+		collectionIntervalMinutes,
 		isLoading,
 		error,
 	} = useConvexHistoryReadings(
@@ -129,69 +150,59 @@ function AnalyticsPage() {
 		})),
 		[readings]
 	);
+	const chartData = useMemo(
+		() => transformReadingsToChartData(chartReadings, {
+			aggregation: filters.aggregation,
+			samplingIntervalMs,
+			collectionIntervalMinutes,
+		}),
+		[chartReadings, filters.aggregation, samplingIntervalMs, collectionIntervalMinutes]
+	);
+	const temperatureChartData = useMemo(
+		() => transformTemperatureReadingsToChartData(temperatureReadings ?? [], filters.aggregation),
+		[temperatureReadings, filters.aggregation]
+	);
+	const [chartRange, setChartRange] = useState<ChartRange>({
+		startIndex: 0,
+		endIndex: 0,
+	});
+	const firstChartTimestamp = chartData[0]?.timestamp;
+	const lastChartTimestamp = chartData.at(-1)?.timestamp;
 
-	// ─── Energy Totals (trapezoidal integration of watts → kWh) ──────────
-	const energyTotals = useMemo(() => {
-		if (readings.length < 2) return { consumed: 0, acInput: 0, solarInput: 0 };
+	useEffect(() => {
+		setChartRange({
+			startIndex: 0,
+			endIndex: Math.max(0, chartData.length - 1),
+		});
+	}, [chartData.length, firstChartTimestamp, lastChartTimestamp]);
 
-		// Max allowed gap between consecutive points (in hours) used for energy integration.
-		// Rationale:
-		// - "raw": up to 1h — primary cron is 1 min; allow short outages / retries without
-		//   stitching across long offline periods.
-		// - "5m": up to 0.5h — 5‑minute buckets should be relatively dense; we exclude wider
-		//   gaps to avoid over‑estimating when data is sparse.
-		// - "1h": up to 3h — hourly aggregation tolerates some jitter and the occasional
-		//   missing point while still capturing realistic daily totals.
-		// - "1d": up to 36h — daily aggregation can span a missed day (e.g. temporary outage)
-		//   without discarding nearby intervals, but we still cut off pathological gaps.
-		const maxGapHours: Record<HistoryFilters['aggregation'], number> = {
-			raw: 1,
-			'5m': 0.5,
-			'1h': 3,
-			'1d': 36,
-		};
-		const maxGap = maxGapHours[filters.aggregation];
+	const visibleChartData = useMemo(() => {
+		if (chartData.length === 0) return [];
+		const startIndex = Math.min(chartRange.startIndex, chartData.length - 1);
+		const endIndex = Math.max(
+			startIndex,
+			Math.min(chartRange.endIndex, chartData.length - 1)
+		);
+		return chartData.slice(startIndex, endIndex + 1);
+	}, [chartData, chartRange]);
+	const visibleTemperatureChartData = useMemo(() => selectTemperatureHistoryWindow(
+		temperatureChartData, chartData, chartRange,
+		{ raw: 0, '5m': 300_000, '1h': 3_600_000, '1d': 86_400_000 }[filters.aggregation]
+	), [temperatureChartData, chartData, chartRange, filters.aggregation]);
 
-		let consumedWh = 0;
-		let acInputWh = 0;
-		let solarInputWh = 0;
-
-		for (let i = 1; i < readings.length; i++) {
-			const prev = readings[i - 1] as HistoryReading;
-			const curr = readings[i] as HistoryReading;
-			const dtHours = (curr.recordedAt - prev.recordedAt) / MS_PER_HOUR;
-			if (dtHours <= 0 || dtHours > maxGap) continue;
-
-			// Only integrate intervals where both endpoints have a valid numeric value;
-			// null readings are excluded to avoid skewing totals with false zeros.
-			if (prev.outputWatts != null && curr.outputWatts != null) {
-				consumedWh += ((prev.outputWatts + curr.outputWatts) / 2) * dtHours;
-			}
-
-			if (prev.acInputWatts != null && curr.acInputWatts != null) {
-				acInputWh += ((prev.acInputWatts + curr.acInputWatts) / 2) * dtHours;
-			}
-
-			if (prev.dcInputWatts != null && curr.dcInputWatts != null) {
-				solarInputWh += ((prev.dcInputWatts + curr.dcInputWatts) / 2) * dtHours;
-			}
-		}
-
-		return {
-			consumed: consumedWh / 1000,
-			acInput: acInputWh / 1000,
-			solarInput: solarInputWh / 1000,
-		};
-	}, [readings, filters.aggregation]);
-
-	const formatValue = (value: number | null | undefined, unit: string) => {
-		if (value === null || value === undefined || isNaN(value)) return "0" + unit;
-		return value.toFixed(1) + unit;
+	// The backend integrates the bounded original sample before chart averaging.
+	const selectedDurationMs = summary ? summary.endTime - summary.startTime : 0;
+	const temperatureStats = temperatureSummary ?? (summary ? {
+		avgTemperature: summary.avgTemperature, maxTemperature: summary.highestTemperature,
+	} : null);
+	const hasSourceEnergy = (energyTotals?.sourceIntervals ?? 0) > 0;
+	const hasStationSolarEnergy = (energyTotals?.solarIntervals ?? 0) > 0;
+	const hasPanelEnergy = (energyTotals?.solarPanelIntervals ?? 0) > 0;
+	const formatEnergy = (value: number | null | undefined) => {
+		if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return '—';
+		if (value > 0 && value < 0.01) return '<0.01';
+		return value < 10 ? value.toFixed(2) : value.toFixed(1);
 	};
-
-	/** Format energy value: 2 decimal places under 10 kWh, 1 above. */
-	const formatEnergy = (value: number) =>
-		value < 10 ? value.toFixed(2) : value.toFixed(1);
 
 	if (devicesLoading) {
 		return (
@@ -350,17 +361,23 @@ function AnalyticsPage() {
 					)}
 
 					{/* Summary Cards */}
-					{summary && (
+					{samplingIntervalMs !== null && samplingIntervalMs > 0 && (
+						<p className="text-xs text-text-muted" role="note">
+							Sampled history: approximately one reading per {(samplingIntervalMs / 60_000).toFixed(1)} minutes before averaging.
+							{' '}Summaries and charts cover the displayed sample, not every stored reading.
+						</p>
+					)}
+					{(summary || temperatureSummary) && (
 						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[18px]">
 							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
 								<div className="flex items-center justify-between mb-2">
 									<BarChart3 className="w-5 h-5 text-brand-tertiary" />
-									<span className="text-xs text-text-muted">{formatTimeSpan(summary.startTime, summary.endTime)}</span>
+									<span className="text-xs text-text-muted">{summary ? formatTimeSpan(summary.startTime, summary.endTime) : 'Temperature observations'}</span>
 								</div>
 								<div className="text-2xl font-medium text-text-primary mb-1">
-									{(summary.totalReadings || 0).toLocaleString()}
+									{(summary?.totalReadings ?? 0).toLocaleString()}
 								</div>
-								<div className="text-sm text-text-secondary">Data Points</div>
+								<div className="text-sm text-text-secondary">Power Data Points</div>
 							</div>
 							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
 								<div className="flex items-center justify-between mb-2">
@@ -368,29 +385,32 @@ function AnalyticsPage() {
 									<span className="text-xs text-text-muted">Average</span>
 								</div>
 								<div className="text-2xl font-medium text-text-primary mb-1">
-									{formatValue(summary.avgBatteryLevel, "%")}
+									{formatValue(readings.length ? summary?.avgBatteryLevel : null, "%")}
 								</div>
 								<div className="text-sm text-text-secondary">Battery Level</div>
 							</div>
 							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
 								<div className="flex items-center justify-between mb-2">
 									<BarChart3 className="w-5 h-5 text-warning" />
-									<span className="text-xs text-text-muted">Peak: {formatValue(summary.peakPowerOutput, "W")}</span>
+									<span className="text-xs text-text-muted">Peak: {formatValue(readings.length ? summary?.peakPowerOutput : null, "W")}</span>
 								</div>
 								<div className="text-2xl font-medium text-text-primary mb-1">
-									{formatValue(summary.avgPowerOutput, "W")}
+									{formatValue(readings.length ? summary?.avgPowerOutput : null, "W")}
 								</div>
 								<div className="text-sm text-text-secondary">Avg Power Output</div>
 							</div>
 							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
 								<div className="flex items-center justify-between mb-2">
 									<Thermometer className="w-5 h-5 text-danger" />
-									<span className="text-xs text-text-muted">Max: {formatValue(summary.highestTemperature, "°C")}</span>
+									<span className="text-xs text-text-muted">Max: {formatValue(temperatureStats?.maxTemperature, "°C")}</span>
 								</div>
 								<div className="text-2xl font-medium text-text-primary mb-1">
-									{formatValue(summary.avgTemperature, "°C")}
+									{formatValue(temperatureStats?.avgTemperature, "°C")}
 								</div>
 								<div className="text-sm text-text-secondary">Avg Temperature</div>
+								<div className="text-xs text-text-muted mt-1">
+									{(temperatureSampledReadings ?? 0).toLocaleString()} temperature readings{temperatureSamplingIntervalMs ? ' (sampled)' : ''}
+								</div>
 							</div>
 						</div>
 					)}
@@ -399,46 +419,77 @@ function AnalyticsPage() {
 					{summary && (
 						<div className="grid grid-cols-1 sm:grid-cols-3 gap-[18px]">
 							{/* Energy Consumed */}
-							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 flex flex-col gap-2">
+							<div role="group" aria-label="Energy consumed" className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 flex flex-col gap-2">
 								<div className="flex items-center gap-2 mb-1">
 									<Zap className="w-6 h-6 text-warning" />
 									<span className="text-sm text-text-secondary">Energy Consumed</span>
 								</div>
 								<div className="text-metric text-text-primary">
-									{formatEnergy(energyTotals.consumed)}
+									{readings.length ? formatEnergy(energyTotals?.consumed) : '—'}
 								</div>
 								<span className="text-sm text-text-muted">kWh</span>
 							</div>
 
 							{/* AC Input */}
-							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 flex flex-col gap-2">
+							<div role="group" aria-label="AC input energy" className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 flex flex-col gap-2">
 								<div className="flex items-center gap-2 mb-1">
 									<Plug className="w-6 h-6 text-brand-tertiary" />
 									<span className="text-sm text-text-secondary">AC Input</span>
 								</div>
 								<div className="text-metric text-text-primary">
-									{formatEnergy(energyTotals.acInput)}
+									{hasSourceEnergy ? formatEnergy(energyTotals?.acInput) : '—'}
 								</div>
 								<span className="text-sm text-text-muted">kWh</span>
+								<span className="text-xs text-text-muted">
+									{hasSourceEnergy && energyTotals ? formatCoverage(energyTotals.sourceCoveredMs, selectedDurationMs) : 'AC/DC split unavailable: no verified source intervals'}
+								</span>
 							</div>
 
-							{/* DC Input (Solar/Car) */}
-							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 flex flex-col gap-2">
+							{/* Independent panel measurement */}
+							<div role="group" aria-label="Solar panel energy" className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-6 flex flex-col gap-2">
 								<div className="flex items-center gap-2 mb-1">
 									<Sun className="w-6 h-6 text-brand-secondary" />
-									<span className="text-sm text-text-secondary">DC Input (Solar/Car)</span>
+									<span className="text-sm text-text-secondary">Solar panels</span>
 								</div>
 								<div className="text-metric text-text-primary">
-									{formatEnergy(energyTotals.solarInput)}
+									{hasPanelEnergy ? formatEnergy(energyTotals?.solarPanelInput) : '—'}
 								</div>
 								<span className="text-sm text-text-muted">kWh</span>
+								<span className="text-xs text-text-muted">
+									Separate panel measurement. {hasPanelEnergy && energyTotals ? formatCoverage(energyTotals.solarPanelCoveredMs, selectedDurationMs) : 'Panel energy unavailable: no verified panel intervals'}
+								</span>
+								<div className="mt-1 border-t border-stroke-subtle pt-3 text-xs text-text-muted space-y-2">
+									<div>
+										<p>Station DC: {hasSourceEnergy ? `${formatEnergy(energyTotals?.dcInput)} kWh` : 'Unavailable'}</p>
+										{hasSourceEnergy && energyTotals && <p>{formatCoverage(energyTotals.sourceCoveredMs, selectedDurationMs)}</p>}
+									</div>
+									<div>
+										<p>Confirmed station solar: {hasStationSolarEnergy ? `${formatEnergy(energyTotals?.solarInput)} kWh` : 'Unavailable'}</p>
+										{hasStationSolarEnergy && energyTotals && <p>{formatCoverage(energyTotals.solarCoveredMs, selectedDurationMs)}</p>}
+									</div>
+								</div>
 							</div>
 						</div>
+					)}
+					{summary && (
+						<p className="text-xs text-text-muted">
+							Energy is estimated from {(sampledReadings ?? 0).toLocaleString()} {samplingIntervalMs ? 'sampled ' : ''}readings before chart averaging; gaps and unverified intervals are excluded.
+							{' '}Panel energy uses its own report times and is separate from station AC/DC totals. Unclassified station input: {readings.length ? formatEnergy(energyTotals?.unattributedInput) : '—'} kWh.
+						</p>
 					)}
 
 					{/* Charts Section */}
 					<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px] mt-6">
-						<h3 className="text-section-title font-medium text-text-primary mb-6">Power Usage Trends</h3>
+						<div className="flex flex-col gap-4 mb-6">
+							<h3 className="text-section-title font-medium text-text-primary">Power Usage Trends</h3>
+							{chartData.length > 1 && (
+								<ChartZoomControls
+									data={chartData}
+									range={chartRange}
+									onRangeChange={setChartRange}
+								/>
+							)}
+						</div>
 						{isLoading ? (
 							<div className="flex items-center justify-center h-64">
 								<div className="text-center">
@@ -446,7 +497,7 @@ function AnalyticsPage() {
 									<p className="text-text-secondary">Loading chart data...</p>
 								</div>
 							</div>
-						) : chartReadings.length === 0 ? (
+						) : chartReadings.length === 0 && temperatureChartData.length === 0 ? (
 							<div className="flex flex-col items-center justify-center h-64 text-center">
 								<BarChart3 className="w-16 h-16 text-text-muted mb-4" />
 								<h3 className="text-lg font-medium text-text-secondary mb-2">No Analytics Data</h3>
@@ -463,27 +514,28 @@ function AnalyticsPage() {
 							</div>
 						) : (
 							<CombinedChart
-								data={transformReadingsToChartData(chartReadings)}
+								data={visibleChartData}
+								temperatureData={visibleTemperatureChartData}
 								height={400}
-								defaultChart="power"
+								defaultChart={chartData.length ? 'power' : 'temperature'}
 							/>
 						)}
 					</div>
 
 					{/* Additional Chart Views */}
-					{chartReadings.length > 0 && (
+					{(chartReadings.length > 0 || temperatureChartData.length > 0) && (
 						<div className="grid grid-cols-1 lg:grid-cols-2 gap-[18px] mt-6">
 							{/* Battery Level Chart */}
-							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
+							{chartReadings.length > 0 && <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
 								<div className="flex items-center gap-2 mb-4">
 									<Battery className="w-5 h-5 text-brand-primary" />
 									<h3 className="text-section-title font-medium text-text-primary">Battery Level</h3>
 								</div>
 								<BatteryLevelChart
-									data={transformReadingsToChartData(chartReadings)}
+									data={visibleChartData}
 									height={250}
 								/>
-							</div>
+							</div>}
 
 							{/* Temperature Chart */}
 							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
@@ -492,7 +544,7 @@ function AnalyticsPage() {
 									<h3 className="text-section-title font-medium text-text-primary">Temperature</h3>
 								</div>
 								<TemperatureChart
-									data={transformReadingsToChartData(chartReadings)}
+									data={visibleTemperatureChartData}
 									height={250}
 								/>
 							</div>
