@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { mergeDisplayTelemetry, type DisplayTelemetry } from "../displayTelemetry";
 import { recordDisplayTelemetry } from "../devices_internal";
 
@@ -78,7 +78,22 @@ const record = (recordDisplayTelemetry as unknown as {
   _handler: (ctx: ReturnType<typeof makeContext>, args: { deviceId: string; telemetry: DisplayTelemetry }) => Promise<null>;
 })._handler;
 
+afterEach(() => { vi.unstubAllEnvs(); });
+
 describe("internal display telemetry recording", () => {
+  it("ignores late temperature cache updates while preserving power display updates", async () => {
+    vi.stubEnv("TEMPERATURE_COLLECTION_ENABLED", undefined);
+    const ctx = makeContext({ isActive: true, displayTelemetry: structuredClone(cache) });
+    await record(ctx, { deviceId: "owned-device", telemetry: {
+      temperature: { value: 70, source: "mqtt", receivedAt: 3_000 },
+      dcOutputWatts: { value: 25, source: "mqtt", receivedAt: 3_000 },
+    } });
+    expect(ctx.db.patch).toHaveBeenCalledExactlyOnceWith("owned-device", {
+      displayTelemetry: { ...cache, dcOutputWatts: { value: 25, source: "mqtt", receivedAt: 3_000 } },
+    });
+    expect(ctx.db.insert).not.toHaveBeenCalled();
+  });
+
   it("atomically merges only device display metadata without reading or writing history", async () => {
     const ctx = makeContext();
     expect(await record(ctx, { deviceId: "owned-device", telemetry: { dcOutputWatts: { value: 0, source: "mqtt", receivedAt: 3_000 } } })).toBeNull();

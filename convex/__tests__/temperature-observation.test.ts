@@ -67,10 +67,25 @@ const record = (recordTemperatureObservation as unknown as {
 })._handler;
 const args: Args = { deviceId, temperature: 39, receivedAt: now - 50, leaseToken };
 
-beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(now); });
-afterEach(() => { vi.restoreAllMocks(); });
+beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(now); vi.stubEnv("TEMPERATURE_COLLECTION_ENABLED", "true"); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 describe("durable generic BMS temperature observations", () => {
+  it.each([undefined, "false"])("fences a late in-flight temperature callback while paused (%s)", async value => {
+    vi.stubEnv("TEMPERATURE_COLLECTION_ENABLED", value);
+    const existing = { deviceId, readingKind: "temperature", temperature: 37, recordedAt: now - 1_000 };
+    const device = activeDevice();
+    const before = structuredClone(device);
+    const ctx = makeContext(device, [existing]);
+    expect(await record(ctx, args)).toBeNull();
+    expect(ctx.db.get).not.toHaveBeenCalled();
+    expect(ctx.db.query).not.toHaveBeenCalled();
+    expect(ctx.db.insert).not.toHaveBeenCalled();
+    expect(ctx.db.patch).not.toHaveBeenCalled();
+    expect(ctx.readings).toEqual([existing]);
+    expect(device).toEqual(before);
+  });
+
   it("appends only the explicit temperature at its original receipt and atomically merges display", async () => {
     const device = activeDevice();
     const powerRow = { deviceId, inputWatts: 350, acInputWatts: 0, solarPanelInputWatts: 355, recordedAt: now - 100 };

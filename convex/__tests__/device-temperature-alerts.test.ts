@@ -57,11 +57,23 @@ function invoke<Result>(registered: unknown, ctx: ReturnType<typeof setup>["ctx"
 beforeEach(() => {
   vi.spyOn(Date, "now").mockReturnValue(now);
   vi.stubEnv("DISABLE_CRONS", "false");
+  vi.stubEnv("TEMPERATURE_COLLECTION_ENABLED", "true");
   vi.mocked(auth.getUserId).mockResolvedValue("owner" as Awaited<ReturnType<typeof auth.getUserId>>);
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 describe("temperature observation monitor compatibility", () => {
+  it("pauses temperature alerts without stopping battery/offline checks or changing history", async () => {
+    vi.stubEnv("TEMPERATURE_COLLECTION_ENABLED", undefined);
+    const store = setup({ readings: [{ ...power, batteryLevel: 5, recordedAt: now - 31 * 60_000 }, thermal] });
+    const before = structuredClone(store.tables.deviceReadings);
+    expect(await invoke(checkDeviceAlerts, store.ctx)).toEqual({ alertsCreated: 2 });
+    expect(store.tables.alerts.map(alert => alert.type).sort()).toEqual(["BATTERY_LOW", "DEVICE_OFFLINE"]);
+    expect(store.indexes.filter(request => request.table === "deviceReadings").every(request =>
+      request.equalities.some(([field, value]) => field === "readingKind" && value === undefined))).toBe(true);
+    expect(store.tables.deviceReadings).toEqual(before);
+  });
+
   it("keeps battery/offline checks on power and alerts from a separate fresh verified temperature", async () => {
     const store = setup({ devices: [{ ...device, displayTelemetry: { temperature: { value: 60, source: "mqtt", receivedAt: now } } }],
       readings: [{ ...power, batteryLevel: 5, recordedAt: now - 31 * 60_000 }, thermal] });

@@ -6,8 +6,9 @@ import { v } from "convex/values";
 import { internalAction, type ActionCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { generateSignature, hasPdPowerOrSourceFields } from "./ecoflow";
+import { generateSignature, hasPdPowerOrSourceFields } from "./ecoflowProtocol";
 import { selectSolarPanelTelemetry } from "./solarPanelTelemetry";
+import { isTemperatureCollectionEnabled } from "./temperatureCollection";
 
 const CERTIFICATE_TIMEOUT_MS = 15_000;
 const MQTT_DEADLINE_MS = 20_000;
@@ -60,7 +61,7 @@ export interface DiagnosticFrame {
   values: Record<string, number>;
 }
 
-type StopReason = "deadline" | "measurement_ready" | "temperature_ready" | "capture_busy" | "frame_limit" | "byte_limit" | "connection_error" | "subscription_error" | "connection_closed";
+type StopReason = "deadline" | "measurement_ready" | "temperature_ready" | "disabled" | "capture_busy" | "frame_limit" | "byte_limit" | "connection_error" | "subscription_error" | "connection_closed";
 
 export interface MqttDiagnosticResult {
   reason: StopReason;
@@ -182,8 +183,13 @@ export const capture = internalAction({
  */
 export const captureReading = internalAction({
   args: { deviceId: v.id("devices") },
-  handler: async (ctx, args): Promise<MqttDiagnosticResult> => captureSession(ctx, args.deviceId, "collector"),
+  handler: async (ctx, args): Promise<MqttDiagnosticResult> => captureReadingInProcess(ctx, args.deviceId),
 });
+
+/** Share the collector session with Node callers without a nested action. */
+export async function captureReadingInProcess(ctx: ActionCtx, deviceId: Id<"devices">): Promise<MqttDiagnosticResult> {
+  return captureSession(ctx, deviceId, "collector");
+}
 
 /** Wait independently for an explicit temperature in a progressing BMS report. */
 export const captureTemperature = internalAction({
@@ -192,6 +198,7 @@ export const captureTemperature = internalAction({
 });
 
 async function captureSession(ctx: ActionCtx, deviceId: Id<"devices">, purpose: "diagnostic" | "collector" | "temperature"): Promise<MqttDiagnosticResult> {
+    if (purpose === "temperature" && !isTemperatureCollectionEnabled()) return emptyCaptureResult("disabled");
     const device = await ctx.runQuery(internal.devices_internal.getById, { deviceId });
     if (!device || !device.isActive) throw new Error("Active device not found");
     const accessKey = process.env.ECOFLOW_ACCESS_KEY;
@@ -199,16 +206,7 @@ async function captureSession(ctx: ActionCtx, deviceId: Id<"devices">, purpose: 
     if (!accessKey || !secretKey) throw new Error("EcoFlow credentials not configured");
     const lease = { deviceId, purpose, token: randomUUID() };
     const claim = await ctx.runMutation(internal.devices_internal.claimMqttSession, lease);
-    if (!claim.allowed) {
-      const at = Date.now();
-      return {
-        reason: "capture_busy", startedAt: at, finishedAt: at,
-        connected: false, subscribed: false, receivedMessages: 0, receivedBytes: 0,
-        rejectedFrames: 0, duplicateFrames: 0, retainedFrames: 0, liveFrames: 0, frames: [],
-        envelopeCounts: { paramsObject: 0, dataObject: 0, otherObject: 0, nonObject: 0, malformedJson: 0 },
-        moduleCounts: { pd: 0, inv: 0, mppt: 0, bms: 0, ems: 0, other: 0 },
-      };
-    }
+    if (!claim.allowed) return emptyCaptureResult("capture_busy");
     try {
     const certificate = await getCertification(accessKey, secretKey);
     // The public broker limits distinct client IDs. Reuse a privacy-safe ID for
@@ -396,4 +394,15 @@ async function captureSession(ctx: ActionCtx, deviceId: Id<"devices">, purpose: 
       try { await ctx.runMutation(internal.devices_internal.releaseMqttSession, lease); }
       catch { throw new Error("Unable to release EcoFlow MQTT session"); }
     }
+}
+
+function emptyCaptureResult(reason: "disabled" | "capture_busy"): MqttDiagnosticResult {
+  const at = Date.now();
+  return {
+    reason, startedAt: at, finishedAt: at,
+    connected: false, subscribed: false, receivedMessages: 0, receivedBytes: 0,
+    rejectedFrames: 0, duplicateFrames: 0, retainedFrames: 0, liveFrames: 0, frames: [],
+    envelopeCounts: { paramsObject: 0, dataObject: 0, otherObject: 0, nonObject: 0, malformedJson: 0 },
+    moduleCounts: { pd: 0, inv: 0, mppt: 0, bms: 0, ems: 0, other: 0 },
+  };
 }

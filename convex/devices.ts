@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { auth } from "./auth";
 import { internal } from "./_generated/api";
 import { dcInputSourceValidator } from "./readingQuality";
+import { isTemperatureCollectionEnabled } from "./temperatureCollection";
 
 const TEMPERATURE_OBSERVATION_MAX_AGE_MS = 6 * 60_000;
 
@@ -273,13 +274,13 @@ export const checkDeviceAlerts = internalMutation({
       // BMS observations have their own clock and must not depend on a power
       // sample being present. Select the newest observation before validation:
       // a newer cool/invalid report cannot fall back to an older hot one.
-      const latestTemperature = await ctx.db
+      const latestTemperature = isTemperatureCollectionEnabled() ? await ctx.db
         .query("deviceReadings")
         .withIndex("by_deviceId_readingKind_recordedAt", (q) =>
           q.eq("deviceId", device._id).eq("readingKind", "temperature")
         )
         .order("desc")
-        .first();
+        .first() : null;
 
       // Get user's notification settings
       const notifSettings = await ctx.db

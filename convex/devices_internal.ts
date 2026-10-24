@@ -2,6 +2,7 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { displayTelemetryValidator, mergeDisplayTelemetry } from "./displayTelemetry";
 import { internal } from "./_generated/api";
+import { isTemperatureCollectionEnabled } from "./temperatureCollection";
 
 /**
  * Internal query to list devices by userId.
@@ -52,7 +53,8 @@ export const recordDisplayTelemetry = internalMutation({
   handler: async (ctx, args) => {
     const device = await ctx.db.get(args.deviceId);
     if (!device || !device.isActive) throw new Error("Device unavailable");
-    const merged = mergeDisplayTelemetry(device.displayTelemetry, args.telemetry);
+    const incoming = isTemperatureCollectionEnabled() ? args.telemetry : { ...args.telemetry, temperature: undefined };
+    const merged = mergeDisplayTelemetry(device.displayTelemetry, incoming);
     if (merged !== device.displayTelemetry && merged !== undefined) {
       await ctx.db.patch(args.deviceId, { displayTelemetry: merged });
     }
@@ -70,6 +72,8 @@ export const recordTemperatureObservation = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Fence callbacks from temperature actions started before the pause release.
+    if (!isTemperatureCollectionEnabled()) return null;
     const device = await ctx.db.get(args.deviceId);
     if (!device || !device.isActive) throw new Error("Device unavailable");
     const now = Date.now();
@@ -134,6 +138,7 @@ const mqttSessionArgs = {
 export const claimMqttSession = internalMutation({
   args: mqttSessionArgs,
   handler: async (ctx, args) => {
+    if (args.purpose === "temperature" && !isTemperatureCollectionEnabled()) return { allowed: false };
     const device = await ctx.db.get(args.deviceId);
     if (!device || !device.isActive) throw new Error("Device unavailable");
     const now = Date.now();

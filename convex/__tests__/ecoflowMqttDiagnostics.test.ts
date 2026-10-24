@@ -2,7 +2,9 @@ import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { connect, type MqttClient } from "mqtt";
 import { getFunctionName, type FunctionReference } from "convex/server";
-import { capture, captureReading, captureTemperature, sanitizeQuotaFrame, type MqttDiagnosticResult } from "../ecoflowMqttDiagnostics";
+import { capture, captureReading, captureReadingInProcess, captureTemperature, sanitizeQuotaFrame, type MqttDiagnosticResult } from "../ecoflowMqttDiagnostics";
+import type { ActionCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import { generateSignature } from "../ecoflow";
 
 vi.mock("mqtt", () => ({ connect: vi.fn() }));
@@ -46,6 +48,9 @@ const invokeReading = (captureReading as unknown as {
 const invokeTemperature = (captureTemperature as unknown as {
   _handler: typeof invoke;
 })._handler;
+const invokeInProcess: typeof invoke = (ctx, args) => captureReadingInProcess(
+  ctx as unknown as ActionCtx, args.deviceId as Id<"devices">
+);
 
 let client: TestClient;
 function response(data: unknown, code = "0") {
@@ -66,6 +71,7 @@ beforeEach(() => {
   vi.setSystemTime(1_800_000_000_000);
   vi.stubEnv("ECOFLOW_ACCESS_KEY", "test-access");
   vi.stubEnv("ECOFLOW_SECRET_KEY", "test-secret");
+  vi.stubEnv("TEMPERATURE_COLLECTION_ENABLED", "true");
   fetchMock.mockReset().mockResolvedValue(response(certificate));
   vi.stubGlobal("fetch", fetchMock);
   client = new TestClient();
@@ -337,7 +343,91 @@ describe('live PD measurement readiness', () => {
   });
 });
 
+describe('in-process MQTT power capture', () => {
+  const fullPd = (time: number) => ({ ...pd, time, id: time, params: {
+    wattsInSum: 105, inputWatts: 105, wattsOutSum: 160,
+  } });
+
+  it('retains the original measurement receipt and collector lease without scheduling another action', async () => {
+    vi.stubEnv("TEMPERATURE_COLLECTION_ENABLED", undefined);
+    const { ctx, result } = await start(invokeInProcess);
+    send(fullPd(1));
+    await vi.advanceTimersByTimeAsync(5_000);
+    send(fullPd(2));
+    await vi.advanceTimersByTimeAsync(0);
+
+    const captured = await result;
+    expect(captured).toMatchObject({ reason: 'measurement_ready', finishedAt: 1_800_000_005_000 });
+    expect(captured.frames.at(-1)).toMatchObject({ receivedAt: 1_800_000_005_000,
+      values: { wattsInSum: 105, inputWatts: 105, wattsOutSum: 160 } });
+    expectLeaseOnlyWrites(ctx);
+    expect(ctx.runMutation.mock.calls[0][1]).toMatchObject({ deviceId: device._id, purpose: 'collector' });
+    expect(ctx.runMutation.mock.calls[1][1]).toEqual(ctx.runMutation.mock.calls[0][1]);
+    expect(ctx.scheduler.runAfter).not.toHaveBeenCalled();
+    expect(client.publish).not.toHaveBeenCalled();
+    expect(client.listenerCount('message')).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('keeps the twenty-second deadline when fresh progressing power never arrives', async () => {
+    const { ctx, result } = await start(invokeInProcess);
+    send(fullPd(1), { retain: true });
+    send(fullPd(2));
+    send(fullPd(2)); // A duplicate cannot establish a second fresh observation.
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(await result).toMatchObject({ reason: 'deadline', finishedAt: 1_800_000_020_000 });
+    expectLeaseOnlyWrites(ctx);
+    expect(client.end).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('returns busy without certification or releasing another caller\'s lease', async () => {
+    const ctx = context();
+    ctx.runMutation.mockResolvedValue({ allowed: false });
+    await expect(invokeInProcess(ctx, { deviceId: device._id })).resolves.toMatchObject({ reason: 'capture_busy', frames: [] });
+    expect(ctx.runMutation).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('releases its collector lease after a hard certification timeout', async () => {
+    fetchMock.mockImplementation(() => new Promise(() => {}));
+    const ctx = context();
+    const pending = invokeInProcess(ctx, { deviceId: device._id }).catch((error: Error) => error.message);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(await pending).toBe('Unable to obtain EcoFlow MQTT certification');
+    expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+    expectLeaseOnlyWrites(ctx);
+    expect(connect).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([null, { ...device, isActive: false }])('rejects unavailable devices before claiming a lease (%j)', async found => {
+    const ctx = context(found);
+    await expect(invokeInProcess(ctx, { deviceId: device._id })).rejects.toThrow('Active device not found');
+    expect(ctx.runMutation).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(connect).not.toHaveBeenCalled();
+  });
+});
+
 describe('independent fresh temperature capture', () => {
+  it.each([undefined, "false", "TRUE", "1"])("does no database, credential, socket or timer work while paused (%s)", async value => {
+    vi.stubEnv("TEMPERATURE_COLLECTION_ENABLED", value);
+    vi.stubEnv("ECOFLOW_ACCESS_KEY", undefined);
+    vi.stubEnv("ECOFLOW_SECRET_KEY", undefined);
+    const ctx = context();
+    await expect(invokeTemperature(ctx, { deviceId: device._id })).resolves.toMatchObject({
+      reason: "disabled", connected: false, subscribed: false, frames: [],
+    });
+    expect(ctx.runQuery).not.toHaveBeenCalled();
+    expect(ctx.runMutation).not.toHaveBeenCalled();
+    expect(ctx.scheduler.runAfter).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(connect).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   const bms = (time: number | null, params: Record<string, unknown>) => ({
     moduleType: 2, typeCode: 'bmsStatus', id: time, time, params,
   });

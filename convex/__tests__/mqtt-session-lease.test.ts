@@ -28,10 +28,20 @@ const claim = (claimMqttSession as unknown as { _handler: (ctx: TestContext, arg
 const release = (releaseMqttSession as unknown as { _handler: (ctx: TestContext, args: Args) => Promise<null> })._handler;
 const args: Args = { deviceId, purpose: "collector", token: "first-session" };
 
-beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(now); });
-afterEach(() => { vi.restoreAllMocks(); });
+beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(now); vi.stubEnv("TEMPERATURE_COLLECTION_ENABLED", "true"); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 describe("internal MQTT session leases", () => {
+  it("refuses a paused thermal lease but preserves power and diagnostic leases", async () => {
+    vi.stubEnv("TEMPERATURE_COLLECTION_ENABLED", undefined);
+    const ctx = makeContext();
+    expect(await claim(ctx, { ...args, purpose: "temperature" })).toEqual({ allowed: false });
+    expect(ctx.db.get).not.toHaveBeenCalled();
+    expect(ctx.scheduler.runAfter).not.toHaveBeenCalled();
+    expect(await claim(ctx, args)).toEqual({ allowed: true });
+    expect(await claim(ctx, { ...args, purpose: "diagnostic" })).toEqual({ allowed: true });
+  });
+
   it("claims a server-timed 90-second lease and refuses overlap for the same purpose", async () => {
     const ctx = makeContext();
     expect(await claim(ctx, args)).toEqual({ allowed: true });

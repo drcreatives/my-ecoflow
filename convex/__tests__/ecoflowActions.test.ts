@@ -2,9 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getFunctionName, type FunctionReference } from "convex/server";
 import { auth } from "../auth";
 import { collectAllUserReadings, generateSignature, refreshDeviceReading, refreshReadings } from "../ecoflow";
-import type { DiagnosticFrame, MqttDiagnosticResult } from "../ecoflowMqttDiagnostics";
+import { captureReadingInProcess, type DiagnosticFrame, type MqttDiagnosticResult } from "../ecoflowMqttDiagnostics";
 
 vi.mock("../auth", () => ({ auth: { getUserId: vi.fn() } }));
+vi.mock("../ecoflowMqttDiagnostics", () => ({ captureReadingInProcess: vi.fn() }));
+
+const captureReadingMock = vi.mocked(captureReadingInProcess);
 
 const now = 1_700_000_000_000;
 const device = { _id: "device-one", userId: "user-one", deviceSn: "TEST-DEVICE-ONE", isActive: true };
@@ -66,11 +69,7 @@ function makeContext(devices: Array<typeof device & { dcInputSource?: "auto" | "
       if (name(reference) === "readings:claimRefreshAttempt") return { allowed: true, reason: "allowed", retryAfterMs: 0 };
       return null;
     }),
-    runAction: vi.fn(async (reference: Reference, args?: Record<string, unknown>) => {
-      void args;
-      if (name(reference) !== "ecoflowMqttDiagnostics:captureReading") throw new Error("Unexpected action");
-      return liveResult();
-    }),
+    runAction: vi.fn(async () => { throw new Error("Unexpected nested action"); }),
   };
 }
 
@@ -119,7 +118,9 @@ beforeEach(() => {
   vi.stubEnv("ECOFLOW_ACCESS_KEY", "test-access");
   vi.stubEnv("ECOFLOW_SECRET_KEY", "test-secret");
   vi.stubEnv("DISABLE_CRONS", "false");
+  vi.stubEnv("TEMPERATURE_COLLECTION_ENABLED", "true");
   fetchMock.mockReset();
+  captureReadingMock.mockReset().mockImplementation(async () => liveResult());
   vi.stubGlobal("fetch", fetchMock);
   mockTelemetry();
 });
@@ -132,6 +133,56 @@ afterEach(() => {
 });
 
 describe("on-demand EcoFlow collection", () => {
+  it.each(["manual", "cron", "afterSet"] as const)("keeps %s power collection running while temperature is paused", async (path) => {
+    vi.stubEnv("TEMPERATURE_COLLECTION_ENABLED", undefined);
+    const ctx = makeContext();
+    const result = path === "manual" ? await refresh(ctx, { force: true })
+      : path === "cron" ? await collect(ctx, {})
+        : await refreshAfterSet(ctx, { deviceId: device._id, deviceSn: device.deviceSn });
+    expect(result).toMatchObject({ success: true });
+    expect(captureReadingMock).toHaveBeenCalledExactlyOnceWith(ctx, device._id);
+    expect(mutationCalls(ctx, "readings:insertReading")).toHaveLength(1);
+    expect(mutationCalls(ctx, "readings:insertReading")[0]?.[1]).toMatchObject({ powerMeasurement: "pd-totals-mqtt-v1" });
+    expect(ctx.scheduler.runAfter).not.toHaveBeenCalled();
+  });
+
+  it.each(["manual", "cron", "afterSet"] as const)("captures %s power in the caller without starting a second action", async (path) => {
+    const ctx = makeContext();
+    const capturedAt = now + 2_000;
+    captureReadingMock.mockResolvedValue(liveResult(quota, capturedAt));
+
+    const result = path === "manual" ? await refresh(ctx, { force: true })
+      : path === "cron" ? await collect(ctx, {})
+        : await refreshAfterSet(ctx, { deviceId: device._id, deviceSn: device.deviceSn });
+
+    expect(result).toMatchObject({ success: true });
+    expect(captureReadingMock).toHaveBeenCalledExactlyOnceWith(ctx, device._id);
+    expect(ctx.runAction).not.toHaveBeenCalled();
+    expect(mutationCalls(ctx, "readings:insertReading")).toHaveLength(1);
+    expect(mutationCalls(ctx, "readings:insertReading")[0]?.[1]).toMatchObject({
+      inputWatts: 400, outputWatts: 100, recordedAt: capturedAt,
+      powerMeasurement: "pd-totals-mqtt-v1", inputMeasurement: "delta2-pd-mqtt-v1",
+    });
+    expect(ctx.scheduler.runAfter).toHaveBeenCalledExactlyOnceWith(0, expect.anything(), { deviceId: device._id });
+    expect(getFunctionName(ctx.scheduler.runAfter.mock.calls[0][1] as Reference)).toBe("ecoflowMqttDiagnostics:captureTemperature");
+  });
+
+  it.each(["manual", "cron", "afterSet"] as const)("preserves %s collection failure handling when the in-process capture rejects", async (path) => {
+    const ctx = makeContext();
+    captureReadingMock.mockRejectedValue(new Error("Private upstream MQTT failure"));
+    const result = path === "manual" ? await refresh(ctx, { force: true })
+      : path === "cron" ? await collect(ctx, {})
+        : await refreshAfterSet(ctx, { deviceId: device._id, deviceSn: device.deviceSn });
+
+    expect(result).toMatchObject({ success: false });
+    expect(JSON.stringify(result)).not.toContain("Private upstream");
+    expect(mutationCalls(ctx, "readings:insertReading")).toHaveLength(0);
+    expect(mutationCalls(ctx, "settings:updateLastCollection")).toHaveLength(0);
+    expect(mutationCalls(ctx, "readings:recordCollectionStatus")[0]?.[1]).toMatchObject({ status: "error" });
+    expect(ctx.runAction).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects unauthenticated requests before any database/network work", async () => {
     vi.mocked(auth.getUserId).mockResolvedValue(null);
     const ctx = makeContext();
@@ -182,12 +233,12 @@ describe("on-demand EcoFlow collection", () => {
       "pd.wattsOutSum": 172, "pd.chargerType": 255, "bms_bmsStatus.soc": 100,
       "bms_bmsStatus.temp": 99, "bms_emsStatus.chgRemainTime": 999 });
     const ctx = makeContext();
-    ctx.runAction.mockResolvedValue(liveResult({
+    captureReadingMock.mockResolvedValue(liveResult({
       ...quota, "pd.wattsInSum": 98, "pd.inputWatts": 0, "pd.wattsOutSum": 158,
       "pd.chargerType": 2, "pd.soc": 76, "bms_bmsStatus.soc": 76, "pd.remainTime": -90,
     }, now + 2_000));
     await refresh(ctx, { force: true });
-    expect(ctx.runAction).toHaveBeenCalledWith(expect.anything(), { deviceId: device._id });
+    expect(captureReadingMock).toHaveBeenCalledWith(ctx, device._id);
     expect(mutationCalls(ctx, "readings:insertReading")[0]?.[1]).toMatchObject({
       inputWatts: 98, outputWatts: 158, acInputWatts: 0, dcInputWatts: 98,
       solarInputWatts: 98, chargingType: 2, batteryLevel: 76, remainingTime: -90,
@@ -208,7 +259,7 @@ describe("on-demand EcoFlow collection", () => {
     result.frames.unshift({ ...result.frames[0], module: "bms", moduleTime: 50,
       receivedAt: now + 1_000, values: { temp: 37 } });
     const ctx = makeContext();
-    ctx.runAction.mockResolvedValue(result);
+    captureReadingMock.mockResolvedValue(result);
     await refresh(ctx, { force: true });
     expect(mutationCalls(ctx, "readings:insertReading")[0]?.[1]).toMatchObject({
       temperature: undefined, acOutputWatts: 92, dcOutputWatts: 62, usbOutputWatts: 5, recordedAt: now + 2_000,
@@ -262,7 +313,7 @@ describe("on-demand EcoFlow collection", () => {
 
   it.each(["manual", "cron", "afterSet"])("skips a busy %s capture without corrupting health or inserting cached data", async (path) => {
     const ctx = makeContext();
-    ctx.runAction.mockResolvedValue({ ...liveResult(), reason: "capture_busy", frames: [], liveFrames: 0 });
+    captureReadingMock.mockResolvedValue({ ...liveResult(), reason: "capture_busy", frames: [], liveFrames: 0 });
     const result = path === "manual" ? await refresh(ctx, { force: true })
       : path === "cron" ? await collect(ctx, {})
         : await refreshAfterSet(ctx, { deviceId: device._id, deviceSn: device.deviceSn });
@@ -287,7 +338,7 @@ describe("on-demand EcoFlow collection", () => {
       if (failure === "no_pd") result.frames = [];
       if (failure === "one_frame") result.frames = result.frames.slice(0, 1);
       const ctx = makeContext();
-      ctx.runAction.mockResolvedValue(result);
+      captureReadingMock.mockResolvedValue(result);
       expect(await refresh(ctx, { force: true })).toMatchObject({ success: false, devicesFailed: 1, devicesRefreshed: 0 });
       expect(mutationCalls(ctx, "readings:insertReading")).toHaveLength(0);
       expect(ctx.runMutation.mock.calls.every(([reference]) => ["readings:claimRefreshAttempt", "readings:recordCollectionStatus"].includes(name(reference)))).toBe(true);
@@ -303,7 +354,7 @@ describe("on-demand EcoFlow collection", () => {
       if (missing === "sysVer" || missing === "both") delete frame.values.sysVer;
       if (missing === "chargerType") delete frame.values.chargerType;
     }
-    ctx.runAction.mockResolvedValue(result);
+    captureReadingMock.mockResolvedValue(result);
     expect(await refresh(ctx, { force: true })).toMatchObject({ success: true, devicesRefreshed: 1 });
     expect(mutationCalls(ctx, "readings:insertReading")[0]?.[1]).toMatchObject({
       inputWatts: 400, acInputWatts: 400, dcInputWatts: 0, solarInputWatts: 0,
@@ -313,7 +364,7 @@ describe("on-demand EcoFlow collection", () => {
 
   it("lets live firmware override supported cached firmware without inventing a source", async () => {
     const ctx = makeContext();
-    ctx.runAction.mockResolvedValue(liveResult({ ...quota, "pd.sysVer": 16908851 }));
+    captureReadingMock.mockResolvedValue(liveResult({ ...quota, "pd.sysVer": 16908851 }));
     await refresh(ctx, { force: true });
     expect(mutationCalls(ctx, "readings:insertReading")[0]?.[1]).toMatchObject({
       inputWatts: 400, inputQuality: "incomplete", inputMeasurement: undefined, chargingType: undefined,
@@ -323,7 +374,7 @@ describe("on-demand EcoFlow collection", () => {
   it("uses configured direct solar wiring when delta reports omit source flags", async () => {
     const configured = { ...device, dcInputSource: "solar" as const };
     const ctx = makeContext([configured]);
-    ctx.runAction.mockResolvedValue(liveResult({ "pd.wattsInSum": 486, "pd.inputWatts": 0, "pd.wattsOutSum": 158 }));
+    captureReadingMock.mockResolvedValue(liveResult({ "pd.wattsInSum": 486, "pd.inputWatts": 0, "pd.wattsOutSum": 158 }));
     await refresh(ctx, { force: true });
     expect(mutationCalls(ctx, "readings:insertReading")[0]?.[1]).toMatchObject({
       inputWatts: 486, acInputWatts: 0, dcInputWatts: 486, solarInputWatts: 486,
@@ -336,7 +387,7 @@ describe("on-demand EcoFlow collection", () => {
     const configured = { ...device, dcInputSource: "solar" as const };
     const ctx = makeContext([configured]);
     const live = liveResult({ "pd.wattsInSum": 228, "pd.wattsOutSum": 217, "pd.soc": 76 });
-    ctx.runAction.mockResolvedValue(live);
+    captureReadingMock.mockResolvedValue(live);
     const result = path === "manual" ? await refresh(ctx, { force: true })
       : path === "cron" ? await collect(ctx, {})
         : await refreshAfterSet(ctx, { deviceId: configured._id, deviceSn: configured.deviceSn });
@@ -355,7 +406,7 @@ describe("on-demand EcoFlow collection", () => {
     const ctx = makeContext([{ ...device, dcInputSource: "solar" as const }]);
     const live = liveResult();
     live.frames[1].values = { wattsInSum: 228, wattsOutSum: 217, soc: 76 };
-    ctx.runAction.mockResolvedValue(live);
+    captureReadingMock.mockResolvedValue(live);
     expect(await refresh(ctx, { force: true })).toMatchObject({ success: true, devicesRefreshed: 1 });
     expect(mutationCalls(ctx, "readings:insertReading")[0]?.[1]).toMatchObject({
       inputWatts: 228, outputWatts: 217, batteryLevel: 76,
@@ -369,7 +420,7 @@ describe("on-demand EcoFlow collection", () => {
     const live = liveResult({ "pd.wattsInSum": 228, "pd.wattsOutSum": 217 });
     live.finishedAt = now + 1_000;
     live.frames.push({ ...live.frames[1], moduleTime: 3, receivedAt: live.finishedAt, values: { soc: 77, remainTime: 20 } });
-    ctx.runAction.mockResolvedValue(live);
+    captureReadingMock.mockResolvedValue(live);
     expect(await refresh(ctx, { force: true })).toMatchObject({ success: true, devicesRefreshed: 1 });
     expect(mutationCalls(ctx, "readings:insertReading")[0]?.[1]).toMatchObject({
       inputWatts: 228, outputWatts: 217, batteryLevel: 77, recordedAt: now,
@@ -385,7 +436,7 @@ describe("on-demand EcoFlow collection", () => {
     live.frames[1].receivedAt = now + 1_000;
     live.frames.splice(1, 0, { ...live.frames[0], module: "mppt", moduleTime: 10, values: { inWatts: 230, chgType: 2 } });
     live.frames.push({ ...live.frames[0], module: "mppt", moduleTime: 11, receivedAt: live.finishedAt, values: { inWatts: 231, chgType: 2 } });
-    ctx.runAction.mockResolvedValue(live);
+    captureReadingMock.mockResolvedValue(live);
     expect(await refresh(ctx, { force: true })).toMatchObject({ success: true, devicesRefreshed: 1 });
     expect(mutationCalls(ctx, "readings:insertReading")[0]?.[1]).toMatchObject({
       inputWatts: 221, outputWatts: 217, recordedAt: now + 1_000, powerMeasurement: "pd-totals-mqtt-v1",
@@ -402,7 +453,7 @@ describe("on-demand EcoFlow collection", () => {
       { ...live.frames[0], module: "mppt", moduleTime: 10, values: { inWatts: 230, chgType: 2 } },
       { ...live.frames[0], module: "mppt", moduleTime: 11, values: { inWatts: 231, chgType: 2 } },
     );
-    ctx.runAction.mockResolvedValue(live);
+    captureReadingMock.mockResolvedValue(live);
     expect(await refresh(ctx, { force: true })).toMatchObject({ success: true, devicesRefreshed: 1 });
     const inserted = mutationCalls(ctx, "readings:insertReading")[0]?.[1];
     expect(inserted).toMatchObject({ inputWatts: 221, outputWatts: 217, inputMeasurement: undefined, powerMeasurement: "pd-totals-mqtt-v1" });
@@ -426,7 +477,7 @@ describe("on-demand EcoFlow collection", () => {
     });
     if (failure === "before_session") live.frames = live.frames.map(frame => ({ ...frame, receivedAt: live.startedAt - 1 }));
     if (failure === "after_session") live.frames = live.frames.map(frame => ({ ...frame, receivedAt: live.finishedAt + 1 }));
-    ctx.runAction.mockResolvedValue(live);
+    captureReadingMock.mockResolvedValue(live);
     expect(await refresh(ctx, { force: true })).toMatchObject({ success: false, devicesRefreshed: 0, devicesFailed: 1 });
     expect(mutationCalls(ctx, "readings:insertReading")).toHaveLength(0);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -441,7 +492,7 @@ describe("on-demand EcoFlow collection", () => {
       { ...live.frames[1], id: 1000, moduleTime: 3,
         values: { wattsInSum: 105, inputWatts: 105, wattsOutSum: 160, model: 80, sysVer: 16908850 } },
     );
-    ctx.runAction.mockResolvedValue(live);
+    captureReadingMock.mockResolvedValue(live);
     expect(await refresh(ctx, { force: true })).toMatchObject({ success: false, devicesRefreshed: 0, devicesFailed: 1 });
     expect(mutationCalls(ctx, "readings:insertReading")).toHaveLength(0);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -455,7 +506,7 @@ describe("on-demand EcoFlow collection", () => {
       { ...result.frames[1], moduleTime: 3, values: { wattsInSum: 105, inputWatts: 0, wattsOutSum: 150 } },
     ];
     const ctx = makeContext();
-    ctx.runAction.mockResolvedValue(result);
+    captureReadingMock.mockResolvedValue(result);
     await refresh(ctx, { force: true });
     expect(mutationCalls(ctx, "readings:insertReading")[0]?.[1]).toMatchObject({
       inputWatts: 105, outputWatts: 150, solarInputWatts: 105, chargingType: 2,
@@ -467,7 +518,7 @@ describe("on-demand EcoFlow collection", () => {
     const result = liveResult({ "pd.wattsInSum": 98, "pd.inputWatts": 0, "pd.wattsOutSum": 158 });
     result.frames.unshift({ ...result.frames[0], moduleTime: 0, retained: true, values: { model: 80, sysVer: 16908850, chargerType: 2 } });
     const ctx = makeContext();
-    ctx.runAction.mockResolvedValue(result);
+    captureReadingMock.mockResolvedValue(result);
     expect(await refresh(ctx, { force: true })).toMatchObject({ success: true, devicesRefreshed: 1 });
     expect(mutationCalls(ctx, "readings:insertReading")[0]?.[1]).toMatchObject({
       inputWatts: 98, acInputWatts: 0, dcInputWatts: 98, inputQuality: "consistent",
@@ -483,7 +534,7 @@ describe("on-demand EcoFlow collection", () => {
       { ...result.frames[0], module: "bms", moduleTime: 49, values: { temp: 99, soc: 100 } },
     );
     const ctx = makeContext();
-    ctx.runAction.mockResolvedValue(result);
+    captureReadingMock.mockResolvedValue(result);
     await refresh(ctx, { force: true });
     expect(mutationCalls(ctx, "readings:insertReading")[0]?.[1]).toMatchObject({ batteryLevel: 76, temperature: undefined, remainingTime: 90 });
   });
@@ -496,7 +547,7 @@ describe("on-demand EcoFlow collection", () => {
       { ...result.frames[0], module: "bms", moduleTime: 51, receivedAt: now + 2_000, values: { temp: 38, soc: 74 } },
     );
     const ctx = makeContext();
-    ctx.runAction.mockResolvedValue(result);
+    captureReadingMock.mockResolvedValue(result);
     expect(await refresh(ctx, { force: true })).toMatchObject({ success: true, devicesRefreshed: 1 });
     expect(mutationCalls(ctx, "readings:insertReading")[0]?.[1]).toMatchObject({
       inputWatts: 400, acInputWatts: 400, dcInputWatts: 0, outputWatts: 100,
@@ -608,7 +659,7 @@ describe("on-demand EcoFlow collection", () => {
       return response({ ...quota, "pd.wattsInSum": 378, "inv.inputWatts": 0, "mppt.inWatts": 378, "mppt.chgType": 2 });
     });
     const ctx = makeContext();
-    ctx.runAction.mockResolvedValueOnce(liveResult(quota, now)).mockResolvedValueOnce(liveResult({
+    captureReadingMock.mockResolvedValueOnce(liveResult(quota, now)).mockResolvedValueOnce(liveResult({
       ...quota, "pd.wattsInSum": 378, "pd.inputWatts": 0, "pd.chargerType": 2,
     }, now + 1_000));
     const oldCapture = refreshAfterSet(ctx, { deviceId: device._id, deviceSn: device.deviceSn });
@@ -638,6 +689,34 @@ describe("on-demand EcoFlow collection", () => {
 });
 
 describe("scheduled reading collection", () => {
+  it("retains one power reading in each consecutive saved one-minute slot", async () => {
+    const ctx = makeContext();
+    let lastCollectionAt = now - 60_000;
+    const originalQuery = ctx.runQuery.getMockImplementation()!;
+    const originalMutation = ctx.runMutation.getMockImplementation()!;
+    ctx.runQuery.mockImplementation(async (reference) => name(reference) === "settings:getCollectionSettingsForDevices"
+      ? [{ userId: "user-one", collectionIntervalMinutes: 1, lastCollectionAt }]
+      : originalQuery(reference));
+    ctx.runMutation.mockImplementation(async (reference, args) => {
+      if (name(reference) === "settings:updateLastCollection" && typeof args?.timestamp === "number") {
+        lastCollectionAt = args.timestamp;
+      }
+      return originalMutation(reference, args);
+    });
+
+    expect(await collect(ctx, {})).toMatchObject({ success: true, totalReadings: 1 });
+    vi.mocked(Date.now).mockReturnValue(now + 60_000);
+    expect(await collect(ctx, {})).toMatchObject({ success: true, totalReadings: 1 });
+
+    expect(captureReadingMock).toHaveBeenCalledTimes(2);
+    expect(ctx.runAction).not.toHaveBeenCalled();
+    expect(mutationCalls(ctx, "readings:insertReading").map(([, args]) => args?.recordedAt))
+      .toEqual([now, now + 60_000]);
+    expect(mutationCalls(ctx, "settings:updateLastCollection").map(([, args]) => args?.timestamp))
+      .toEqual([now, now + 60_000]);
+    expect(ctx.scheduler.runAfter).toHaveBeenCalledTimes(2);
+  });
+
   it("preserves the development cron disable guard", async () => {
     vi.stubEnv("DISABLE_CRONS", "true");
     const ctx = makeContext();

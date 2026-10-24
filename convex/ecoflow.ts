@@ -5,12 +5,15 @@ import { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
-import crypto from "crypto";
 import { auth } from "./auth";
 import type { ChargingTypeSource, DcInputSource, InputMeasurement, InputQuality } from "./readingQuality";
-import type { DiagnosticFrame, MqttDiagnosticResult } from "./ecoflowMqttDiagnostics";
+import { captureReadingInProcess, type DiagnosticFrame, type MqttDiagnosticResult } from "./ecoflowMqttDiagnostics";
 import type { DisplayTelemetry } from "./displayTelemetry";
 import { selectSolarPanelTelemetry } from "./solarPanelTelemetry";
+import { generateSignature, hasPdPowerOrSourceFields } from "./ecoflowProtocol";
+import { isTemperatureCollectionEnabled } from "./temperatureCollection";
+
+export { generateSignature, hasPdPowerOrSourceFields } from "./ecoflowProtocol";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,31 +59,6 @@ async function fetchEcoFlowJson<T>(
   } finally {
     clearTimeout(timeout);
   }
-}
-
-export function generateSignature(
-  secretKey: string,
-  accessKey: string,
-  params: Record<string, string | number>,
-  timestamp: number,
-  nonce: string
-): string {
-  // Per EcoFlow docs: sort request params alphabetically first,
-  // then append accessKey, nonce, timestamp at the end (fixed order).
-  const sortedRequestParams = Object.keys(params)
-    .sort()
-    .map((key) => `${key}=${params[key]}`)
-    .join("&");
-
-  const authSuffix = `accessKey=${accessKey}&nonce=${nonce}&timestamp=${timestamp}`;
-  const signatureString = sortedRequestParams
-    ? `${sortedRequestParams}&${authSuffix}`
-    : authSuffix;
-
-  return crypto
-    .createHmac("sha256", secretKey)
-    .update(signatureString)
-    .digest("hex");
 }
 
 async function makeEcoFlowRequest<T = Record<string, unknown>>(
@@ -477,15 +455,6 @@ async function getOnlineSnapshot(accessKey: string, secretKey: string): Promise<
 // PD delta reports can omit the AC branch even while both aggregate powers
 // advance. Liveness does not establish availability of the source allocation.
 const PD_TOTAL_POWERS = ["wattsInSum", "wattsOutSum"] as const;
-// A later source/power delta invalidates an earlier selected power packet if it
-// omits either total. Pure metadata updates do not make measured totals vanish.
-const PD_POWER_OR_SOURCE_FIELDS = new Set(["wattsInSum", "wattsOutSum", "inputWatts", "outputWatts",
-  "inWatts", "outWatts", "carWatts", "usb1Watts", "usb2Watts", "qcUsb1Watts", "qcUsb2Watts",
-  "typec1Watts", "typec2Watts", "chargerType", "acChargeFlag", "redunChargeFlag", "chgDsgState"]);
-
-export function hasPdPowerOrSourceFields(values: Record<string, number>) {
-  return Object.keys(values).some(key => PD_POWER_OR_SOURCE_FIELDS.has(key));
-}
 const PD_SESSION_METADATA = ["model", "sysVer", "wifiVer", "chargerType", "soc", "remainTime",
   "chgDsgState", "acChargeFlag", "redunChargeFlag"] as const;
 const PD_CONFIG_FIELDS = new Set(["dcOutState", "standbyMin", "pvChgPrioSet", "watchIsConfig",
@@ -627,18 +596,19 @@ async function captureDeviceReading(
     return "offline";
   }
 
-  try {
-    // Temperature arrives less often than power and has an independent lease.
-    // Scheduling it must neither delay the power capture nor change its health.
-    await ctx.scheduler.runAfter(0, internal.ecoflowMqttDiagnostics.captureTemperature, { deviceId: device._id });
-  } catch {
-    console.warn("EcoFlow temperature capture could not be scheduled");
+  if (isTemperatureCollectionEnabled()) {
+    try {
+      // Temperature has an independent lease and must not delay power capture.
+      await ctx.scheduler.runAfter(0, internal.ecoflowMqttDiagnostics.captureTemperature, { deviceId: device._id });
+    } catch {
+      console.warn("EcoFlow temperature capture could not be scheduled");
+    }
   }
 
   try {
-    const capture = await ctx.runAction(internal.ecoflowMqttDiagnostics.captureReading, {
-      deviceId: device._id,
-    });
+    // Both callers run in Node; a helper avoids retaining a second action's
+    // allocation while the parent waits for the same MQTT measurement.
+    const capture = await captureReadingInProcess(ctx, device._id);
     if (capture.reason === "capture_busy") return "busy";
     const live = selectLivePdMeasurement(capture);
     const quota = await getDeviceQuota(accessKey, secretKey, device.deviceSn);
