@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ChartZoomControls,
   resizeChartRange,
@@ -14,6 +14,11 @@ import {
   CombinedChart,
 } from './HistoryCharts'
 import type { DeviceReading, TemperatureHistoryReading } from '@/lib/data-utils'
+
+// Existing feature coverage remains runnable when temperature is re-enabled.
+const temperatureFeature = vi.hoisted(() => ({ enabled: true }))
+vi.mock('@/lib/features', () => ({ get TEMPERATURE_FEATURE_ENABLED() { return temperatureFeature.enabled } }))
+beforeEach(() => { temperatureFeature.enabled = true })
 
 vi.stubGlobal(
   'ResizeObserver',
@@ -313,4 +318,11 @@ describe('historical temperature evidence', () => {
     expect(screen.getByRole('button', { name: /Battery Level/ })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: /Power Usage/ })).toBeEnabled()
   })
+})
+
+it('should hide the temperature tab and chart while retaining power controls when paused', () => {
+  temperatureFeature.enabled = false
+  render(<CombinedChart data={chartData} temperatureData={[{ ...chartData[0], temperature: 39 }]} defaultChart="temperature" />)
+  expect(screen.queryByRole('button', { name: /Temperature/ })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /Power Usage/ })).toHaveAttribute('aria-pressed', 'true')
 })

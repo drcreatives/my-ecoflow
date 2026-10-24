@@ -5,6 +5,11 @@ import DevicesPage from './page'
 import type { DisplayTelemetry } from '@/types'
 import type { ReadingFreshness } from '@/lib/reading-status'
 
+// Existing feature coverage remains runnable when temperature is re-enabled.
+const temperatureFeature = vi.hoisted(() => ({ enabled: true }))
+vi.mock('@/lib/features', () => ({ get TEMPERATURE_FEATURE_ENABLED() { return temperatureFeature.enabled } }))
+beforeEach(() => { temperatureFeature.enabled = true })
+
 const mocks = vi.hoisted(() => {
   const device = {
     id: 'device-test', deviceSn: 'TEST-DEVICE', deviceName: 'Test station', userId: '',
@@ -114,4 +119,16 @@ describe('device list temperature evidence', () => {
     expect(screen.queryByRole('heading', { name: 'Refresh failed station' })).not.toBeInTheDocument()
     expect(within(summary).getByText('1')).toBeInTheDocument()
   })
+})
+
+it('should hide device-list temperature and updating indicators when paused', () => {
+  temperatureFeature.enabled = false
+  mocks.device.online = true
+  mocks.device.isActive = true
+  mocks.device.displayTelemetry = { temperature: { value: 39, source: 'mqtt', receivedAt: Date.now() } }
+  mocks.device.temperatureRefreshing = true
+  render(<DevicesPage />)
+  expect(screen.queryByLabelText(/Temperature/)).not.toBeInTheDocument()
+  expect(screen.queryByText(/°C|Updating|Checking temperature/)).not.toBeInTheDocument()
+  expect(screen.getByText('Test station')).toBeInTheDocument()
 })

@@ -1,5 +1,6 @@
 'use client'
 
+import { TEMPERATURE_FEATURE_ENABLED } from '@/lib/features'
 import { use } from 'react'
 import { formatRemainingTime } from '@/lib/data-utils'
 import { getInputLabel, getInputSourceDescription, getTrustedInputChannels, getVerifiedSolarPanelInput } from '@/lib/reading-status'
@@ -292,7 +293,7 @@ export default function DevicePage({ params }: DevicePageProps) {
         </div>
 
         {/* Status Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${TEMPERATURE_FEATURE_ENABLED ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4 sm:gap-6 mb-8`}>
           {/* Battery Level */}
           <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-160 ease-dashboard">
             <div className="flex items-center justify-between mb-3">
@@ -359,7 +360,7 @@ export default function DevicePage({ params }: DevicePageProps) {
           </div>
 
           {/* Temperature */}
-          <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-160 ease-dashboard">
+          {TEMPERATURE_FEATURE_ENABLED && (<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-4 sm:p-6 hover:border-brand-primary/30 transition-all duration-160 ease-dashboard">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
                 <Thermometer className={`w-5 h-5 ${temperatureMetric.status === 'reported' ? 'text-brand-primary' : 'text-text-muted'}`} />
@@ -370,7 +371,7 @@ export default function DevicePage({ params }: DevicePageProps) {
               {temperature === null ? '—' : `${temperature}°C`}
             </div>
             <TemperatureStatus metric={temperatureMetric} refreshing={device.temperatureRefreshing} className="mt-1" />
-          </div>
+          </div>)}
         </div>
 
         {/* Independent panel input */}

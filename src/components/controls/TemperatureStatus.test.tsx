@@ -1,8 +1,13 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolveTemperatureMetric } from '@/lib/display-telemetry'
 import { TemperatureStatus } from './TemperatureStatus'
+
+// Existing feature coverage remains runnable when temperature is re-enabled.
+const temperatureFeature = vi.hoisted(() => ({ enabled: true }))
+vi.mock('@/lib/features', () => ({ get TEMPERATURE_FEATURE_ENABLED() { return temperatureFeature.enabled } }))
+beforeEach(() => { temperatureFeature.enabled = true })
 
 describe('temperature status presentation', () => {
   it('should keep the card age short while exposing the exact report time to keyboard and assistive technology', async () => {
@@ -54,4 +59,11 @@ describe('temperature status presentation', () => {
     expect(screen.getByText(metric.label)).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Checking temperature…')
   })
+})
+
+it('should hide both compact and full temperature progress when paused', () => {
+  temperatureFeature.enabled = false
+  const metric = resolveTemperatureMetric({ value: 39, source: 'mqtt', receivedAt: Date.now() })
+  const { container } = render(<><TemperatureStatus metric={metric} refreshing /><TemperatureStatus metric={metric} refreshing compact /></>)
+  expect(container).toBeEmptyDOMElement()
 })

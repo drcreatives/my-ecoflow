@@ -18,6 +18,7 @@ import {
   Brush
 } from 'recharts'
 import { DeviceReading, type TemperatureHistoryReading } from '@/lib/data-utils'
+import { TEMPERATURE_FEATURE_ENABLED } from '@/lib/features'
 import { format, parseISO } from 'date-fns'
 import { RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
 import { getTrustedInputChannels, getVerifiedSolarPanelInput } from '@/lib/reading-status'
@@ -346,7 +347,7 @@ export const CustomTooltip = ({ active, payload, label }: {
     return (
       <div className="bg-surface-2 border border-stroke-subtle rounded-inner p-3 shadow-card">
         <p className="text-text-muted text-sm mb-2">{label}</p>
-        {payload.map((entry, index) => (
+        {payload.filter(entry => TEMPERATURE_FEATURE_ENABLED || entry.name !== 'Temperature').map((entry, index) => (
           <div key={index}>
             <p className="text-sm" style={{ color: entry.color }}>
               {`${entry.name}: ${entry.value}${entry.unit || ''}`}
@@ -633,6 +634,7 @@ interface TemperatureChartProps {
 }
 
 export const TemperatureChart = ({ data, height = 300 }: TemperatureChartProps) => {
+  if (!TEMPERATURE_FEATURE_ENABLED) return null
   const series = getTemperatureSeries(data)
   if (!data.some(point => typeof point.temperature === 'number' && Number.isFinite(point.temperature))) {
     return (
@@ -812,11 +814,12 @@ interface CombinedChartProps {
 
 export const CombinedChart = ({ data, temperatureData, height = 400, defaultChart = 'power' }: CombinedChartProps) => {
   const [activeChart, setActiveChart] = useState(defaultChart)
-  const temperatureOnly = data.length === 0 && temperatureData?.some(point =>
+  const temperatureOnly = TEMPERATURE_FEATURE_ENABLED && data.length === 0 && temperatureData?.some(point =>
     typeof point.temperature === 'number' && Number.isFinite(point.temperature))
   // A filtered sensor-only range still has useful data. Retain the user's normal
   // chart choice so returning to power observations restores that choice.
-  const displayedChart = temperatureOnly ? 'temperature' : activeChart
+  const displayedChart = temperatureOnly ? 'temperature'
+    : !TEMPERATURE_FEATURE_ENABLED && activeChart === 'temperature' ? 'power' : activeChart
 
   const chartTabs = [
     { id: 'power', label: 'Power Usage', icon: '⚡' },
@@ -844,7 +847,7 @@ export const CombinedChart = ({ data, temperatureData, height = 400, defaultChar
     <div className="w-full">
       {/* Chart Tabs */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {chartTabs.map(tab => (
+        {chartTabs.filter(tab => TEMPERATURE_FEATURE_ENABLED || tab.id !== 'temperature').map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveChart(tab.id)}

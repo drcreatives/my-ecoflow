@@ -1,5 +1,6 @@
 'use client'
 
+import { TEMPERATURE_FEATURE_ENABLED } from '@/lib/features'
 import { 
   Battery, 
   Zap, 
@@ -260,7 +261,7 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
       {/* Main Stats Grid */}
       <div className={cn(
         "grid gap-3",
-        isCompact ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4"
+        isCompact ? "grid-cols-2" : TEMPERATURE_FEATURE_ENABLED ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3"
       )}>
         {/* Battery Level */}
         <div className="flex items-center gap-2">
@@ -323,7 +324,7 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
         </div>
 
         {/* Temperature */}
-        <div className="flex items-center gap-2">
+        {TEMPERATURE_FEATURE_ENABLED && (<div className="flex items-center gap-2">
           <Thermometer 
             size={isCompact ? 16 : 18} 
             className={temperatureMetric.status === 'reported' && temperature !== null && temperature > 40 ? "text-warning" : "text-text-muted"}
@@ -338,7 +339,7 @@ export const DeviceStatusCard = ({ device, isCompact = false }: DeviceStatusCard
             </span>
             <TemperatureStatus metric={temperatureMetric} refreshing={device.temperatureRefreshing} compact />
           </div>
-        </div>
+        </div>)}
       </div>
 
       {/* Additional Info for non-compact view */}

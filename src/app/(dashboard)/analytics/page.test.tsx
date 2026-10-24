@@ -4,6 +4,11 @@ import type { EnergyTotals } from '@/lib/analytics'
 import type { DeviceReading, TemperatureHistoryReading } from '@/lib/data-utils'
 import AnalyticsPage from './page'
 
+// Existing feature coverage remains runnable when temperature is re-enabled.
+const temperatureFeature = vi.hoisted(() => ({ enabled: true }))
+vi.mock('@/lib/features', () => ({ get TEMPERATURE_FEATURE_ENABLED() { return temperatureFeature.enabled } }))
+beforeEach(() => { temperatureFeature.enabled = true })
+
 const HOUR = 3_600_000
 const mocks = vi.hoisted(() => ({
   devices: [{ id: 'station', deviceName: 'Test station', deviceSn: 'TEST', isActive: true }],
@@ -249,4 +254,14 @@ describe('Analytics energy evidence', () => {
     expect(screen.queryByText(/Unclassified station input:/)).not.toBeInTheDocument()
     expect(mocks.combinedChart).toHaveBeenLastCalledWith(expect.objectContaining({ defaultChart: 'temperature' }))
   })
+})
+
+it('should hide analytics temperature summary and chart when paused', () => {
+  temperatureFeature.enabled = false
+  mocks.temperatureReadings = [{ deviceId: 'station', deviceName: 'Test station', deviceSn: 'TEST', recordedAt: 123, temperature: 39, temperatureSampleCount: 1, temperatureMeasurement: 'bms-generic-mqtt-v1' }]
+  mocks.temperatureSummary = { avgTemperature: 39, maxTemperature: 39, temperatureReadings: 1 }
+  render(<AnalyticsPage />)
+  expect(screen.queryByText('Avg Temperature')).not.toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: 'Temperature' })).not.toBeInTheDocument()
+  expect(screen.getByRole('group', { name: 'Energy consumed' })).toBeInTheDocument()
 })

@@ -4,6 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useConvexHistoryReadings, useConvexReadingHistory } from "./useConvexData";
 import { notifyReadingWindowRefresh } from "@/lib/reading-refresh-events";
 
+// Existing feature coverage remains runnable when temperature is re-enabled.
+const temperatureFeature = vi.hoisted(() => ({ enabled: true }))
+vi.mock('@/lib/features', () => ({ get TEMPERATURE_FEATURE_ENABLED() { return temperatureFeature.enabled } }))
+beforeEach(() => { temperatureFeature.enabled = true })
+
 const mocks = vi.hoisted(() => ({
   useQuery: vi.fn(),
   latest: [] as Array<{ deviceId: string; reading: { recordedAt: number } }>,
@@ -251,3 +256,18 @@ describe("reading history windows", () => {
     expect(historyArgs().endTime).toBe(initialTime);
   });
 });
+
+it('should skip the thermal timestamp subscription and ignore thermal data when paused', () => {
+  temperatureFeature.enabled = false
+  mocks.useQuery.mockImplementation((reference) => {
+    if (getFunctionName(reference) === 'readings:history') return { readings: [{ recordedAt: initialTime }], temperatureReadings: [{ temperature: 39 }], temperatureSummary: { avgTemperature: 39 } }
+    if (getFunctionName(reference) === 'readings:latest') return [{ deviceId: 'device-a', reading: { recordedAt: initialTime } }]
+    return undefined
+  })
+  const { result } = renderHook(() => useConvexHistoryReadings('device-a', { timeRange: '24h' }))
+  const calls = mocks.useQuery.mock.calls.filter(([reference]) => getFunctionName(reference) === 'readings:latestTemperatureTimestamp')
+  expect(calls.at(-1)?.[1]).toBe('skip')
+  expect(result.current.temperatureReadings).toEqual([])
+  expect(result.current.temperatureSummary).toBeNull()
+  expect(result.current.readings).toHaveLength(1)
+})

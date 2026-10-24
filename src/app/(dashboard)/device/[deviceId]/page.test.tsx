@@ -4,6 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import DevicePage from './page'
 import type { DisplayTelemetry } from '@/types'
 
+// Existing feature coverage remains runnable when temperature is re-enabled.
+const temperatureFeature = vi.hoisted(() => ({ enabled: true }))
+vi.mock('@/lib/features', () => ({ get TEMPERATURE_FEATURE_ENABLED() { return temperatureFeature.enabled } }))
+beforeEach(() => { temperatureFeature.enabled = true })
+
 const mocks = vi.hoisted(() => {
   const device = {
     id: 'test-device', deviceSn: 'TEST-DEVICE', deviceName: 'Test station',
@@ -224,4 +229,15 @@ describe('device reading timestamp', () => {
     expect(screen.getByText(`Reported ${new Date(receivedAt).toLocaleString()}`)).toBeInTheDocument()
     expect(screen.queryByText('88°C')).not.toBeInTheDocument()
   })
+})
+
+it('should hide device-detail temperature while retaining power when paused', async () => {
+  temperatureFeature.enabled = false
+  mocks.device.displayTelemetry = { temperature: { value: 39, source: 'mqtt', receivedAt: Date.now() } }
+  mocks.device.temperatureRefreshing = true
+  const params = Promise.resolve({ deviceId: mocks.device.id })
+  await act(async () => { render(<Suspense fallback="Loading"><DevicePage params={params} /></Suspense>) })
+  expect(screen.queryByText('Temperature')).not.toBeInTheDocument()
+  expect(screen.queryByText(/°C|Checking temperature/)).not.toBeInTheDocument()
+  expect(screen.getByText('Power Out')).toBeInTheDocument()
 })

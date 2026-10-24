@@ -1,5 +1,6 @@
 'use client';
 
+import { TEMPERATURE_FEATURE_ENABLED } from '@/lib/features'
 import { useState, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useConvexDevices, useConvexDeviceMutations, useConvexDeviceControl, useConvexSchedules } from '@/hooks/useConvexData';
@@ -457,7 +458,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                       />
                     </div>
 
-                    <div className="p-4 bg-surface-2/30 rounded-inner">
+                    {TEMPERATURE_FEATURE_ENABLED && (<div className="p-4 bg-surface-2/30 rounded-inner">
                       <label className="block text-sm font-medium text-text-muted mb-2">
                         High Temperature Alert (°C)
                       </label>
@@ -472,7 +473,7 @@ export default function DeviceSettingsPage({ params }: DeviceSettingsPageProps) 
                         }))}
                         className="w-full px-3 py-2 bg-surface-2 border border-stroke-subtle rounded-inner focus:border-brand-primary focus:ring-1 focus:ring-brand-primary/40 focus:outline-none text-text-primary"
                       />
-                    </div>
+                    </div>)}
 
                     <div className="p-4 bg-surface-2/30 rounded-inner">
                       <label className="block text-sm font-medium text-text-muted mb-2">

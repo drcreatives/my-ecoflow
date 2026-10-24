@@ -4,6 +4,11 @@ import HistoryPage from './page'
 import AnalyticsPage from '../analytics/page'
 import type { TemperatureHistoryReading } from '@/lib/data-utils'
 
+// Existing feature coverage remains runnable when temperature is re-enabled.
+const temperatureFeature = vi.hoisted(() => ({ enabled: true }))
+vi.mock('@/lib/features', () => ({ get TEMPERATURE_FEATURE_ENABLED() { return temperatureFeature.enabled } }))
+beforeEach(() => { temperatureFeature.enabled = true })
+
 const mocks = vi.hoisted(() => ({
   devices: [{ id: 'device-test', deviceName: 'Test station', deviceSn: 'TEST-DEVICE', isActive: true }],
   readings: [{
@@ -194,4 +199,16 @@ describe('historical temperature display', () => {
     expect(within(screen.getByText('Battery Level').parentElement!).getByText('—')).toBeInTheDocument()
     expect(within(screen.getByText('Avg Power Output').parentElement!).getByText('—')).toBeInTheDocument()
   })
+})
+
+it('should hide history temperature columns, summary and independent rows when paused', () => {
+  temperatureFeature.enabled = false
+  mocks.temperatureReadings = [{ deviceId: 'device-test', deviceName: 'Test station', deviceSn: 'TEST-DEVICE', recordedAt: 1_790_000_001_000, temperature: 39, temperatureSampleCount: 1, temperatureMeasurement: 'bms-generic-mqtt-v1' }]
+  mocks.temperatureSummary = { avgTemperature: 39, maxTemperature: 39, temperatureReadings: 1 }
+  render(<HistoryPage />)
+  expect(screen.queryByRole('columnheader', { name: 'Temperature' })).not.toBeInTheDocument()
+  expect(screen.queryByText('Avg Temperature')).not.toBeInTheDocument()
+  expect(screen.queryByText('Temperature observation')).not.toBeInTheDocument()
+  expect(screen.getByRole('columnheader', { name: 'Input Power' })).toBeInTheDocument()
+  expect(screen.getAllByRole('row')).toHaveLength(2)
 })

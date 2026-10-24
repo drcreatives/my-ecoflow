@@ -1,6 +1,11 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DeviceStatusCard } from './DeviceStatusCard'
+
+// Existing feature coverage remains runnable when temperature is re-enabled.
+const temperatureFeature = vi.hoisted(() => ({ enabled: true }))
+vi.mock('@/lib/features', () => ({ get TEMPERATURE_FEATURE_ENABLED() { return temperatureFeature.enabled } }))
+beforeEach(() => { temperatureFeature.enabled = true })
 
 vi.mock('@/hooks/useConvexData', () => ({
   useConvexDeviceMutations: () => ({ registerDevice: vi.fn(), unregisterDevice: vi.fn() }),
@@ -130,4 +135,12 @@ describe('DeviceStatusCard telemetry', () => {
     expect(screen.getByRole('status')).toHaveAttribute('aria-label', expect.stringContaining(`Stale temperature. Temperature reported by the device at ${new Date(receivedAt).toLocaleString()}`))
     expect(screen.queryByText('99°C')).not.toBeInTheDocument()
   })
+})
+
+it('should hide temperature and progress while keeping dashboard power when paused', () => {
+  temperatureFeature.enabled = false
+  render(<DeviceStatusCard device={{ ...device, displayTelemetry: { temperature: { value: 39, source: 'mqtt', receivedAt: Date.now() } }, temperatureRefreshing: true }} />)
+  expect(screen.queryByLabelText(/Temperature/)).not.toBeInTheDocument()
+  expect(screen.queryByText(/°C|Updating|Checking temperature/)).not.toBeInTheDocument()
+  expect(screen.getByText('100W')).toBeInTheDocument()
 })

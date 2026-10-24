@@ -1,5 +1,6 @@
 'use client'
 
+import { TEMPERATURE_FEATURE_ENABLED } from '@/lib/features'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { 
@@ -135,7 +136,7 @@ function HistoryPage() {
     }
   )
 
-  const mergedReadings = useMemo(() => mergeTemperatureHistoryReadings(readings, temperatureReadings), [readings, temperatureReadings])
+  const mergedReadings = useMemo(() => TEMPERATURE_FEATURE_ENABLED ? mergeTemperatureHistoryReadings(readings, temperatureReadings) : readings, [readings, temperatureReadings])
   // Reverse the combined display rows; power calculations continue to use the original stream.
   const tableReadings = useMemo(() => [...mergedReadings].reverse(), [mergedReadings])
   const lastRecordedAt = mergedReadings.reduce((latest, reading) => Math.max(latest, new Date(reading.recordedAt).getTime()), 0)
@@ -190,7 +191,7 @@ function HistoryPage() {
   const getAggregationLabel = (aggregation: HistoryFilters['aggregation']) => {
     switch (aggregation) {
       case 'raw':
-        return samplingIntervalMs || temperatureSamplingIntervalMs ? 'Raw Data (sampled)' : 'Raw Data'
+        return samplingIntervalMs || (TEMPERATURE_FEATURE_ENABLED && temperatureSamplingIntervalMs) ? 'Raw Data (sampled)' : 'Raw Data'
       case '5m':
         return '5 Minute Avg'
       case '1h':
@@ -400,8 +401,8 @@ function HistoryPage() {
           )}
 
           {/* Summary Cards */}
-          {(summary || temperatureSummary) && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[18px]">
+          {(summary || (TEMPERATURE_FEATURE_ENABLED && temperatureSummary)) && (
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${TEMPERATURE_FEATURE_ENABLED ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-[18px]`}>
               <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
                 <div className="flex items-center justify-between mb-2">
                   <Activity className="w-5 h-5 text-brand-tertiary" />
@@ -435,7 +436,7 @@ function HistoryPage() {
                 <div className="text-sm text-text-secondary">Avg Power Output</div>
               </div>
 
-              <div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
+              {TEMPERATURE_FEATURE_ENABLED && (<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
                 <div className="flex items-center justify-between mb-2">
                   <Thermometer className="w-5 h-5 text-danger" />
                   <span className="text-xs text-text-muted">Max: {formatValue(temperatureStats?.maxTemperature, '°C')}</span>
@@ -447,7 +448,7 @@ function HistoryPage() {
                 <div className="text-xs text-text-muted mt-1">
                   {(temperatureSampledReadings ?? 0).toLocaleString()} temperature readings{temperatureSamplingIntervalMs ? ' (sampled)' : ''}
                 </div>
-              </div>
+              </div>)}
             </div>
           )}
 
@@ -512,7 +513,7 @@ function HistoryPage() {
                       <th className="text-left p-4 text-sm font-medium text-text-secondary">AC Output</th>
                       <th className="text-left p-4 text-sm font-medium text-text-secondary">DC Output</th>
                       <th className="text-left p-4 text-sm font-medium text-text-secondary">USB Output</th>
-                      <th className="text-left p-4 text-sm font-medium text-text-secondary">Temperature</th>
+                      {TEMPERATURE_FEATURE_ENABLED && (<th className="text-left p-4 text-sm font-medium text-text-secondary">Temperature</th>)}
                       <th className="text-left p-4 text-sm font-medium text-text-secondary">Status</th>
                     </tr>
                   </thead>
@@ -562,12 +563,12 @@ function HistoryPage() {
                           <td className="p-4 text-sm text-success font-medium">
                             {formatValue(reading.usbOutputWatts, 'W', 0)}
                           </td>
-                          <td className="p-4 text-sm text-danger font-medium">
+                          {TEMPERATURE_FEATURE_ENABLED && (<td className="p-4 text-sm text-danger font-medium">
                             {formatValue(reading.temperature, '°C')}
                             {filters.aggregation !== 'raw' && (reading.temperatureSampleCount ?? 0) > 0 && (
                               <div className="mt-1 text-xs text-text-muted">{reading.temperatureSampleCount} temperature readings</div>
                             )}
-                          </td>
+                          </td>)}
                           <td className="p-4 text-sm">
                             <span className={`px-2 py-1 rounded-pill text-xs font-medium ${
                               reading.status === 'charging' ? 'bg-brand-primary/10 text-brand-primary' :

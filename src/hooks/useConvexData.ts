@@ -6,6 +6,7 @@ import { Id } from "../../convex/_generated/dataModel";
 import type { DcInputSource } from "@/types";
 import { getReadingFreshness, getReadingStaleAt } from "@/lib/reading-status";
 import { getTemperatureAge, resolveTemperatureMetric } from "@/lib/display-telemetry";
+import { TEMPERATURE_FEATURE_ENABLED } from "@/lib/features";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   READING_WINDOW_REFRESH_EVENT,
@@ -30,7 +31,7 @@ export function useConvexDevices() {
     const readingExpiries = (latestReadings ?? [])
       .filter((entry) => activeIds.has(entry.deviceId))
       .map((entry) => getReadingStaleAt(entry.reading?.recordedAt, collectionInterval));
-    const temperatureExpiries = (rawDevices ?? [])
+    const temperatureExpiries = (TEMPERATURE_FEATURE_ENABLED ? rawDevices ?? [] : [])
       .flatMap((device) => {
         const metric = resolveTemperatureMetric(device.displayTelemetry?.temperature, now);
         return [metric.expiresAt, getTemperatureAge(metric, freshnessNow).nextUpdateAt];
@@ -74,7 +75,7 @@ export function useConvexDevices() {
         ...d,
         // compat fields expected by DeviceData / DeviceStatusCard
         userId: "", // not exposed to client, placeholder for type compat
-        temperatureRefreshing: d.temperatureRefreshing ?? false,
+        temperatureRefreshing: TEMPERATURE_FEATURE_ENABLED && (d.temperatureRefreshing ?? false),
         readingFreshness,
         status,
         currentReading: reading,
@@ -247,10 +248,10 @@ function useReadingHistoryWindow(deviceId: string | null, enabled: boolean, wind
   );
   const latestReadings = useQuery(api.readings.latest, enabled && deviceId ? {} : "skip");
   const latestTemperatureAt = useQuery(api.readings.latestTemperatureTimestamp,
-    enabled && deviceId ? { deviceId: deviceId as Id<"devices"> } : "skip");
+    TEMPERATURE_FEATURE_ENABLED && enabled && deviceId ? { deviceId: deviceId as Id<"devices"> } : "skip");
   const latestRecordedAt = latestReadings?.find(reading => reading.deviceId === deviceId)?.reading?.recordedAt;
   const latestTimestamp = useMemo(
-    () => enabled ? Math.min(Math.max(latestRecordedAt ?? 0, latestTemperatureAt ?? 0), Date.now()) : 0,
+    () => enabled ? Math.min(Math.max(latestRecordedAt ?? 0, TEMPERATURE_FEATURE_ENABLED ? latestTemperatureAt ?? 0 : 0), Date.now()) : 0,
     [enabled, latestRecordedAt, latestTemperatureAt]
   );
 
@@ -317,10 +318,10 @@ export function useConvexHistoryReadings(
     samplingIntervalMs: result?.samplingIntervalMs ?? null,
     energyTotals: result?.energyTotals ?? null,
     sampledReadings: result?.sampledReadings ?? 0,
-    temperatureReadings: result?.temperatureReadings ?? [],
-    temperatureSummary: result?.temperatureSummary ?? null,
-    temperatureSamplingIntervalMs: result?.temperatureSamplingIntervalMs ?? null,
-    temperatureSampledReadings: result?.temperatureSampledReadings ?? 0,
+    temperatureReadings: TEMPERATURE_FEATURE_ENABLED ? result?.temperatureReadings ?? [] : [],
+    temperatureSummary: TEMPERATURE_FEATURE_ENABLED ? result?.temperatureSummary ?? null : null,
+    temperatureSamplingIntervalMs: TEMPERATURE_FEATURE_ENABLED ? result?.temperatureSamplingIntervalMs ?? null : null,
+    temperatureSampledReadings: TEMPERATURE_FEATURE_ENABLED ? result?.temperatureSampledReadings ?? 0 : 0,
     collectionIntervalMinutes: collectionSettings === undefined
       ? null : Math.max(1, collectionSettings?.collectionIntervalMinutes ?? 5),
     isLoading: result === undefined && deviceId !== null,

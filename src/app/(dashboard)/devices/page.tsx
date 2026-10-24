@@ -1,5 +1,6 @@
 "use client";
 
+import { TEMPERATURE_FEATURE_ENABLED } from '@/lib/features'
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -122,7 +123,7 @@ const DevicesPage = () => {
 
           {/* Metrics Grid */}
           {device.online && device.currentReading && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div className={`grid grid-cols-2 ${TEMPERATURE_FEATURE_ENABLED ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4 mb-4`}>
               {/* Battery */}
               <div className="flex items-center gap-2">
                 <Battery
@@ -162,13 +163,13 @@ const DevicesPage = () => {
               </div>
 
               {/* Temperature */}
-              <DeviceTemperature metric={temperature} refreshing={device.temperatureRefreshing} />
+              {TEMPERATURE_FEATURE_ENABLED && <DeviceTemperature metric={temperature} refreshing={device.temperatureRefreshing} />}
             </div>
           )}
 
-          {(!device.online || !device.currentReading) && (
+          {TEMPERATURE_FEATURE_ENABLED && (!device.online || !device.currentReading) && (
             <div className="mb-4 p-3 bg-surface-2 rounded-inner">
-              <DeviceTemperature metric={temperature} refreshing={device.temperatureRefreshing} />
+              {TEMPERATURE_FEATURE_ENABLED && <DeviceTemperature metric={temperature} refreshing={device.temperatureRefreshing} />}
             </div>
           )}
 

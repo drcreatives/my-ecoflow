@@ -1,5 +1,6 @@
 "use client"
 
+import { TEMPERATURE_FEATURE_ENABLED } from '@/lib/features'
 import { useEffect, useState, useMemo } from "react";
 import { useConvexDevices, useConvexHistoryReadings } from "@/hooks/useConvexData";
 import { CombinedChart, BatteryLevelChart, TemperatureChart, ChartZoomControls, transformReadingsToChartData, transformTemperatureReadingsToChartData, type ChartRange } from "@/components/charts/HistoryCharts";
@@ -159,7 +160,7 @@ function AnalyticsPage() {
 		[chartReadings, filters.aggregation, samplingIntervalMs, collectionIntervalMinutes]
 	);
 	const temperatureChartData = useMemo(
-		() => transformTemperatureReadingsToChartData(temperatureReadings ?? [], filters.aggregation),
+		() => transformTemperatureReadingsToChartData(TEMPERATURE_FEATURE_ENABLED ? temperatureReadings ?? [] : [], filters.aggregation),
 		[temperatureReadings, filters.aggregation]
 	);
 	const [chartRange, setChartRange] = useState<ChartRange>({
@@ -367,8 +368,8 @@ function AnalyticsPage() {
 							{' '}Summaries and charts cover the displayed sample, not every stored reading.
 						</p>
 					)}
-					{(summary || temperatureSummary) && (
-						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[18px]">
+					{(summary || (TEMPERATURE_FEATURE_ENABLED && temperatureSummary)) && (
+						<div className={`grid grid-cols-1 sm:grid-cols-2 ${TEMPERATURE_FEATURE_ENABLED ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-[18px]`}>
 							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
 								<div className="flex items-center justify-between mb-2">
 									<BarChart3 className="w-5 h-5 text-brand-tertiary" />
@@ -399,7 +400,7 @@ function AnalyticsPage() {
 								</div>
 								<div className="text-sm text-text-secondary">Avg Power Output</div>
 							</div>
-							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
+							{TEMPERATURE_FEATURE_ENABLED && (<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
 								<div className="flex items-center justify-between mb-2">
 									<Thermometer className="w-5 h-5 text-danger" />
 									<span className="text-xs text-text-muted">Max: {formatValue(temperatureStats?.maxTemperature, "°C")}</span>
@@ -411,7 +412,7 @@ function AnalyticsPage() {
 								<div className="text-xs text-text-muted mt-1">
 									{(temperatureSampledReadings ?? 0).toLocaleString()} temperature readings{temperatureSamplingIntervalMs ? ' (sampled)' : ''}
 								</div>
-							</div>
+							</div>)}
 						</div>
 					)}
 
@@ -517,7 +518,7 @@ function AnalyticsPage() {
 								data={visibleChartData}
 								temperatureData={visibleTemperatureChartData}
 								height={400}
-								defaultChart={chartData.length ? 'power' : 'temperature'}
+								defaultChart={TEMPERATURE_FEATURE_ENABLED && !chartData.length ? 'temperature' : 'power'}
 							/>
 						)}
 					</div>
@@ -538,7 +539,7 @@ function AnalyticsPage() {
 							</div>}
 
 							{/* Temperature Chart */}
-							<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
+							{TEMPERATURE_FEATURE_ENABLED && (<div className="bg-surface-1 border border-stroke-subtle rounded-card shadow-card p-[18px]">
 								<div className="flex items-center gap-2 mb-4">
 									<Thermometer className="w-5 h-5 text-danger" />
 									<h3 className="text-section-title font-medium text-text-primary">Temperature</h3>
@@ -547,7 +548,7 @@ function AnalyticsPage() {
 									data={visibleTemperatureChartData}
 									height={250}
 								/>
-							</div>
+							</div>)}
 						</div>
 					)}
 				</div>

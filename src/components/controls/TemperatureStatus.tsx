@@ -2,6 +2,7 @@
 
 import { useId, useState } from 'react'
 import { getTemperatureAge, type TemperatureMetric } from '@/lib/display-telemetry'
+import { TEMPERATURE_FEATURE_ENABLED } from '@/lib/features'
 import { cn } from '@/lib/utils'
 
 interface TemperatureStatusProps {
@@ -44,6 +45,7 @@ function CompactTemperatureStatus({ metric, refreshing, className }: Temperature
 }
 
 export function TemperatureStatus({ metric, refreshing, className, compact = false }: TemperatureStatusProps) {
+  if (!TEMPERATURE_FEATURE_ENABLED) return null
   if (compact) return <CompactTemperatureStatus metric={metric} refreshing={refreshing} className={className} />
   return (
     <span className={cn('flex flex-col text-xs text-text-muted', className)}>

@@ -7,6 +7,11 @@ import type { InputSourceReading } from '@/lib/reading-status';
 import type { DisplayTelemetry } from '@/types';
 import { getTemperatureAge, resolveTemperatureMetric } from '@/lib/display-telemetry';
 
+// Existing feature coverage remains runnable when temperature is re-enabled.
+const temperatureFeature = vi.hoisted(() => ({ enabled: true }))
+vi.mock('@/lib/features', () => ({ get TEMPERATURE_FEATURE_ENABLED() { return temperatureFeature.enabled } }))
+beforeEach(() => { temperatureFeature.enabled = true })
+
 const mockState = vi.hoisted(() => ({
   status: null as "online" | "offline" | "error" | null,
   recordedAt: 0,
@@ -161,3 +166,11 @@ describe("device telemetry health", () => {
     expect(result.current.devices[0]).toMatchObject({ online: false, readingFreshness: "stale" });
   });
 });
+
+it('should suppress thermal progress without changing power health when paused', () => {
+  temperatureFeature.enabled = false
+  mockState.temperatureRefreshing = true
+  const { result } = renderHook(() => useConvexDevices())
+  expect(result.current.devices[0].temperatureRefreshing).toBe(false)
+  expect(result.current.devices[0].online).toBe(true)
+})
