@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import localFont from 'next/font/local'
 import { Toaster } from 'sonner'
 import { ConvexClientProvider } from '@/components/ConvexClientProvider'
+import { isPowerApp } from '@/lib/app-mode'
 import './globals.css'
 
 const neueMontreal = localFont({
@@ -20,7 +21,10 @@ const neueMontreal = localFont({
   fallback: ['Inter', 'SF Pro Text', 'Segoe UI', 'Roboto', 'system-ui', 'sans-serif'],
 })
 
-export const metadata: Metadata = {
+export const metadata: Metadata = isPowerApp ? {
+  title: 'Power · Meter operations',
+  description: 'Monitor and manage your simulated prepaid meter fleet',
+} : {
   title: 'EcoFlow Dashboard',
   description: 'Monitor and manage your EcoFlow Delta 2 power station',
   keywords: ['EcoFlow', 'Delta 2', 'Power Station', 'Battery Monitor', 'Energy Management'],

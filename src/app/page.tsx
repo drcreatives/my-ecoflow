@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useConvexAuth } from 'convex/react'
 import { Loader2 } from 'lucide-react'
+import { appHome } from '@/lib/app-mode'
 
 export default function Home() {
   const router = useRouter()
@@ -13,7 +14,7 @@ export default function Home() {
     if (isLoading) return
 
     if (isAuthenticated) {
-      router.push('/dashboard')
+      router.replace(appHome)
     } else {
       router.push('/login')
     }

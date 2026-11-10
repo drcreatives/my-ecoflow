@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { appHome, isPowerApp } from '@/lib/app-mode'
 import Link from 'next/link'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { useConvexAuth } from 'convex/react'
@@ -38,7 +39,7 @@ export default function AuthPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      router.push('/dashboard')
+      router.replace(appHome)
     }
   }, [isAuthenticated, authLoading, router])
 
@@ -87,7 +88,7 @@ export default function AuthPage() {
       formDataObj.set('flow', isLogin ? 'signIn' : 'signUp')
 
       await signIn('password', formDataObj)
-      router.push('/dashboard')
+      router.replace(appHome)
     } catch (err) {
       console.error('Auth error:', err)
       const message = err instanceof Error ? err.message : 'An unexpected error occurred'
@@ -132,10 +133,10 @@ export default function AuthPage() {
             <Power className="w-7 h-7 sm:w-8 sm:h-8 text-bg-base" />
           </div>
           <h1 className="text-page-title font-medium text-text-primary mb-2">
-            EcoFlow Dashboard
+            {isPowerApp ? 'Power' : 'EcoFlow Dashboard'}
           </h1>
           <p className="text-text-muted text-sm sm:text-base">
-            Monitor and control your EcoFlow devices
+            {isPowerApp ? 'Sign in to manage your demo meter fleet' : 'Monitor and control your EcoFlow devices'}
           </p>
         </div>
 
@@ -169,12 +170,13 @@ export default function AuthPage() {
           <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
             {/* Email Field */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label htmlFor="login-email" className="block text-sm font-medium text-text-secondary mb-2">
                 Email Address
               </label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-text-muted z-10" />
                 <input
+                  id="login-email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
@@ -195,12 +197,13 @@ export default function AuthPage() {
 
             {/* Password Field */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label htmlFor="login-password" className="block text-sm font-medium text-text-secondary mb-2">
                 Password
               </label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-text-muted z-10" />
                 <input
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
@@ -229,12 +232,13 @@ export default function AuthPage() {
             {/* Confirm Password Field (Signup only) */}
             {!isLogin && (
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
+                <label htmlFor="login-confirm-password" className="block text-sm font-medium text-text-secondary mb-2">
                   Confirm Password
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-text-muted z-10" />
                   <input
+                    id="login-confirm-password"
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={formData.confirmPassword || ''}
                     onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
@@ -306,25 +310,26 @@ export default function AuthPage() {
           </div>
         </div>
 
-        {/* Quick Test Links */}
-        <div className="mt-8 text-center">
-          <p className="text-text-muted text-sm mb-4">Development Tools</p>
-          <div className="flex space-x-4 justify-center">
-            <a 
-              href="/api/test-ecoflow" 
-              target="_blank"
-              className="text-brand-tertiary hover:text-brand-tertiary/80 text-sm transition-colors"
-            >
-              Test API
-            </a>
-            <Link 
-              href="/" 
-              className="text-text-muted hover:text-text-secondary text-sm transition-colors"
-            >
-              Home
-            </Link>
+        {!isPowerApp && (
+          <div className="mt-8 text-center">
+            <p className="text-text-muted text-sm mb-4">Development Tools</p>
+            <div className="flex space-x-4 justify-center">
+              <a
+                href="/api/test-ecoflow"
+                target="_blank"
+                className="text-brand-tertiary hover:text-brand-tertiary/80 text-sm transition-colors"
+              >
+                Test API
+              </a>
+              <Link
+                href="/"
+                className="text-text-muted hover:text-text-secondary text-sm transition-colors"
+              >
+                Home
+              </Link>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
