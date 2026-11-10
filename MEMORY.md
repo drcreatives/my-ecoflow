@@ -2,7 +2,7 @@
 
 Living repository memory for future coding sessions. This is a factual snapshot, not a substitute for reading the source.
 
-**Last devoted update:** 2026-10-24
+**Last devoted update:** 2026-11-10
 
 **Evidence reviewed:** current source/configuration, git history/status, `README.md`, `BACKGROUND_COLLECTION.md`, and all guidance under `.github/`; local regression tests, authorized Convex/Vercel production deployments and production verification on 2026-10-18, plus the shared-helper backend release, development pause and matched execution measurements on 2026-10-22.
 
@@ -434,6 +434,18 @@ Node 18+ is documented as the minimum. `package-lock.json` is authoritative for 
 
 - The user authorized committing and pushing all existing local collection/pause changes, then creating a new branch for REST/MQTT overlap. They explicitly approved three granular groups: backend helpers/temperature pause with tests and the safe environment template, frontend temperature hiding with tests, and this documentation. No credentials, generated files or unrelated branch work belong in those groups.
 - The current baseline passed explicit lint (39 existing warnings, zero errors), all 1,119 tests in 51 files with four fork workers and a 15-second test timeout, TypeScript and the local production build. Independent diff review found no blockers and confirmed unchanged signing/PD predicates, schema, crons, retention and authentication. Git hooks remain enabled. The next optimization must stay local for review before deployment, preserve live one-minute PD/PV proof and 90-day retention, and leave temperature off and cloud development paused.
+
+## Power meter proof of concept (2026-11-10)
+
+- The Power frontend shares Convex Auth, the existing database, and the dashboard design tokens. It uses an independent authenticated layout for /meters and /meters/[meterId]. NEXT_PUBLIC_APP_MODE=power sets Power branding and sends the root and login to /meters.
+- Each signed-in account can create one isolated fleet of 50 fictional meters. The mockMeters, mockMeterEvents and mockMeterReadings tables hold prepaid balances, activity and bounded load history. Credits are integer Wh, mock amounts are integer kobo, and the demo tariff is ₦200/kWh. Top-ups, suspension changes and explicit simulation use deduplicated, owner-checked mutations.
+- Supply depends on a positive balance and the absence of an admin hold. Top-ups restore an exhausted meter automatically. Recharging a manually held meter preserves the hold until admin reactivation. Connectivity is separate and offline telemetry is stale while simulated usage can continue.
+- The bounded simulate-mock-meters job uses oldest due work first, stops processing suspended/depleted meters, samples active load every 15 minutes, and honors DISABLE_CRONS and DISABLE_MOCK_METER_SIMULATION. The detail screen can apply up to 1 kWh of simulated usage to demonstrate cutoff immediately.
+- Release Power from the codex/mock-meter-monitoring branch to the dedicated Power Vercel project with power.devrunor.com and the shared Convex production URL. Preserve exact deployed EcoFlow code when assembling the additive Convex release, since the collector checkout includes unrelated local changes.
+
+- The 2026-11-10 release deployed Power to the dedicated Vercel project and attached power.devrunor.com. GO54 and public DNS resolve the Vercel CNAME and the HTTPS Power login returns 200. Production Convex readback matched all 115 prior function and HTTP contracts and retained 67 existing bundles byte-for-byte, including the app definition. The three mock tables, five indexes, seven function contracts and simulator cron were added to the existing database.
+
+- Final verification passed lint (39 existing warnings, zero errors), type-check, all 1,157 Vitest tests in 55 files, and local and Vercel production builds. On this Windows host the full Vitest rerun used threads, two workers and 20-second test/hook timeouts after initial fork and timeout failures. Live Playwright verified a synthetic signup, exact 50-meter seed, combined filters, natural usage tick, cutoff, mock recharge and automatic restoration, hold precedence, manual restoration, reload persistence, 390px mobile layout and sign-out.
 
 ## How to update this memory devotedly
 
