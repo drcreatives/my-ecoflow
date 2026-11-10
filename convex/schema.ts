@@ -3,9 +3,20 @@ import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 import { chargingTypeSourceValidator, dcInputSourceValidator, inputMeasurementValidator, inputQualityValidator } from "./readingQuality";
 import { displayTelemetryValidator } from "./displayTelemetry";
+import { mockMeterFields, mockMeterEventFields, mockMeterReadingFields } from "./mockMeterModel";
 
 export default defineSchema({
   ...authTables,
+
+  // ─── Mock prepaid meters ───────────────────────────────────────────────────
+  mockMeters: defineTable(mockMeterFields)
+    .index("by_userId", ["userId"])
+    .index("by_nextSimulationAt", ["nextSimulationAt"]),
+  mockMeterEvents: defineTable(mockMeterEventFields)
+    .index("by_meterId_createdAt", ["meterId", "createdAt"])
+    .index("by_userId_requestId", ["userId", "requestId"]),
+  mockMeterReadings: defineTable(mockMeterReadingFields)
+    .index("by_meterId_recordedAt", ["meterId", "recordedAt"]),
 
   // ─── Users ──────────────────────────────────────────────────────────────────
   users: defineTable({

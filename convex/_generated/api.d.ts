@@ -8,6 +8,11 @@
  * @module
  */
 
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
 import type * as admin from "../admin.js";
 import type * as auth from "../auth.js";
 import type * as backup from "../backup.js";
@@ -19,6 +24,7 @@ import type * as devices_internal from "../devices_internal.js";
 import type * as displayTelemetry from "../displayTelemetry.js";
 import type * as ecoflow from "../ecoflow.js";
 import type * as ecoflowMqttDiagnostics from "../ecoflowMqttDiagnostics.js";
+import type * as ecoflowProtocol from "../ecoflowProtocol.js";
 import type * as ecoflowTemperature from "../ecoflowTemperature.js";
 import type * as ecoflowTemperatureMqttGet from "../ecoflowTemperatureMqttGet.js";
 import type * as email from "../email.js";
@@ -32,6 +38,8 @@ import type * as googleDrive_queries from "../googleDrive_queries.js";
 import type * as historyAnalytics from "../historyAnalytics.js";
 import type * as http from "../http.js";
 import type * as migrations from "../migrations.js";
+import type * as mockMeterModel from "../mockMeterModel.js";
+import type * as mockMeters from "../mockMeters.js";
 import type * as readingExport from "../readingExport.js";
 import type * as readingQuality from "../readingQuality.js";
 import type * as readings from "../readings.js";
@@ -39,15 +47,18 @@ import type * as schedules from "../schedules.js";
 import type * as schedules_internal from "../schedules_internal.js";
 import type * as settings from "../settings.js";
 import type * as solarPanelTelemetry from "../solarPanelTelemetry.js";
+import type * as temperatureCollection from "../temperatureCollection.js";
 import type * as temperatureHistory from "../temperatureHistory.js";
 import type * as users from "../users.js";
 
-import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
-} from "convex/server";
-
+/**
+ * A utility for referencing Convex functions in your app's API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   auth: typeof auth;
@@ -60,6 +71,7 @@ declare const fullApi: ApiFromModules<{
   displayTelemetry: typeof displayTelemetry;
   ecoflow: typeof ecoflow;
   ecoflowMqttDiagnostics: typeof ecoflowMqttDiagnostics;
+  ecoflowProtocol: typeof ecoflowProtocol;
   ecoflowTemperature: typeof ecoflowTemperature;
   ecoflowTemperatureMqttGet: typeof ecoflowTemperatureMqttGet;
   email: typeof email;
@@ -73,6 +85,8 @@ declare const fullApi: ApiFromModules<{
   historyAnalytics: typeof historyAnalytics;
   http: typeof http;
   migrations: typeof migrations;
+  mockMeterModel: typeof mockMeterModel;
+  mockMeters: typeof mockMeters;
   readingExport: typeof readingExport;
   readingQuality: typeof readingQuality;
   readings: typeof readings;
@@ -80,34 +94,15 @@ declare const fullApi: ApiFromModules<{
   schedules_internal: typeof schedules_internal;
   settings: typeof settings;
   solarPanelTelemetry: typeof solarPanelTelemetry;
+  temperatureCollection: typeof temperatureCollection;
   temperatureHistory: typeof temperatureHistory;
   users: typeof users;
 }>;
-
-/**
- * A utility for referencing Convex functions in your app's public API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
 export declare const api: FilterApi<
   typeof fullApi,
   FunctionReference<any, "public">
 >;
-
-/**
- * A utility for referencing Convex functions in your app's internal API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = internal.myModule.myFunction;
- * ```
- */
 export declare const internal: FilterApi<
   typeof fullApi,
   FunctionReference<any, "internal">
 >;
-
-export declare const components: {};

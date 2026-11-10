@@ -3,6 +3,13 @@ import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 
+// Fictional prepaid-meter usage, bounded independently from EcoFlow collection.
+crons.interval(
+  "simulate-mock-meters",
+  { minutes: 1 },
+  internal.mockMeters.simulateFleet
+);
+
 // ─── Collect device readings every minute ─────────────────────────────────────
 // The action itself checks each user's collectionIntervalMinutes before
 // actually hitting the EcoFlow API, so this runs as a lightweight tick.
